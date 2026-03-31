@@ -65,7 +65,7 @@ function renderGenderBar(confidence, label) {
   const scoreEl = document.getElementById('mc-gender-score')
   if (!thumb || !scoreEl) return
 
-  const scaledConf = Math.min(confidence * 1.7, 1)
+  const scaledConf = Math.min(confidence, 1)
   const pct = label === 'female'
     ? 50 + scaledConf * 50
     : 50 - scaledConf * 50
@@ -73,7 +73,7 @@ function renderGenderBar(confidence, label) {
   requestAnimationFrame(() => { thumb.style.left = `${pct}%` })
   thumb.dataset.gender = label
 
-  const pctDisplay = Math.min(Math.round(confidence * 170), 100)
+  const pctDisplay = Math.min(Math.round(confidence * 100), 100)
   const symbol = label === 'female' ? '♀' : '♂'
   scoreEl.textContent = `${pctDisplay}% ${symbol}`
 }
@@ -138,7 +138,7 @@ export function renderMetricsPanel(segment) {
 
   // ── Gender score bar (Engine A confidence as primary) ────
   const conf = segment.confidence != null ? segment.confidence : (a.gender_score / 100)
-  renderGenderBar(conf, segment.label || 'female')
+  renderGenderBar(conf, segment.label)
 
   // Reference: Engine B acoustic gender_score
   const refEl = document.getElementById('mc-gender-score-ref')
