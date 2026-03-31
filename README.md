@@ -2,6 +2,13 @@
 
 基于深度学习与声学特征分析的音频性别识别 Web 应用。
 
+## 致谢
+
+本项目使用了以下开源成果：
+
+- [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) — Doukhan et al., ICASSP 2018，MIT License
+- [WaveSurfer.js](https://wavesurfer.xyz/) — 音频波形可视化
+
 ## 项目简介
 
 VoiceScope 是一款浏览器端音频分析工具，能够：
@@ -17,8 +24,7 @@ VoiceScope 是一款浏览器端音频分析工具，能够：
 |------|------|
 | 前端 | Vanilla JS + Vite + WaveSurfer.js |
 | 后端 | Python · FastAPI · Uvicorn |
-| 引擎 A（分段分类） | inaSpeechSegmenter（Doukhan et al., ICASSP 2018） |
-| 引擎 B（声学分析） | librosa · SciPy LPC · pyin 基频追踪 |
+| 引擎 | inaSpeechSegmenter（Doukhan et al., ICASSP 2018） |
 | 预训练模型 | `interspeech2023_cvfr.hdf5`（TensorFlow/Keras） |
 
 ## 目录结构
@@ -41,31 +47,6 @@ VoiceScope 是一款浏览器端音频分析工具，能够：
 │       └── styles/
 ├── inaSpeechSegmenter-interspeech23/    # 本地 vendored 依赖
 └── output/                              # 分析结果输出目录
-```
-
-## 快速开始
-
-### 环境要求
-
-- Python 3.11
-- Node.js 18+
-- ffmpeg（inaSpeechSegmenter 的音频解码依赖）
-
-### 安装
-
-```bash
-# 1. 安装 Python 依赖
-python -m venv venv
-source venv/bin/activate       # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# 2. 安装本地 vendored 库
-pip install -e ./inaSpeechSegmenter-interspeech23
-
-# 3. 安装前端依赖
-cd frontend
-npm install
-```
 
 ### 运行
 
@@ -78,25 +59,7 @@ python main.py
 cd frontend
 npm run dev
 ```
-
-访问 [http://localhost:5173](http://localhost:5173) 即可使用。
-
-## 声学特征说明
-
-| 特征 | 描述 |
-|------|------|
-| F0（基频） | 语音的音高，单位 Hz。女性通常 175–255 Hz，男性 85–155 Hz |
-| F1/F2/F3（共振峰） | 声道谐振频率，通过 LPC 分析提取 |
-| 频谱倾斜 | 低频与高频能量之比（dB/倍频程），负值越大越偏男性化 |
-| 共鸣评分 | 基于 F3 估算声道长度后映射到 0–100% |
-| 综合性别评分 | 加权融合：音高 45% + 共振峰 30% + 共鸣 15% + 频谱倾斜 10% |
-
-## 致谢
-
-本项目使用了以下开源成果：
-
-- [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) — Doukhan et al., ICASSP 2018，MIT License
-- [WaveSurfer.js](https://wavesurfer.xyz/) — 音频波形可视化
+访问端口即可使用。
 
 ## 声明
 
