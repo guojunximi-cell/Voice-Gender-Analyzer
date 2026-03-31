@@ -2,8 +2,18 @@ import asyncio
 import os
 import tempfile
 import time
-import librosa
 import numpy as np
+
+# numpy 2.x made np.stack() reject generators; patch it early so librosa/
+# inaSpeechSegmenter code that passes generator expressions still works.
+_orig_np_stack = np.stack
+def _np_stack_compat(arrays, *args, **kwargs):
+    if not isinstance(arrays, (list, tuple)):
+        arrays = list(arrays)
+    return _orig_np_stack(arrays, *args, **kwargs)
+np.stack = _np_stack_compat
+
+import librosa
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
@@ -202,8 +212,10 @@ async def _do_analyze(file: UploadFile):
 
     try:
         # ── Engine A: 时间分段 ─────────────────────────────────
+        if seg is None:
+            raise RuntimeError("Engine A (inaSpeechSegmenter) 未能成功加载，无法分析")
         print("⚙️  Engine A 分析中...")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         segmentation_result = await loop.run_in_executor(None, seg, tmp_path)
         # segmentation_result: [('male'|'female'|..., start, end), ...]
 
@@ -308,7 +320,7 @@ async def _do_analyze(file: UploadFile):
                 "overall_f0_median_hz":   overall_f0,
                 "overall_gender_score":   overall_gender_score,
                 "overall_confidence":     overall_confidence,
-                "dominant_label":         "female" if female_ratio >= 0.5 else "male",
+                "dominant_label":         ("female" if female_ratio >= 0.5 else "male") if total_voice_sec > 0 else None,
             },
             "analysis": analysis_data,
         }
