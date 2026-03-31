@@ -5,6 +5,7 @@ import time
 import librosa
 import numpy as np
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
@@ -85,8 +86,23 @@ async def _check_rate_limit(ip: str) -> None:
             )
         _ip_call_times[ip].append(now)
 
+seg = None
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    global seg
+    print("🚀 正在将 AI 模型载入内存...")
+    try:
+        loop = asyncio.get_event_loop()
+        seg = await loop.run_in_executor(None, lambda: Segmenter(detect_gender=True))
+        print("✅ Engine A (inaSpeechSegmenter) 加载完毕")
+    except Exception as e:
+        print(f"❌ Engine A 加载失败: {e}")
+        seg = None
+    yield
+
 # 1. FastAPI 实例
-app = FastAPI(title="VFP Voice Analysis API", version="2.0")
+app = FastAPI(title="VFP Voice Analysis API", version="2.0", lifespan=lifespan)
 
 # 2. CORS
 app.add_middleware(
@@ -97,14 +113,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. 全局预加载模型
-print("🚀 正在将 AI 模型载入内存...")
-try:
-    seg = Segmenter(detect_gender=True)
-    print("✅ Engine A (inaSpeechSegmenter) 加载完毕")
-except Exception as e:
-    print(f"❌ Engine A 加载失败: {e}")
-    seg = None
+
+# ─── 根路由 ───────────────────────────────────────────────────
+@app.get("/")
+def root():
+    return {"status": "ok", "name": "VFP Voice Analysis API", "version": "2.0", "docs": "/docs"}
 
 
 # ─── 配置接口 ──────────────────────────────────────────────────
