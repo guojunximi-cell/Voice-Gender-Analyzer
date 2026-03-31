@@ -7,8 +7,10 @@ import numpy as np
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
-from typing import List
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from typing import List
 import uvicorn
 
 from inaSpeechSegmenter import Segmenter
@@ -113,11 +115,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 3. 静态文件（Vite 构建产物）
+_DIST_DIR = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+if os.path.isdir(_DIST_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_DIST_DIR, "assets")), name="assets")
 
-# ─── 根路由 ───────────────────────────────────────────────────
-@app.get("/")
-def root():
-    return {"status": "ok", "name": "VFP Voice Analysis API", "version": "2.0", "docs": "/docs"}
+    @app.get("/", include_in_schema=False)
+    def root():
+        return FileResponse(os.path.join(_DIST_DIR, "index.html"))
+else:
+    @app.get("/")
+    def root():
+        return {"status": "ok", "name": "VFP Voice Analysis API", "version": "2.0", "docs": "/docs"}
 
 
 # ─── 配置接口 ──────────────────────────────────────────────────
