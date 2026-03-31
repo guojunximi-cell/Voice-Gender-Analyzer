@@ -1,0 +1,10 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = ""          # Dockerfile CMD is used
+healthcheckPath = "/api/config"
+healthcheckTimeout = 300   # allow up to 5 min for model loading on first start
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

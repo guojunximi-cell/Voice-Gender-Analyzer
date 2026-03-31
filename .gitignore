@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+
+# Node.js
+frontend/node_modules/
+frontend/dist/
+
+# Output files
+output/*
+!output/.gitkeep
+
+# Audio scratch files
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.m4a
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log

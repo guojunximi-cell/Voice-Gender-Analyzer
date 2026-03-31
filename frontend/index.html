@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceScope — 声音性别分析</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/styles/main.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="10" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M6 11 Q8.5 6 11 11 Q13.5 16 16 11" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span>VoiceScope</span>
+    </div>
+    <button id="theme-toggle" class="icon-btn" aria-label="切换主题">
+      <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/>
+        <line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/>
+        <line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- ══════════════════════════ THREE-PANEL LAYOUT ════════════════════════ -->
+<div class="app-layout">
+
+  <!-- ══ LEFT PANEL: Scatter plot ════════════════════════════════════════ -->
+  <aside class="panel panel-left">
+    <div class="panel-header">
+      <span class="panel-title">历史分析</span>
+      <div class="panel-header-actions">
+        <!-- Upload new file (available at all times) -->
+        <label class="icon-btn" title="上传新文件" id="scatter-upload-label">
+          <input type="file" id="scatter-file-input" accept="audio/*" hidden />
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <path d="M8 11V3M4 7l4-4 4 4"/><path d="M2 13h12"/>
+          </svg>
+        </label>
+        <button id="delete-session-btn" class="icon-btn" title="删除此记录" hidden>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <path d="M3 3l10 10M13 3L3 13"/>
+          </svg>
+        </button>
+        <button id="clear-sessions-btn" class="icon-btn" title="清空历史">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 4h10M6 4V3h4v1M5 4l.5 9h5L11 4"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="scatter-wrap">
+      <canvas id="scatter-canvas"></canvas>
+    </div>
+  </aside>
+
+  <!-- ══ CENTER PANEL: Waveform + Stats + Segments ═══════════════════════ -->
+  <main class="panel panel-center">
+
+    <!-- Upload Zone (shown when no file is loaded) -->
+    <section id="upload-section" class="card upload-zone">
+      <input type="file" id="file-input" accept="audio/*" hidden />
+      <div class="upload-icon">
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+          <rect width="40" height="40" rx="12" fill="var(--accent-subtle)"/>
+          <path d="M20 26V14M14 20l6-6 6 6" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M13 29h14" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p class="upload-title">拖拽音频文件到此处</p>
+      <p class="upload-subtitle">或 <button class="link-btn" id="browse-btn">点击选择文件</button></p>
+      <p class="upload-hint">支持 MP3 · WAV · OGG · M4A · FLAC · 最大 200MB</p>
+    </section>
+
+    <!-- Player (shown after file is loaded) -->
+    <section id="player-section" class="card player-card" hidden>
+      <div class="file-info">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 2h7l3 3v9H3V2z"/><path d="M9 2v4h3"/>
+        </svg>
+        <span id="file-name" class="file-name">—</span>
+        <button id="change-file-btn" class="link-btn small">更换文件</button>
+      </div>
+      <div id="waveform-container" class="waveform-container">
+        <div id="waveform"></div>
+        <svg id="segment-overlay" class="segment-overlay" aria-hidden="true"></svg>
+        <div id="seg-tooltip" class="waveform-tooltip" aria-hidden="true"></div>
+        <div id="waveform-loading" class="waveform-loading">
+          <div class="skeleton-wave"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="play-btn" class="play-btn" disabled aria-label="播放">
+          <svg class="icon-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5V2.5z"/></svg>
+          <svg class="icon-pause" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" hidden>
+            <rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/>
+          </svg>
+        </button>
+        <span id="current-time" class="time-label">0:00</span>
+        <div id="seek-bar" class="seek-bar" role="slider" aria-label="播放进度">
+          <div class="seek-track">
+            <div id="seek-progress" class="seek-progress"></div>
+            <div id="seek-thumb"    class="seek-thumb"></div>
+          </div>
+        </div>
+        <span id="total-time" class="time-label">0:00</span>
+        <button id="analyze-btn" class="btn-primary" disabled>
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="7" cy="7" r="5.5"/><path d="M5 7l1.5 1.5L9 5"/>
+          </svg>
+          <span id="analyze-text">开始分析</span>
+          <span id="analyze-spinner" class="spinner" hidden></span>
+        </button>
+      </div>
+
+      <!-- Duck progress bar -->
+      <div id="duck-progress" class="duck-progress" hidden>
+        <div class="duck-track">
+          <div id="duck-fill" class="duck-fill"></div>
+          <span id="duck-emoji" class="duck-emoji">🦆</span>
+        </div>
+        <span id="duck-label" class="duck-label">正在分析…</span>
+      </div>
+    </section>
+
+    <!-- Stats cards -->
+    <section id="stats-section" class="stats-section" hidden>
+      <div class="stats-grid">
+        <div class="stat-card stat-male">
+          <div class="stat-dot"></div>
+          <div class="stat-label">男声</div>
+          <div class="stat-pct" id="male-pct">—</div>
+          <div class="stat-bar-wrap"><div class="stat-bar-fill" id="male-bar" style="width:0%"></div></div>
+          <div class="stat-duration" id="male-duration">—</div>
+        </div>
+        <div class="stat-card stat-female">
+          <div class="stat-dot"></div>
+          <div class="stat-label">女声</div>
+          <div class="stat-pct" id="female-pct">—</div>
+          <div class="stat-bar-wrap"><div class="stat-bar-fill" id="female-bar" style="width:0%"></div></div>
+          <div class="stat-duration" id="female-duration">—</div>
+        </div>
+        <div class="stat-card stat-other">
+          <div class="stat-dot"></div>
+          <div class="stat-label">其他</div>
+          <div class="stat-pct" id="other-pct">—</div>
+          <div class="stat-bar-wrap"><div class="stat-bar-fill" id="other-bar" style="width:0%"></div></div>
+          <div class="stat-duration" id="other-duration">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Segment list -->
+    <section id="segments-section" class="card" hidden>
+      <div class="section-header">
+        <h2 class="section-title">分段详情</h2>
+        <span id="segment-count" class="badge">—</span>
+      </div>
+      <div id="segments-list" class="segments-list"></div>
+    </section>
+
+  </main>
+
+  <!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
+  <aside class="panel panel-right">
+    <div class="panel-header">
+      <span class="panel-title">声学特征</span>
+      <span id="mc-segment-label" class="mc-segment-label"></span>
+    </div>
+
+    <div id="metrics-empty" class="metrics-placeholder">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true">
+        <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span>点击音段<br/>查看声学特征</span>
+    </div>
+
+    <div id="metrics-content" hidden>
+
+      <!-- F0 + Resonance cards side by side -->
+      <div class="mc-cards-row">
+        <div class="mc-card">
+          <div class="mc-card-title">基频 PITCH</div>
+          <div class="mc-card-big" id="mc-f0-median">— Hz</div>
+          <div class="mc-card-sub"  id="mc-f0-std">±— Hz</div>
+        </div>
+        <div class="mc-card">
+          <div class="mc-card-title">共鸣 RESONANCE</div>
+          <div class="mc-card-big" id="mc-res-val">—%</div>
+          <div class="mc-res-bar-wrap">
+            <div class="mc-res-bar-fill" id="mc-res-bar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collapsible: Pitch range -->
+      <details class="mc-collapsible" open>
+        <summary class="mc-collapsible-header">音高范围 (80–320 Hz)</summary>
+        <div class="mc-collapsible-body">
+          <div class="pitch-range-bar">
+            <div class="pitch-zone pitch-zone-male"   title="男性 85–155 Hz"></div>
+            <div class="pitch-zone pitch-zone-overlap" title="中间 145–185 Hz"></div>
+            <div class="pitch-zone pitch-zone-female"  title="女性 175–255 Hz"></div>
+            <div class="pitch-indicator" id="mc-pitch-indicator"></div>
+          </div>
+          <div class="pitch-range-labels">
+            <span>80</span><span>120</span><span>160</span>
+            <span>200</span><span>240</span><span>280</span><span>320</span>
+          </div>
+          <div class="pitch-legend">
+            <span class="legend-male">♂ 85–155 Hz</span>
+            <span class="legend-neutral">♂♀ 145–185 Hz</span>
+            <span class="legend-female">♀ 175–255 Hz</span>
+          </div>
+        </div>
+      </details>
+
+      <!-- Collapsible: Formants + Spectral Tilt -->
+      <details class="mc-collapsible" open>
+        <summary class="mc-collapsible-header">共振峰 / 频谱倾斜</summary>
+        <div class="mc-collapsible-body">
+          <div class="formants-grid">
+            <div class="formant-row"><span class="fn-label">F1</span><span class="fn-val" id="mc-f1">—</span></div>
+            <div class="formant-row"><span class="fn-label">F2</span><span class="fn-val" id="mc-f2">—</span></div>
+            <div class="formant-row"><span class="fn-label">F3</span><span class="fn-val" id="mc-f3">—</span></div>
+            <div class="formant-row"><span class="fn-label">倾斜</span><span class="fn-val" id="mc-tilt-val">—</span></div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Collapsible: Gender expression (Engine A as primary) -->
+      <details class="mc-collapsible" open>
+        <summary class="mc-collapsible-header">综合性别表达</summary>
+        <div class="mc-collapsible-body">
+          <div class="gender-primary-label">分类置信度 (Engine A · inaSpeechSegmenter)</div>
+          <div class="gender-spectrum">
+            <div class="gender-track">
+              <div class="gender-thumb" id="mc-gender-thumb" style="left:50%"></div>
+            </div>
+            <div class="gender-labels">
+              <span>♂ 男性化</span>
+              <span>中性</span>
+              <span>♀ 女性化</span>
+            </div>
+          </div>
+          <div class="gender-score-display" id="mc-gender-score">—</div>
+        </div>
+      </details>
+
+      <!-- Disclaimer -->
+      <p class="mc-disclaimer">
+        本工具的神经网络驱动的分类器由开源项目提供，真挚的感谢前辈在酷儿语音分析领域的贡献。
+        <br> <br> <a href="https://github.com/ina-foss/inaSpeechSegmenter" target="_blank" rel="noopener">inaSpeechSegmenter</a>（Doukhan et al., ICASSP 2018, IEEE）
+      </p>
+
+    </div><!-- /metrics-content -->
+  </aside>
+
+</div><!-- /app-layout -->
+
+<!-- Toast -->
+<div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

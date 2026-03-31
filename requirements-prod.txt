@@ -1,0 +1,32 @@
+# Runtime dependencies for Railway.app deployment
+# Python 3.11
+
+# Web framework
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+gunicorn==23.0.0
+python-multipart==0.0.20
+
+# AI / signal processing
+tensorflow-cpu==2.17.0
+librosa==0.11.0
+numpy==1.26.4
+scipy==1.14.1
+scikit-image==0.24.0
+soundfile==0.13.1
+audioread==3.0.1
+soxr==1.0.0
+
+# inaSpeechSegmenter dependencies
+pandas==2.2.3
+matplotlib==3.9.4
+Pyro4==4.82
+pytextgrid==0.1.4
+pyannote.core==6.0.1
+pyannote.algorithms==0.8
+pyannote.parser==0.8
+decorator==5.2.1
+sortedcontainers==2.4.0
+
+# inaSpeechSegmenter itself (installed from local dir in Dockerfile)
+# scikit-image already listed above

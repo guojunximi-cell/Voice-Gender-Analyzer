@@ -1,0 +1,370 @@
+/**
+ * scatter.js — Gender expression bar chart (Canvas 2D)
+ *
+ * Y-axis: Comprehensive gender score (0–100%)
+ *         0% = ♂ 男性化, 50% = 中性, 100% = ♀ 女性化
+ * X-axis: Each session as a vertical bar
+ *
+ * Click a bar → fires onDotClick(session).
+ */
+
+import { resolveCSSVar } from '../utils.js'
+
+// ─── Layout constants ────────────────────────────────────────
+const PAD = { top: 36, right: 16, bottom: 56, left: 48 }
+const BAR_MAX_W    = 56
+const BAR_MIN_W    = 8
+const BAR_GAP_RATIO = 0.35   // gap / slot width
+
+// ─── Module state ─────────────────────────────────────────────
+let canvas, ctx, dpr = 1
+let sessions = []          // { id, filename, gender_score, confidence, label, color }
+let selectedId = null
+let hoveredId  = null
+let _onDotClick   = null
+let _onDeselect   = null
+
+// ─── Init ─────────────────────────────────────────────────────
+export function initScatter(canvasEl, { onDotClick, onDeselect } = {}) {
+  canvas = canvasEl
+  _onDotClick = onDotClick
+  _onDeselect = onDeselect
+
+  canvas.addEventListener('click',     _handleClick)
+  canvas.addEventListener('mousemove', _handleHover)
+  canvas.addEventListener('mouseleave', () => { hoveredId = null; _draw() })
+
+  const ro = new ResizeObserver(() => _resize())
+  ro.observe(canvas.parentElement)
+  _resize()
+}
+
+// ─── Public API ───────────────────────────────────────────────
+export function addSession(session) {
+  sessions = sessions.filter(s => s.id !== session.id)
+  sessions.push(session)
+  _draw()
+}
+
+export function loadAllSessions(arr) {
+  sessions = arr.slice()
+  _draw()
+}
+
+export function selectSession(id) {
+  selectedId = id
+  _draw()
+}
+
+export function clearAllSessions() {
+  sessions = []
+  selectedId = null
+  hoveredId  = null
+  _draw()
+}
+
+export function removeSession(id) {
+  sessions = sessions.filter(s => s.id !== id)
+  if (selectedId === id) selectedId = null
+  hoveredId = null
+  _draw()
+}
+
+export function redraw() {
+  _resize()
+}
+
+// ─── Helpers ──────────────────────────────────────────────────
+function _w() { return canvas.width  / dpr }
+function _h() { return canvas.height / dpr }
+
+/** Resolve gender score — mirrors renderGenderBar in metrics-panel.js. */
+function _getScore(s) {
+  const label = s.label
+  if (label !== 'female' && label !== 'male') return 50
+  const conf       = s.confidence != null ? s.confidence : (s.gender_score != null ? s.gender_score / 100 : 0.5)
+  const scaledConf = Math.min(conf * 1.7, 1)
+  return label === 'female' ? 50 + scaledConf * 50 : 50 - scaledConf * 50
+}
+
+/** Blue(0) → violet(50) → rose(100). */
+function _scoreToColor(score) {
+  const t = Math.max(0, Math.min(100, score)) / 100
+  if (t <= 0.5) {
+    const s = t * 2
+    return `rgb(${Math.round(59 + s * 80)},${Math.round(130 - s * 38)},246)`
+  }
+  const s = (t - 0.5) * 2
+  return `rgb(${Math.round(139 + s * 105)},${Math.round(92 - s * 29)},${Math.round(246 - s * 152)})`
+}
+
+/** Inject alpha into an rgb() string. */
+function _withAlpha(rgb, a) {
+  return rgb.replace('rgb(', 'rgba(').replace(')', `,${a})`)
+}
+
+/** Score → canvas Y (0%=bottom, 100%=top). */
+function _scoreToY(score, plotTop, plotBottom) {
+  const ratio = Math.max(0, Math.min(100, score)) / 100
+  return plotBottom - ratio * (plotBottom - plotTop)
+}
+
+/** Compute bar layout from current canvas size. */
+function _layout() {
+  const W = _w(), H = _h()
+  const plotLeft   = PAD.left
+  const plotRight  = W - PAD.right
+  const plotTop    = PAD.top
+  const plotBottom = H - PAD.bottom
+  const plotW      = plotRight - plotLeft
+  const n          = Math.max(1, sessions.length)
+  const slotW      = plotW / n
+  const barW       = Math.max(BAR_MIN_W, Math.min(BAR_MAX_W, slotW * (1 - BAR_GAP_RATIO)))
+  return { W, H, plotLeft, plotRight, plotTop, plotBottom, plotW, slotW, barW }
+}
+
+// ─── Draw ─────────────────────────────────────────────────────
+function _draw() {
+  if (!canvas || !ctx) return
+
+  const { W, H, plotLeft, plotRight, plotTop, plotBottom, plotW, slotW, barW } = _layout()
+  ctx.clearRect(0, 0, W, H)
+
+  const textColor = resolveCSSVar('--text-muted') || '#888'
+  const lineColor = resolveCSSVar('--border')     || 'rgba(128,128,128,0.15)'
+  const isSmall   = W < 260
+
+  // ── Background gradient (male=blue bottom → female=pink top) ──
+  const bg = ctx.createLinearGradient(0, plotBottom, 0, plotTop)
+  bg.addColorStop(0,   'rgba(59,130,246,0.09)')
+  bg.addColorStop(0.5, 'rgba(167,139,250,0.02)')
+  bg.addColorStop(1,   'rgba(244,63,94,0.09)')
+  ctx.fillStyle = bg
+  ctx.fillRect(plotLeft, plotTop, plotW, plotBottom - plotTop)
+
+  // ── Center line (neutral / 50%) ───────────────────────────────
+  const centerY = _scoreToY(50, plotTop, plotBottom)
+
+  // ── Y-axis grid lines & tick labels (± format) ────────────────
+  const ticks = [0, 25, 50, 75, 100]
+  ctx.font = `${isSmall ? 9 : 10}px Inter, sans-serif`
+  for (const pct of ticks) {
+    const y         = _scoreToY(pct, plotTop, plotBottom)
+    const isNeutral = pct === 50
+
+    ctx.save()
+    ctx.strokeStyle = isNeutral ? 'rgba(128,128,128,0.45)' : lineColor
+    ctx.lineWidth   = isNeutral ? 1.5 : 1
+    ctx.setLineDash(isNeutral ? [] : [3, 5])
+    ctx.beginPath()
+    ctx.moveTo(plotLeft, y)
+    ctx.lineTo(plotRight, y)
+    ctx.stroke()
+    ctx.restore()
+
+    // Map score 0-100 → display -50 to +50
+    const dev = pct - 50
+    const label = dev === 0 ? '0' : (dev > 0 ? `+${dev}` : `${dev}`)
+    ctx.fillStyle = dev > 0
+      ? 'rgba(236,72,153,0.7)'
+      : dev < 0
+        ? 'rgba(59,130,246,0.7)'
+        : textColor
+    ctx.textAlign = 'right'
+    ctx.fillText(`${label}%`, plotLeft - 4, y + 3.5)
+  }
+
+  // ── Zone labels (inside plot area) ────────────────────────────
+  ctx.font = `${isSmall ? 9 : 10}px Inter, sans-serif`
+  ctx.fillStyle = 'rgba(59,130,246,0.45)'
+  ctx.textAlign = 'left'
+  ctx.fillText('♂ 男', plotLeft + 4, plotBottom - 5)
+
+  ctx.fillStyle = 'rgba(128,128,128,0.4)'
+  ctx.textAlign = 'left'
+  ctx.fillText('中性', plotLeft + 4, centerY - 4)
+
+  ctx.fillStyle = 'rgba(236,72,153,0.5)'
+  ctx.textAlign = 'left'
+  ctx.fillText('♀ 女', plotLeft + 4, plotTop + 12)
+
+  // ── Y-axis title (rotated) ─────────────────────────────────────
+  if (!isSmall) {
+    ctx.save()
+    ctx.translate(12, (plotTop + plotBottom) / 2)
+    ctx.rotate(-Math.PI / 2)
+    ctx.textAlign = 'center'
+    ctx.fillStyle = textColor
+    ctx.font = '10px Inter, sans-serif'
+    ctx.fillText('综合性别表达 (%)', 0, 0)
+    ctx.restore()
+  }
+
+  // ── Bars (diverging from center line) ─────────────────────────
+  for (let i = 0; i < sessions.length; i++) {
+    const s          = sessions[i]
+    const score      = _getScore(s)
+    const isSelected = s.id === selectedId
+    const isHovered  = s.id === hoveredId
+    const color      = s.color || _scoreToColor(score)
+    const isFemale   = score >= 50
+
+    const cx     = plotLeft + (i + 0.5) * slotW
+    const barL   = cx - barW / 2
+    const scoreY = _scoreToY(score, plotTop, plotBottom)
+
+    // Bar extends from center toward score
+    const barTop = isFemale ? scoreY  : centerY
+    const barBot = isFemale ? centerY : scoreY
+    const barH   = Math.max(2, barBot - barTop)
+    const radius = Math.min(4, barW / 3)
+
+    // Glow for selected / hovered
+    if (isSelected || isHovered) {
+      ctx.save()
+      ctx.shadowColor = color
+      ctx.shadowBlur  = isSelected ? 14 : 7
+    }
+
+    // Gradient: opaque at tip, transparent toward center
+    const grad = ctx.createLinearGradient(0, barTop, 0, barBot)
+    if (isFemale) {
+      grad.addColorStop(0,   color)
+      grad.addColorStop(0.6, _withAlpha(color, 0.75))
+      grad.addColorStop(1,   _withAlpha(color, 0.3))
+    } else {
+      grad.addColorStop(0,   _withAlpha(color, 0.3))
+      grad.addColorStop(0.4, _withAlpha(color, 0.75))
+      grad.addColorStop(1,   color)
+    }
+
+    ctx.beginPath()
+    if (isFemale && barH > radius) {
+      // Rounded top corners (bar goes upward)
+      ctx.moveTo(barL + radius, barTop)
+      ctx.lineTo(barL + barW - radius, barTop)
+      ctx.quadraticCurveTo(barL + barW, barTop, barL + barW, barTop + radius)
+      ctx.lineTo(barL + barW, barBot)
+      ctx.lineTo(barL, barBot)
+      ctx.lineTo(barL, barTop + radius)
+      ctx.quadraticCurveTo(barL, barTop, barL + radius, barTop)
+    } else if (!isFemale && barH > radius) {
+      // Rounded bottom corners (bar goes downward)
+      ctx.moveTo(barL, barTop)
+      ctx.lineTo(barL + barW, barTop)
+      ctx.lineTo(barL + barW, barBot - radius)
+      ctx.quadraticCurveTo(barL + barW, barBot, barL + barW - radius, barBot)
+      ctx.lineTo(barL + radius, barBot)
+      ctx.quadraticCurveTo(barL, barBot, barL, barBot - radius)
+      ctx.lineTo(barL, barTop)
+    } else {
+      ctx.rect(barL, barTop, barW, barH)
+    }
+    ctx.closePath()
+    ctx.fillStyle = grad
+    ctx.fill()
+
+    // Border for selected
+    if (isSelected) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'
+      ctx.lineWidth   = 1.5
+      ctx.stroke()
+    }
+
+    if (isSelected || isHovered) ctx.restore()
+
+    // Score label at bar tip (above for female, below for male)
+    const dev      = Math.round(Math.abs(score - 50))
+    const sign     = isFemale ? '+' : '-'
+    const tipLabel = `${sign}${dev}%`
+    ctx.fillStyle = isSelected
+      ? (resolveCSSVar('--text-primary') || '#eee')
+      : textColor
+    ctx.font      = `${isSelected ? 'bold ' : ''}${isSmall ? 9 : 10}px Inter, sans-serif`
+    ctx.textAlign = 'center'
+    if (isFemale) {
+      ctx.fillText(tipLabel, cx, barTop - 4)
+    } else {
+      ctx.fillText(tipLabel, cx, barBot + 12)
+    }
+
+    // Filename below x-axis (rotate if slots are narrow)
+    const name      = s.filename || s.name || ''
+    const maxChars  = isSmall ? 6 : 12
+    const shortName = name.length > maxChars ? name.slice(0, maxChars - 1) + '…' : name
+    ctx.save()
+    ctx.translate(cx, plotBottom + 6)
+    if (slotW < 52) {
+      ctx.rotate(-Math.PI / 4)
+      ctx.textAlign = 'right'
+    } else {
+      ctx.textAlign = 'center'
+    }
+    ctx.fillStyle = isSelected
+      ? (resolveCSSVar('--text-primary') || '#eee')
+      : (resolveCSSVar('--text-secondary') || '#aaa')
+    ctx.font = `${isSelected ? 'bold ' : ''}${isSmall ? 9 : 10}px Inter, sans-serif`
+    ctx.fillText(shortName, 0, 10)
+    ctx.restore()
+  }
+}
+
+// ─── Hit test (bars) ──────────────────────────────────────────
+function _hitTest(ex, ey) {
+  const { plotLeft, plotTop, plotBottom, slotW, barW } = _layout()
+  const centerY = _scoreToY(50, plotTop, plotBottom)
+  for (let i = 0; i < sessions.length; i++) {
+    const s        = sessions[i]
+    const score    = _getScore(s)
+    const isFemale = score >= 50
+    const cx       = plotLeft + (i + 0.5) * slotW
+    const barL     = cx - barW / 2 - 4
+    const barR     = cx + barW / 2 + 4
+    const scoreY   = _scoreToY(score, plotTop, plotBottom)
+    const barTop   = (isFemale ? scoreY : centerY) - 4
+    const barBot   = (isFemale ? centerY : scoreY) + 4
+    if (ex >= barL && ex <= barR && ey >= barTop && ey <= barBot) return s
+  }
+  return null
+}
+
+function _getEventPos(e) {
+  const rect = canvas.getBoundingClientRect()
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+}
+
+function _handleClick(e) {
+  const { x, y } = _getEventPos(e)
+  const hit = _hitTest(x, y)
+  selectedId = hit ? hit.id : null
+  _draw()
+  if (hit) _onDotClick?.(hit)
+  else _onDeselect?.()
+}
+
+function _handleHover(e) {
+  const { x, y } = _getEventPos(e)
+  const hit = _hitTest(x, y)
+  const newHovered = hit?.id ?? null
+  if (newHovered !== hoveredId) {
+    hoveredId = newHovered
+    canvas.style.cursor = newHovered ? 'pointer' : 'default'
+    _draw()
+  }
+}
+
+// ─── Resize ───────────────────────────────────────────────────
+function _resize() {
+  if (!canvas?.parentElement) return
+  const rect = canvas.parentElement.getBoundingClientRect()
+  if (!rect.width || !rect.height) return
+
+  dpr = window.devicePixelRatio || 1
+  canvas.width  = rect.width  * dpr
+  canvas.height = rect.height * dpr
+  canvas.style.width  = rect.width  + 'px'
+  canvas.style.height = rect.height + 'px'
+  ctx = canvas.getContext('2d')
+  ctx.scale(dpr, dpr)
+  _draw()
+}

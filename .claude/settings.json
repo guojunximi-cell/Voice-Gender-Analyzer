@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /d/interspeech/frontend/src/modules/*.js)",
+      "Bash(robocopy \"d:/interspeech/frontend\" \"d:/interspeech/ready to upload/frontend\" /E /XD node_modules /NFL /NDL /NJH /NJS)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(node -e \":*)",
+      "Bash(python -c \":*)"
+    ]
+  }
+}
