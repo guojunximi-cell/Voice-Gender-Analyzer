@@ -206,7 +206,7 @@ function _draw() {
     const score      = _getScore(s)
     const isSelected = s.id === selectedId
     const isHovered  = s.id === hoveredId
-    const color      = s.color || _scoreToColor(score)
+    const color      = _scoreToColor(score)
     const isFemale   = score >= 50
     const scoreY     = _scoreToY(score, plotTop, plotBottom)
     const sy         = scoreY - STRIP_H / 2

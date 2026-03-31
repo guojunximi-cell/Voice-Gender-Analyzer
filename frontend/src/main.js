@@ -389,7 +389,11 @@ $('clear-sessions-btn')?.addEventListener('click', () => {
   clearSessions()
   clearAllSessions()
   _selectedSessionId = null
+  analysisData = null
   $('delete-session-btn').hidden = true
+  resetResults()
+  clearMetricsPanel()
+  if (phase === 'results') setPhase(currentFile ? 'loaded' : 'idle')
 })
 
 // ─── Init scatter with stored sessions ───────────────────────
