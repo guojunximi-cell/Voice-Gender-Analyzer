@@ -146,7 +146,14 @@ class DnnSegmenter:
 
         if len(batch) > 0:
             batch = np.concatenate(batch)
+            # Keras 3 loads old .hdf5 CNN models expecting 4-D input
+            # (batch, 1, 68, nmel) instead of the original 3-D (batch, 68, nmel).
+            model_in_rank = len(self.nn.input_shape)
+            if batch.ndim < model_in_rank:
+                batch = batch[:, np.newaxis, :, :]   # (n, 1, 68, nmel)
             rawpred = self.nn.predict(batch, batch_size=self.batch_size, verbose=0)
+            if rawpred.ndim == 3:                    # (n, 1, n_classes) → (n, n_classes)
+                rawpred = rawpred.squeeze(axis=1)
         gc.collect()
             
         ret = []
