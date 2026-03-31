@@ -11,7 +11,7 @@
 import { resolveCSSVar } from '../utils.js'
 
 // ─── Layout constants ────────────────────────────────────────
-const PAD = { top: 36, right: 16, bottom: 56, left: 48 }
+const PAD = { top: 36, right: 44, bottom: 24, left: 48 }
 const BAR_MAX_W    = 56
 const BAR_MIN_W    = 8
 const BAR_GAP_RATIO = 0.35   // gap / slot width
@@ -162,8 +162,8 @@ function _draw() {
     ctx.stroke()
     ctx.restore()
 
-    // Map score 0-100 → display -50 to +50
-    const dev = pct - 50
+    // Map score 0-100 → display -100 to +100
+    const dev = (pct - 50) * 2
     const label = dev === 0 ? '0' : (dev > 0 ? `+${dev}` : `${dev}`)
     ctx.fillStyle = dev > 0
       ? 'rgba(236,72,153,0.7)'
@@ -200,7 +200,8 @@ function _draw() {
     ctx.restore()
   }
 
-  // ── Bars (diverging from center line) ─────────────────────────
+  // ── Bars: single-column thin strips at score position ────────
+  const STRIP_H = 4
   for (let i = 0; i < sessions.length; i++) {
     const s          = sessions[i]
     const score      = _getScore(s)
@@ -208,122 +209,49 @@ function _draw() {
     const isHovered  = s.id === hoveredId
     const color      = s.color || _scoreToColor(score)
     const isFemale   = score >= 50
+    const scoreY     = _scoreToY(score, plotTop, plotBottom)
+    const sy         = scoreY - STRIP_H / 2
 
-    const cx     = plotLeft + (i + 0.5) * slotW
-    const barL   = cx - barW / 2
-    const scoreY = _scoreToY(score, plotTop, plotBottom)
-
-    // Bar extends from center toward score
-    const barTop = isFemale ? scoreY  : centerY
-    const barBot = isFemale ? centerY : scoreY
-    const barH   = Math.max(2, barBot - barTop)
-    const radius = Math.min(4, barW / 3)
-
-    // Glow for selected / hovered
     if (isSelected || isHovered) {
       ctx.save()
       ctx.shadowColor = color
       ctx.shadowBlur  = isSelected ? 14 : 7
     }
 
-    // Gradient: opaque at tip, transparent toward center
-    const grad = ctx.createLinearGradient(0, barTop, 0, barBot)
-    if (isFemale) {
-      grad.addColorStop(0,   color)
-      grad.addColorStop(0.6, _withAlpha(color, 0.75))
-      grad.addColorStop(1,   _withAlpha(color, 0.3))
-    } else {
-      grad.addColorStop(0,   _withAlpha(color, 0.3))
-      grad.addColorStop(0.4, _withAlpha(color, 0.75))
-      grad.addColorStop(1,   color)
-    }
+    ctx.fillStyle = _withAlpha(color, isSelected ? 1 : isHovered ? 0.9 : 0.65)
+    ctx.fillRect(plotLeft, sy, plotW, STRIP_H)
 
-    ctx.beginPath()
-    if (isFemale && barH > radius) {
-      // Rounded top corners (bar goes upward)
-      ctx.moveTo(barL + radius, barTop)
-      ctx.lineTo(barL + barW - radius, barTop)
-      ctx.quadraticCurveTo(barL + barW, barTop, barL + barW, barTop + radius)
-      ctx.lineTo(barL + barW, barBot)
-      ctx.lineTo(barL, barBot)
-      ctx.lineTo(barL, barTop + radius)
-      ctx.quadraticCurveTo(barL, barTop, barL + radius, barTop)
-    } else if (!isFemale && barH > radius) {
-      // Rounded bottom corners (bar goes downward)
-      ctx.moveTo(barL, barTop)
-      ctx.lineTo(barL + barW, barTop)
-      ctx.lineTo(barL + barW, barBot - radius)
-      ctx.quadraticCurveTo(barL + barW, barBot, barL + barW - radius, barBot)
-      ctx.lineTo(barL + radius, barBot)
-      ctx.quadraticCurveTo(barL, barBot, barL, barBot - radius)
-      ctx.lineTo(barL, barTop)
-    } else {
-      ctx.rect(barL, barTop, barW, barH)
-    }
-    ctx.closePath()
-    ctx.fillStyle = grad
-    ctx.fill()
-
-    // Border for selected
     if (isSelected) {
       ctx.strokeStyle = 'rgba(255,255,255,0.85)'
       ctx.lineWidth   = 1.5
-      ctx.stroke()
+      ctx.strokeRect(plotLeft, sy, plotW, STRIP_H)
     }
 
     if (isSelected || isHovered) ctx.restore()
 
-    // Score label at bar tip (above for female, below for male)
-    const dev      = Math.round(Math.abs(score - 50))
+    // Score label to the right of plot
+    const dev      = Math.round(Math.abs(score - 50) * 2)
     const sign     = isFemale ? '+' : '-'
-    const tipLabel = `${sign}${dev}%`
-    ctx.fillStyle = isSelected
+    const tipLabel = dev === 0 ? '0%' : `${sign}${dev}%`
+    ctx.fillStyle  = isSelected
       ? (resolveCSSVar('--text-primary') || '#eee')
-      : textColor
-    ctx.font      = `${isSelected ? 'bold ' : ''}${isSmall ? 9 : 10}px Inter, sans-serif`
-    ctx.textAlign = 'center'
-    if (isFemale) {
-      ctx.fillText(tipLabel, cx, barTop - 4)
-    } else {
-      ctx.fillText(tipLabel, cx, barBot + 12)
-    }
-
-    // Filename below x-axis (rotate if slots are narrow)
-    const name      = s.filename || s.name || ''
-    const maxChars  = isSmall ? 6 : 12
-    const shortName = name.length > maxChars ? name.slice(0, maxChars - 1) + '…' : name
-    ctx.save()
-    ctx.translate(cx, plotBottom + 6)
-    if (slotW < 52) {
-      ctx.rotate(-Math.PI / 4)
-      ctx.textAlign = 'right'
-    } else {
-      ctx.textAlign = 'center'
-    }
-    ctx.fillStyle = isSelected
-      ? (resolveCSSVar('--text-primary') || '#eee')
-      : (resolveCSSVar('--text-secondary') || '#aaa')
-    ctx.font = `${isSelected ? 'bold ' : ''}${isSmall ? 9 : 10}px Inter, sans-serif`
-    ctx.fillText(shortName, 0, 10)
-    ctx.restore()
+      : _withAlpha(color, 0.9)
+    ctx.font       = `${isSelected ? 'bold ' : ''}${isSmall ? 9 : 10}px Inter, sans-serif`
+    ctx.textAlign  = 'left'
+    ctx.fillText(tipLabel, plotRight + 4, scoreY + 3.5)
   }
 }
 
-// ─── Hit test (bars) ──────────────────────────────────────────
+// ─── Hit test (strips) ────────────────────────────────────────
 function _hitTest(ex, ey) {
-  const { plotLeft, plotTop, plotBottom, slotW, barW } = _layout()
-  const centerY = _scoreToY(50, plotTop, plotBottom)
+  const { plotLeft, plotRight, plotTop, plotBottom } = _layout()
+  const HIT_PAD = 6
+  if (ex < plotLeft || ex > plotRight) return null
   for (let i = 0; i < sessions.length; i++) {
-    const s        = sessions[i]
-    const score    = _getScore(s)
-    const isFemale = score >= 50
-    const cx       = plotLeft + (i + 0.5) * slotW
-    const barL     = cx - barW / 2 - 4
-    const barR     = cx + barW / 2 + 4
-    const scoreY   = _scoreToY(score, plotTop, plotBottom)
-    const barTop   = (isFemale ? scoreY : centerY) - 4
-    const barBot   = (isFemale ? centerY : scoreY) + 4
-    if (ex >= barL && ex <= barR && ey >= barTop && ey <= barBot) return s
+    const s      = sessions[i]
+    const score  = _getScore(s)
+    const scoreY = _scoreToY(score, plotTop, plotBottom)
+    if (ey >= scoreY - HIT_PAD && ey <= scoreY + HIT_PAD) return s
   }
   return null
 }
