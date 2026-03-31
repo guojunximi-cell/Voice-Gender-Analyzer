@@ -254,7 +254,7 @@ async function initUploaders() {
   // 更新上传区提示文字
   const hint = document.querySelector('.upload-hint')
   if (hint) {
-    const sizeLabel = allowConcurrent ? '200 MB' : '1 MB'
+    const sizeLabel = allowConcurrent ? '200 MB' : '5 MB'
     hint.textContent = `支持 MP3 · WAV · OGG · M4A · FLAC · 最大 ${sizeLabel}`
   }
 

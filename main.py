@@ -1,5 +1,6 @@
 import asyncio
 import os
+import subprocess
 import tempfile
 import time
 import numpy as np
@@ -100,6 +101,24 @@ def _is_valid_audio_magic(data: bytes) -> bool:
     if data[0:4] == b'.snd':
         return True
     return False
+
+
+def _transcode_to_mp3(in_path: str, out_path: str) -> None:
+    """将任意音频格式转码为 64kbps 单声道 22050Hz MP3，减少分析时的 I/O 开销。"""
+    subprocess.run(
+        [
+            'ffmpeg', '-y',
+            '-i', in_path,
+            '-ar', '22050',  # 与 librosa.load sr=22050 一致，避免二次重采样
+            '-ac', '1',      # 单声道，分析引擎仅使用单声道
+            '-b:a', '64k',   # 64kbps CBR，人声分析完全够用
+            '-f', 'mp3',
+            out_path,
+        ],
+        check=True,
+        timeout=120,
+        capture_output=True,
+    )
 
 
 async def _check_rate_limit(ip: str) -> None:
@@ -228,13 +247,24 @@ async def _do_analyze(file: UploadFile):
         tmp.write(await file.read())
         tmp_path = tmp.name
 
+    mp3_path = None
     try:
+        # ── 转码：统一为 64kbps 单声道 MP3，降低后续 I/O 开销 ──
+        mp3_path = tmp_path + '_normalized.mp3'
+        try:
+            _transcode_to_mp3(tmp_path, mp3_path)
+            analysis_path = mp3_path
+            print(f"🎵 已转码为标准化 MP3: {os.path.basename(mp3_path)}")
+        except Exception as e:
+            print(f"⚠️  ffmpeg 转码失败，回退至原始文件: {e}")
+            analysis_path = tmp_path
+
         # ── Engine A: 时间分段 ─────────────────────────────────
         if seg is None:
             raise RuntimeError("Engine A (inaSpeechSegmenter) 未能成功加载，无法分析")
         print("⚙️  Engine A 分析中...")
         loop = asyncio.get_running_loop()
-        segmentation_result = await loop.run_in_executor(None, seg, tmp_path)
+        segmentation_result = await loop.run_in_executor(None, seg, analysis_path)
         # segmentation_result: [('male'|'female'|..., start, end), ...]
 
         analysis_data    = []
@@ -255,7 +285,7 @@ async def _do_analyze(file: UploadFile):
                 try:
                     # librosa.load 直接支持时间偏移切片，无需 pydub
                     y_seg, _ = librosa.load(
-                        tmp_path,
+                        analysis_path,
                         sr=22050,
                         mono=True,
                         offset=float(start_time),
@@ -348,8 +378,9 @@ async def _do_analyze(file: UploadFile):
         return {"status": "error", "message": str(e)}
 
     finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        for p in (tmp_path, mp3_path):
+            if p and os.path.exists(p):
+                os.remove(p)
 
 
 if __name__ == "__main__":
