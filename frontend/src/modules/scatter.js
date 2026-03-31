@@ -82,9 +82,8 @@ function _h() { return canvas.height / dpr }
 function _getScore(s) {
   const label = s.label
   if (label !== 'female' && label !== 'male') return 50
-  const conf       = s.confidence != null ? s.confidence : (s.gender_score != null ? s.gender_score / 100 : 0.5)
-  const scaledConf = Math.min(conf * 1.7, 1)
-  return label === 'female' ? 50 + scaledConf * 50 : 50 - scaledConf * 50
+  const conf = s.confidence != null ? s.confidence : (s.gender_score != null ? s.gender_score / 100 : 0.5)
+  return label === 'female' ? 50 + Math.min(conf, 1) * 50 : 50 - Math.min(conf, 1) * 50
 }
 
 /** Blue(0) → violet(50) → rose(100). */
@@ -201,7 +200,7 @@ function _draw() {
   }
 
   // ── Bars: single-column thin strips at score position ────────
-  const STRIP_H = 4
+  const STRIP_H = 8
   for (let i = 0; i < sessions.length; i++) {
     const s          = sessions[i]
     const score      = _getScore(s)
@@ -245,7 +244,7 @@ function _draw() {
 // ─── Hit test (strips) ────────────────────────────────────────
 function _hitTest(ex, ey) {
   const { plotLeft, plotRight, plotTop, plotBottom } = _layout()
-  const HIT_PAD = 6
+  const HIT_PAD = 8
   if (ex < plotLeft || ex > plotRight) return null
   for (let i = 0; i < sessions.length; i++) {
     const s      = sessions[i]
