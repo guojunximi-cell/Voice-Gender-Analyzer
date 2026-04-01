@@ -272,6 +272,13 @@ async def _do_analyze(file: UploadFile):
         total_male_sec   = 0.0
         voiced_acoustics = []   # [(acoustics_dict, duration_sec), ...]
 
+        # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
+        try:
+            print("🎵 正在将音频载入内存以供 Engine B 切片...")
+            y_full, sr_full = librosa.load(analysis_path, sr=22050, mono=True)
+        except Exception as e:
+            print(f"⚠️ librosa 读取音频失败: {e}")
+            y_full, sr_full = None, 22050
         for seg_item in segmentation_result:
             label = seg_item[0]
             start_time = seg_item[1]
@@ -281,17 +288,15 @@ async def _do_analyze(file: UploadFile):
             acoustics = None
 
             # ── Engine B: 声学分析（仅对有声语音段）────────────
-            if label in ("female", "male") and duration >= 0.5:
+            if label in ("female", "male") and duration >= 0.5 and y_full is not None:
                 try:
-                    # librosa.load 直接支持时间偏移切片，无需 pydub
-                    y_seg, _ = librosa.load(
-                        analysis_path,
-                        sr=22050,
-                        mono=True,
-                        offset=float(start_time),
-                        duration=float(duration),
-                    )
-                    acoustics = analyze_segment(y_seg, 22050)
+                    # 直接在内存中对 NumPy 数组进行切片，速度极快
+                    start_sample = int(float(start_time) * sr_full)
+                    end_sample   = int(float(end_time) * sr_full)
+                    y_seg = y_full[start_sample:end_sample]
+                    
+                    if len(y_seg) > 0:
+                        acoustics = analyze_segment(y_seg, sr_full)
                     if acoustics:
                         voiced_acoustics.append((acoustics, duration))
                 except Exception as e:
