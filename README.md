@@ -68,7 +68,7 @@ VoiceScope 是一款浏览器端音频分析工具，能够：
 ├── 📁 scripts/                   # 脚本目录
 ├── 📁 output/                    # 输出目录
 │   └── .gitkeep
-
+```
 
 ## 测试和部署环境的更改 (loacation: main.py)
 
