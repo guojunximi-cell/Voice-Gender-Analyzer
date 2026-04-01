@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
+  <script>(function(){var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t)})()</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VoiceScope — 声音性别分析</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -46,7 +47,7 @@
       <div class="panel-header-actions">
         <!-- Upload new file (available at all times) -->
         <label class="icon-btn" title="上传新文件" id="scatter-upload-label">
-          <input type="file" id="scatter-file-input" accept="audio/*" hidden />
+          <input type="file" id="scatter-file-input" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac,.opus,.aiff,.au,.caf" hidden />
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
             <path d="M8 11V3M4 7l4-4 4 4"/><path d="M2 13h12"/>
           </svg>
@@ -73,7 +74,7 @@
 
     <!-- Upload Zone (shown when no file is loaded) -->
     <section id="upload-section" class="card upload-zone">
-      <input type="file" id="file-input" accept="audio/*" hidden />
+      <input type="file" id="file-input" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac,.opus,.aiff,.au,.caf" hidden />
       <div class="upload-icon">
         <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
           <rect width="40" height="40" rx="12" fill="var(--accent-subtle)"/>

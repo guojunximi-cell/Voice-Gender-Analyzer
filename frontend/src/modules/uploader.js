@@ -1,13 +1,15 @@
 const ACCEPTED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4',
-                        'audio/x-m4a', 'audio/flac', 'audio/aac', 'audio/webm']
+                        'audio/x-m4a', 'audio/m4a', 'audio/flac', 'audio/aac', 'audio/webm']
+const ACCEPTED_EXTS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.opus', '.aiff', '.au', '.caf', '.webm']
 export const DEFAULT_MAX_BYTES = 200 * 1024 * 1024  // 200 MB（并发模式）
 export const RESTRICTED_MAX_BYTES = 5 * 1024 * 1024 // 5 MB（非并发模式）
 
 export function validateFile(file, maxBytes = DEFAULT_MAX_BYTES) {
   if (!file) return 'No file selected'
 
-  const isAudio = file.type.startsWith('audio/') || ACCEPTED_TYPES.includes(file.type)
-  if (!isAudio) return `不支持的格式：${file.type || '未知'}。请上传音频文件。`
+  const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+  const isAudio = file.type.startsWith('audio/') || ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTS.includes(ext)
+  if (!isAudio) return `不支持的格式：${file.type || ext || '未知'}。请上传音频文件。`
 
   if (file.size > maxBytes) {
     const mb = (file.size / 1024 / 1024).toFixed(1)

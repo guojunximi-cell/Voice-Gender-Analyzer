@@ -17,6 +17,8 @@ let segments      = []   // full segment objects (including acoustics)
 let resizeObserver = null
 let _tooltip      = null
 let _selectedTint = null  // currently selected tint rect
+let _blobUrl      = null
+let _seekClickHandler = null
 
 // ─── DOM helpers ─────────────────────────────────────────────
 const $  = id => document.getElementById(id)
@@ -132,8 +134,8 @@ export function initWaveform(file, callbacks = {}) {
     cursorWidth:   1,
   })
 
-  const url = URL.createObjectURL(file)
-  ws.load(url)
+  _blobUrl = URL.createObjectURL(file)
+  ws.load(_blobUrl)
 
   ws.on('ready', (dur) => {
     duration = dur
@@ -156,12 +158,16 @@ export function initWaveform(file, callbacks = {}) {
 
   // Seek bar
   const seekBar = $('seek-bar')
-  seekBar?.addEventListener('click', e => {
-    if (!ws || !duration) return
-    const track = seekBar.querySelector('.seek-track')
-    const rect  = track.getBoundingClientRect()
-    ws.seekTo(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)))
-  })
+  if (seekBar) {
+    seekBar.removeEventListener('click', _seekClickHandler)
+    _seekClickHandler = e => {
+      if (!ws || !duration) return
+      const track = seekBar.querySelector('.seek-track')
+      const rect  = track.getBoundingClientRect()
+      ws.seekTo(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)))
+    }
+    seekBar.addEventListener('click', _seekClickHandler)
+  }
 
   resizeObserver = new ResizeObserver(() => {
     ws?.setOptions?.({
@@ -212,6 +218,8 @@ export function destroyWaveform() {
   resizeObserver?.disconnect()
   resizeObserver = null
   if (ws) { try { ws.destroy() } catch (_) {}; ws = null }
+  if (_blobUrl) { URL.revokeObjectURL(_blobUrl); _blobUrl = null }
+  _seekClickHandler = null
   duration = 0; segments = []
   _selectedTint = null
   if (_tooltip) { _tooltip.classList.remove('visible'); _tooltip = null }
