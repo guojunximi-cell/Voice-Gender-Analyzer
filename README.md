@@ -13,9 +13,10 @@
 
 VoiceScope 是一款浏览器端音频分析工具，能够：
 
-- 将音频文件分段并识别每段的性别标签（男声 / 女声 / 其他）
-- 提取声学特征：基频（F0）、共振峰（F1/F2/F3）、频谱倾斜、声道长度
-- 计算综合性别表达评分（0 = 男性化，100 = 女性化）
+- 将音频文件压缩后分段
+- 识别每段的性别标签（男声 / 女声 / 其他）的置信度
+- 提取声学特征：基频/共振峰/共鸣
+- 计算综合性别表达评分 (-100% to 100%)
 - 在交互式散点图中记录历史分析会话
 
 ## 技术架构
@@ -24,31 +25,57 @@ VoiceScope 是一款浏览器端音频分析工具，能够：
 |------|------|
 | 前端 | Vanilla JS + Vite + WaveSurfer.js |
 | 后端 | Python · FastAPI · Uvicorn |
-| 引擎 | inaSpeechSegmenter（Doukhan et al., ICASSP 2018） |
-| 预训练模型 | `interspeech2023_cvfr.hdf5`（TensorFlow/Keras） |
+| 引擎 | inaSpeechSegmenter |
+| 预训练模型 | `interspeech2023_cvfr.hdf5` |
 
 ## 目录结构
 
 ```
-├── main.py                              # FastAPI 后端服务
-├── acoustic_analyzer.py                 # 声学特征分析引擎（Engine B）
-├── interspeech2023_cvfr.hdf5            # 预训练 Keras 模型
-├── requirements.txt                     # Python 直接依赖
-├── scripts/
-│   ├── predict.py                       # 模型推理探索脚本（进行中）
-│   └── test.py                          # 模型加载验证脚本
-├── frontend/                            # Vite 前端
+├── 📄 核心文件
+│   ├── acoustic_analyzer.py      # 声学分析器主模块
+│   ├── main.py                   # 程序入口
+│   ├── interspeech2023_cvfr.hdf5 # 模型权重文件
+│   ├── Dockerfile
+│   ├── railway.toml              # Railway 部署配置
+│   ├── README.md
+│   ├── requirements.txt
+│   ├── requirements-prod.txt
+│   └── .gitignore
+│
+├── 📁 frontend/                  # 前端 (Vite + wavesurfer.js)
 │   ├── index.html
 │   ├── package.json
-│   └── src/
-│       ├── main.js
-│       ├── utils.js
-│       ├── modules/                     # 功能模块
-│       └── styles/
-├── inaSpeechSegmenter-interspeech23/    # 本地 vendored 依赖
-└── output/                              # 分析结果输出目录
+│   ├── package-lock.json
+│   ├── vite.config.js
+│   ├── src/
+│   │   ├── modules/
+│   │   ├── styles/
+│   │   ├── main.js
+│   │   └── utils.js
+│   └── node_modules/
+│
+├── 📁 inaSpeechSegmenter-interspeech23/   # 语音分割子项目
+│   ├── inaSpeechSegmenter/       # Python 包源码
+│   ├── media/                    # 测试媒体文件
+│   ├── scripts/
+│   ├── tutorials/
+│   ├── .github/workflows/
+│   ├── setup.py
+│   ├── Dockerfile
+│   ├── LICENSE
+│   └── README.md
+│
+├── 📁 scripts/                   # 脚本目录
+├── 📁 output/                    # 输出目录
+│   └── .gitkeep
 
-### 运行
+
+## 测试和部署环境的更改 (loacation: main.py)
+
+`ALLOW_CONCURRENT_PROCESSING = True` # 同时处理多文件 + max 200M
+`ALLOW_CONCURRENT_PROCESSING = False` # 1 by 1 + max 5M
+
+## 运行
 
 ```bash
 # 终端 1：启动后端
