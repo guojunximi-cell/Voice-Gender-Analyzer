@@ -49,7 +49,7 @@ function _encodeWAV(ab) {
 
 async function _stripMetadata(file) {
   if (file.size > STRIP_MAX_BYTES) {
-    console.info('[VoiceScope] 文件较大，跳过元数据剥离:', file.name)
+    console.info('[声音分析鸭] 文件较大，跳过元数据剥离:', file.name)
     return file
   }
   try {
@@ -59,7 +59,7 @@ async function _stripMetadata(file) {
     await ctx.close()
     return new File([_encodeWAV(audioBuf)], file.name, { type: 'audio/wav' })
   } catch (err) {
-    console.warn('[VoiceScope] 元数据剥离失败，使用原始文件:', err)
+    console.warn('[声音分析鸭] 元数据剥离失败，使用原始文件:', err)
     return file
   }
 }
