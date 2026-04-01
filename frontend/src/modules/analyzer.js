@@ -4,15 +4,76 @@
 
 const _controllers = new Set()
 
-const TIMEOUT_MS = 120_000  // 2 minutes
+const TIMEOUT_MS = 120_000      // 2 minutes
+const STRIP_MAX_BYTES = 50 * 1024 * 1024  // skip stripping for files > 50 MB
+
+// ─── Metadata stripping ──────────────────────────────────────
+// Decode audio with AudioContext, re-encode as bare 16-bit PCM WAV.
+// This removes all ID3/EXIF metadata (device model, location, author, etc.)
+// before the audio leaves the browser.  Falls back to the original file
+// if the file is too large or the browser cannot decode the format.
+
+function _writeStr(view, off, str) {
+  for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i))
+}
+
+function _encodeWAV(ab) {
+  const numCh  = ab.numberOfChannels
+  const sr     = ab.sampleRate
+  const frames = ab.length
+  const data   = frames * numCh * 2          // 16-bit PCM
+  const buf    = new ArrayBuffer(44 + data)
+  const v      = new DataView(buf)
+
+  _writeStr(v, 0,  'RIFF');  v.setUint32(4,  36 + data, true)
+  _writeStr(v, 8,  'WAVE')
+  _writeStr(v, 12, 'fmt ');  v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true)                   // PCM
+  v.setUint16(22, numCh, true)
+  v.setUint32(24, sr, true)
+  v.setUint32(28, sr * numCh * 2, true)      // byte rate
+  v.setUint16(32, numCh * 2, true)           // block align
+  v.setUint16(34, 16, true)                  // bits/sample
+  _writeStr(v, 36, 'data');  v.setUint32(40, data, true)
+
+  let off = 44
+  for (let i = 0; i < frames; i++) {
+    for (let ch = 0; ch < numCh; ch++) {
+      const s = ab.getChannelData(ch)[i]
+      v.setInt16(off, Math.max(-32768, Math.min(32767, Math.round(s * 32767))), true)
+      off += 2
+    }
+  }
+  return new Blob([buf], { type: 'audio/wav' })
+}
+
+async function _stripMetadata(file) {
+  if (file.size > STRIP_MAX_BYTES) {
+    console.info('[VoiceScope] 文件较大，跳过元数据剥离:', file.name)
+    return file
+  }
+  try {
+    const arrayBuf = await file.arrayBuffer()
+    const ctx      = new (window.AudioContext || window.webkitAudioContext)()
+    const audioBuf = await ctx.decodeAudioData(arrayBuf)
+    await ctx.close()
+    return new File([_encodeWAV(audioBuf)], file.name, { type: 'audio/wav' })
+  } catch (err) {
+    console.warn('[VoiceScope] 元数据剥离失败，使用原始文件:', err)
+    return file
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 
 export async function analyzeAudio(file) {
   const controller = new AbortController()
   _controllers.add(controller)
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
+  const strippedFile = await _stripMetadata(file)
   const formData = new FormData()
-  formData.append('files', file)
+  formData.append('files', strippedFile)
 
   try {
     const response = await fetch('/api/analyze-voice', {

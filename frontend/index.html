@@ -85,6 +85,12 @@
       <p class="upload-title">拖拽音频文件到此处</p>
       <p class="upload-subtitle">或 <button class="link-btn" id="browse-btn">点击选择文件</button></p>
       <p class="upload-hint">支持 MP3 · WAV · OGG · M4A · FLAC · 最大 200MB</p>
+      <p class="upload-privacy-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span>您的文件将被严格阅后即焚，上传时不会保留任何特征数据</span>
+      </p>
     </section>
 
     <!-- Player (shown after file is loaded) -->
@@ -277,6 +283,18 @@
 <!-- Toast -->
 <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
 
+<style>
+  .upload-privacy-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 12px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+</style>
+
 <!-- 💬 意见反馈悬浮窗 -->
 <style>
   .vga-feedback-btn {
@@ -411,7 +429,7 @@
         headers: { 'Accept': 'application/json' } 
       });
       if (response.ok) {
-        submitBtn.textContent = '发送成功！💖';
+        submitBtn.textContent = '发送成功';
         form.reset();
         charCount.textContent = '0 / 500';
         setTimeout(() => { toggleVgaFeedback(); submitBtn.textContent = '发送'; submitBtn.disabled = true; }, 2000);
@@ -419,7 +437,7 @@
         throw new Error('Network response was not ok');
       }
     } catch (error) {
-      submitBtn.textContent = '发送失败 😢';
+      submitBtn.textContent = '发送失败';
       // 如果失败，恢复按钮状态（取决于文本框是否有值）
       setTimeout(() => { 
         submitBtn.textContent = '发送'; 
