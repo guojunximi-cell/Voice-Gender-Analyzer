@@ -70,10 +70,6 @@
 │   └── .gitkeep
 ```
 
-## 测试和部署环境的更改 (loacation: main.py)
-
-`ALLOW_CONCURRENT_PROCESSING = True` # 同时处理多文件 + max 200M
-`ALLOW_CONCURRENT_PROCESSING = False` # 1 by 1 + max 5M
 
 ## 运行
 

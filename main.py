@@ -1,8 +1,10 @@
 import asyncio
+import logging
 import os
 import subprocess
 import tempfile
 import time
+import uuid
 import numpy as np
 
 # numpy 2.x made np.stack/vstack/hstack reject generators; patch them early
@@ -44,6 +46,26 @@ import uvicorn
 
 from inaSpeechSegmenter import Segmenter
 from acoustic_analyzer import analyze_segment
+
+# ─── 日志配置 ──────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("vfp")
+
+
+class _MaskIPFilter(logging.Filter):
+    """将 uvicorn 访问日志中的客户端 IP 替换为脱敏格式（保留前两段，后两段替换为 *）"""
+    def filter(self, record: logging.LogRecord) -> bool:
+        if hasattr(record, "client_addr"):
+            addr: str = record.client_addr          # e.g. "192.168.1.100:54321"
+            host, _, port = addr.rpartition(":")
+            parts = host.split(".")
+            if len(parts) == 4:
+                record.client_addr = f"{parts[0]}.{parts[1]}.*.*:{port}"
+        return True
 
 # ─── 并发控制 ──────────────────────────────────────────────────
 # 同时最多处理的请求数（超出时排队等待，而非拒绝）
@@ -140,13 +162,15 @@ seg = None
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     global seg
-    print("🚀 正在将 AI 模型载入内存...")
+    # 在 lifespan 最早期挂载 IP 脱敏过滤器，确保覆盖所有访问日志
+    logging.getLogger("uvicorn.access").addFilter(_MaskIPFilter())
+    logger.info("正在将 AI 模型载入内存...")
     try:
         loop = asyncio.get_event_loop()
         seg = await loop.run_in_executor(None, lambda: Segmenter(detect_gender=True))
-        print("✅ Engine A (inaSpeechSegmenter) 加载完毕")
+        logger.info("Engine A (inaSpeechSegmenter) 加载完毕")
     except Exception as e:
-        print(f"❌ Engine A 加载失败: {e}")
+        logger.error("Engine A 加载失败: %s", e)
         seg = None
     yield
 
@@ -197,14 +221,14 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
         if ext not in _ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=415,
-                detail=f"不支持的文件类型 '{ext}'，仅接受: {', '.join(sorted(_ALLOWED_EXTENSIONS))}"
+                detail=f"上传的文件格式不受支持，仅接受: {', '.join(sorted(_ALLOWED_EXTENSIONS))}"
             )
 
         header = await f.read(12)
         if not _is_valid_audio_magic(header):
             raise HTTPException(
                 status_code=415,
-                detail=f"文件 '{f.filename}' 的内容与声称的格式不符，拒绝处理"
+                detail="文件内容与声称的格式不符，请检查文件是否为有效音频"
             )
 
         # 文件大小限制（多读 1 字节判断是否超限，避免大文件载入内存）
@@ -212,7 +236,7 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
         if len(header) + len(rest) > MAX_FILE_SIZE_BYTES:
             raise HTTPException(
                 status_code=413,
-                detail=f"文件 '{f.filename}' 超过 {MAX_FILE_SIZE_BYTES // (1024*1024)} MB 大小限制"
+                detail=f"上传的音频文件超过 {MAX_FILE_SIZE_BYTES // (1024*1024)} MB 大小限制"
             )
 
         await f.seek(0)
@@ -239,7 +263,8 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
 
 
 async def _do_analyze(file: UploadFile):
-    print(f"📥 收到文件: {file.filename}")
+    task_id = uuid.uuid4().hex[:8]
+    logger.info("收到文件 [Task: %s] (大小待测量)", task_id)
 
     file_ext = os.path.splitext(file.filename)[1].lower() or ".wav"
 
@@ -254,15 +279,15 @@ async def _do_analyze(file: UploadFile):
         try:
             _transcode_to_mp3(tmp_path, mp3_path)
             analysis_path = mp3_path
-            print(f"🎵 已转码为标准化 MP3: {os.path.basename(mp3_path)}")
+            logger.info("已转码为标准化 MP3 [Task: %s]", task_id)
         except Exception as e:
-            print(f"⚠️  ffmpeg 转码失败，回退至原始文件: {e}")
+            logger.warning("ffmpeg 转码失败，回退至原始文件 [Task: %s]: %s", task_id, e)
             analysis_path = tmp_path
 
         # ── Engine A: 时间分段 ─────────────────────────────────
         if seg is None:
             raise RuntimeError("Engine A (inaSpeechSegmenter) 未能成功加载，无法分析")
-        print("⚙️  Engine A 分析中...")
+        logger.info("Engine A 分析中... [Task: %s]", task_id)
         loop = asyncio.get_running_loop()
         segmentation_result = await loop.run_in_executor(None, seg, analysis_path)
         # segmentation_result: [('male'|'female'|..., start, end), ...]
@@ -274,10 +299,10 @@ async def _do_analyze(file: UploadFile):
 
         # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
         try:
-            print("🎵 正在将音频载入内存以供 Engine B 切片...")
+            logger.info("正在将音频载入内存以供 Engine B 切片 [Task: %s]...", task_id)
             y_full, sr_full = librosa.load(analysis_path, sr=22050, mono=True)
         except Exception as e:
-            print(f"⚠️ librosa 读取音频失败: {e}")
+            logger.warning("librosa 读取音频失败 [Task: %s]: %s", task_id, e)
             y_full, sr_full = None, 22050
         for seg_item in segmentation_result:
             label = seg_item[0]
@@ -300,7 +325,7 @@ async def _do_analyze(file: UploadFile):
                     if acoustics:
                         voiced_acoustics.append((acoustics, duration))
                 except Exception as e:
-                    print(f"⚠️  Engine B 跳过 [{start_time:.1f}–{end_time:.1f}s]: {e}")
+                    logger.warning("Engine B 跳过 [Task: %s] [%.1f–%.1fs]: %s", task_id, start_time, end_time, e)
 
             # 置信度：直接使用 Engine A (inaSpeechSegmenter) 的逐帧均值概率
             confidence = round(float(ina_confidence), 4) if ina_confidence is not None else None
@@ -359,9 +384,10 @@ async def _do_analyze(file: UploadFile):
             if total_w > 0:
                 overall_confidence = round(sum(c * d for c, d in conf_pairs) / total_w, 4)
 
-        print(f"✅ 分析完成 — {len(analysis_data)} 段，"
-              f"F0={overall_f0} Hz，性别评分={overall_gender_score}，"
-              f"女性占比={female_ratio*100:.1f}%")
+        logger.info(
+            "分析完成 [Task: %s] — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.1f%%",
+            task_id, len(analysis_data), overall_f0, overall_gender_score, female_ratio * 100,
+        )
 
         return {
             "status":   "success",
@@ -379,7 +405,7 @@ async def _do_analyze(file: UploadFile):
         }
 
     except Exception as e:
-        print(f"❌ 分析失败: {e}")
+        logger.error("分析失败 [Task: %s]: %s", task_id, e)
         return {"status": "error", "message": str(e)}
 
     finally:
