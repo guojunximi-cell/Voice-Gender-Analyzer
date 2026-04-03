@@ -170,8 +170,10 @@ class DnnSegmenter:
             pred = viterbi_decoding(np.log(r), diag_trans_exp(self.viterbi_arg, len(self.outlabels)))
             for lab2, start2, stop2 in _binidx2seglist(pred):
                 label_idx = int(lab2)
-                seg_conf = float(np.mean(r[start2:stop2, label_idx]))
-                ret.append((self.outlabels[label_idx], start2+start, stop2+start, seg_conf))
+                frame_probs = r[start2:stop2, label_idx]
+                seg_conf = float(np.mean(frame_probs))
+                frame_conf_list = [round(float(p), 3) for p in frame_probs]
+                ret.append((self.outlabels[label_idx], start2+start, stop2+start, seg_conf, frame_conf_list))
         return ret
 
 
@@ -270,7 +272,7 @@ class Segmenter:
         if self.detect_gender:
             lseg = self.gender(mspec, lseg, difflen)
 
-        return [(item[0], start_sec + item[1] * .02, start_sec + item[2] * .02, item[3] if len(item) > 3 else None) for item in lseg]
+        return [(item[0], start_sec + item[1] * .02, start_sec + item[2] * .02, item[3] if len(item) > 3 else None, item[4] if len(item) > 4 else None) for item in lseg]
 
 
     def __call__(self, medianame, tmpdir=None, start_sec=None, stop_sec=None):

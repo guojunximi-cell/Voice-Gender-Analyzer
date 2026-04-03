@@ -85,6 +85,34 @@
       <p class="upload-title">拖拽音频文件到此处</p>
       <p class="upload-subtitle">或 <button class="link-btn" id="browse-btn">点击选择文件</button></p>
       <p class="upload-hint">支持 MP3 · WAV · OGG · M4A · FLAC · 最大 200MB</p>
+
+      <!-- 录音 -->
+      <div class="upload-divider"><span>或</span></div>
+
+      <div class="recorder-idle-ui" id="recorder-idle-ui">
+        <button class="recorder-mic-btn" id="recorder-mic-btn" type="button" aria-label="开始录制">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8"  y1="23" x2="16" y2="23"/>
+          </svg>
+          <span>录制声音</span>
+        </button>
+      </div>
+
+      <div class="recorder-active-ui" id="recorder-active-ui" hidden>
+        <span class="recorder-dot" aria-hidden="true"></span>
+        <span class="recorder-timer" id="recorder-timer">0:00</span>
+        <button class="recorder-stop-btn" id="recorder-stop-btn" type="button" aria-label="停止录制">
+          <svg width="9" height="9" viewBox="0 0 10 10">
+            <rect width="10" height="10" rx="2" fill="currentColor"/>
+          </svg>
+          <span>停止</span>
+        </button>
+      </div>
+
       <p class="upload-privacy-badge">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -215,6 +243,14 @@
         </div>
       </div>
 
+      <!-- Collapsible: Confidence timeline -->
+      <details class="mc-collapsible" id="mc-dist-section" hidden>
+        <summary class="mc-collapsible-header">置信度时间线</summary>
+        <div class="mc-collapsible-body">
+          <canvas id="mc-dist-canvas" height="64" style="width:100%;display:block;border-radius:6px"></canvas>
+        </div>
+      </details>
+
       <!-- Collapsible: Pitch range -->
       <details class="mc-collapsible" open>
         <summary class="mc-collapsible-header">音高范围 (80–320 Hz)</summary>
@@ -266,6 +302,7 @@
             </div>
           </div>
           <div class="gender-score-display" id="mc-gender-score">—</div>
+          <div id="mc-certainty-tag" class="certainty-tag" hidden></div>
         </div>
       </details>
 

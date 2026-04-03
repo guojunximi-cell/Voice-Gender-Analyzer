@@ -39,3 +39,31 @@ export function resolveCSSVar(varName) {
     .getPropertyValue(varName.replace('var(', '').replace(')', '').trim())
     .trim()
 }
+
+// ─── Score → color (Blue→Violet→Rose gradient, score 0–100) ──
+export function scoreToColor(score) {
+  const t = Math.max(0, Math.min(score, 100)) / 100
+  if (t <= 0.5) {
+    const s = t * 2
+    return `rgba(${Math.round(59 + s * 80)},${Math.round(130 - s * 38)},246,0.85)`
+  }
+  const s = (t - 0.5) * 2
+  return `rgba(${Math.round(139 + s * 105)},${Math.round(92 - s * 29)},${Math.round(246 - s * 152)},0.85)`
+}
+
+// ─── Certainty tag (Chinese) for a voiced segment ────────────
+// Uses only Engine A (inaSpeechSegmenter) confidence + label.
+export function certaintTag(seg) {
+  if (!seg || (seg.label !== 'female' && seg.label !== 'male')) return ''
+  const c = seg.confidence ?? 0.5
+  const composite = seg.label === 'female' ? 50 + c * 50 : 50 - c * 50
+
+  if (c < 0.40) return '低置信度'
+  if (composite >= 42 && composite <= 58) return '临界区间'
+  if (c > 0.80) {
+    if (seg.label === 'female') return composite > 82 ? '明确女声' : '较明显女声'
+    return composite < 18 ? '明确男声' : '较明显男声'
+  }
+  if (seg.label === 'female') return composite > 70 ? '偏女性化' : '女性化'
+  return composite < 30 ? '偏男性化' : '男性化'
+}

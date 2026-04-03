@@ -3,7 +3,7 @@
  * Called whenever a segment is clicked (waveform overlay or list item).
  */
 
-import { sigmaRescale, LABEL_META } from '../utils.js'
+import { sigmaRescale, LABEL_META, scoreToColor, certaintTag } from '../utils.js'
 
 // ─── Animated number counter ──────────────────────────────────
 function animNum(el, target, suffix = '', duration = 600) {
@@ -153,6 +153,128 @@ export function renderMetricsPanel(segment) {
     const meta = LABEL_META[segment.label] || { zh: segment.label }
     headerLabel.textContent = `${meta.zh}  ${_fmtTime(segment.start_time)}–${_fmtTime(segment.end_time)}`
   }
+
+  // ── Certainty tag badge ───────────────────────────────────
+  const tagEl = document.getElementById('mc-certainty-tag')
+  if (tagEl) {
+    const tag = certaintTag(segment)
+    tagEl.textContent = tag
+    tagEl.hidden = !tag
+  }
+}
+
+// ─── Confidence timeline (per-frame within a segment) ────────
+export function renderConfidenceDistribution(segment) {
+  const section = document.getElementById('mc-dist-section')
+  const canvas  = document.getElementById('mc-dist-canvas')
+  if (!canvas) { if (section) section.hidden = true; return }
+
+  const frames = segment?.confidence_frames
+  if (!frames || !frames.length) { if (section) section.hidden = true; return }
+  section.hidden = false
+
+  const label = segment.label  // 'female' | 'male'
+  const FRAME_DUR = 0.02       // 20 ms per frame
+
+  // Defer draw if canvas is inside closed <details> (width = 0)
+  const body = canvas.parentElement
+  if (!body || body.clientWidth < 4) {
+    section.addEventListener('toggle', () => renderConfidenceDistribution(segment), { once: true })
+    return
+  }
+
+  const PAD_L = 28, PAD_R = 4, PAD_T = 10, PAD_B = 14
+  const dpr = window.devicePixelRatio || 1
+  const W   = body.clientWidth
+  const H   = 64
+  canvas.width  = W * dpr
+  canvas.height = H * dpr
+  canvas.style.width  = W + 'px'
+  canvas.style.height = H + 'px'
+  const ctx = canvas.getContext('2d')
+  ctx.scale(dpr, dpr)
+
+  const plotL = PAD_L, plotR = W - PAD_R
+  const plotT = PAD_T, plotB = H - PAD_B
+  const plotW = plotR - plotL, plotH = plotB - plotT
+
+  // Background
+  ctx.fillStyle = 'rgba(128,128,128,0.04)'
+  ctx.fillRect(plotL, plotT, plotW, plotH)
+
+  // Horizontal guide lines at 50% and mean
+  const mean = frames.reduce((a, b) => a + b, 0) / frames.length
+  const halfY = plotB - 0.5 * plotH
+  ctx.strokeStyle = 'rgba(128,128,128,0.2)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([2, 4])
+  ctx.beginPath(); ctx.moveTo(plotL, halfY); ctx.lineTo(plotR, halfY); ctx.stroke()
+  ctx.setLineDash([])
+
+  // Mean line
+  const meanY = plotB - mean * plotH
+  const meanColor = label === 'female' ? 'rgba(236,72,153,0.5)' : 'rgba(59,130,246,0.5)'
+  ctx.strokeStyle = meanColor
+  ctx.lineWidth = 1
+  ctx.setLineDash([4, 3])
+  ctx.beginPath(); ctx.moveTo(plotL, meanY); ctx.lineTo(plotR, meanY); ctx.stroke()
+  ctx.setLineDash([])
+
+  // Y-axis labels
+  ctx.font = '8px Inter, sans-serif'
+  ctx.textAlign = 'right'
+  ctx.fillStyle = 'rgba(128,128,128,0.5)'
+  ctx.fillText('1.0', plotL - 3, plotT + 4)
+  ctx.fillText('0.5', plotL - 3, halfY + 3)
+  ctx.fillText('0',   plotL - 3, plotB + 1)
+
+  // Draw frame confidence as area + line
+  const stepW = plotW / frames.length
+  const lineColor = label === 'female' ? 'rgba(236,72,153,0.8)' : 'rgba(59,130,246,0.8)'
+  const fillColor = label === 'female' ? 'rgba(236,72,153,0.12)' : 'rgba(59,130,246,0.12)'
+
+  // Area fill
+  ctx.beginPath()
+  ctx.moveTo(plotL, plotB)
+  for (let i = 0; i < frames.length; i++) {
+    const x = plotL + (i + 0.5) * stepW
+    const y = plotB - Math.min(frames[i], 1) * plotH
+    if (i === 0) ctx.lineTo(x, y); else ctx.lineTo(x, y)
+  }
+  ctx.lineTo(plotL + (frames.length - 0.5) * stepW, plotB)
+  ctx.closePath()
+  ctx.fillStyle = fillColor
+  ctx.fill()
+
+  // Line
+  ctx.beginPath()
+  for (let i = 0; i < frames.length; i++) {
+    const x = plotL + (i + 0.5) * stepW
+    const y = plotB - Math.min(frames[i], 1) * plotH
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+  }
+  ctx.strokeStyle = lineColor
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  // X-axis: time labels relative to segment start
+  const totalSec = frames.length * FRAME_DUR
+  ctx.font = '7px Inter, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillStyle = 'rgba(128,128,128,0.5)'
+  const startT = segment.start_time ?? 0
+  ctx.fillText(_fmtTime(startT), plotL, plotB + 10)
+  ctx.fillText(_fmtTime(startT + totalSec), plotR, plotB + 10)
+  if (totalSec > 0.5) {
+    const midT = startT + totalSec / 2
+    ctx.fillText(_fmtTime(midT), plotL + plotW / 2, plotB + 10)
+  }
+
+  // Mean label
+  ctx.font = '7px Inter, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillStyle = meanColor
+  ctx.fillText(`μ=${(mean * 100).toFixed(0)}%`, plotR - 30, meanY - 3)
 }
 
 // ─── Clear panel ─────────────────────────────────────────────

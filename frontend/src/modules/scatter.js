@@ -8,7 +8,7 @@
  * Click a bar → fires onDotClick(session).
  */
 
-import { resolveCSSVar } from '../utils.js'
+import { resolveCSSVar, scoreToColor as _scoreToColorUtil } from '../utils.js'
 
 // ─── Layout constants ────────────────────────────────────────
 const PAD = { top: 36, right: 44, bottom: 24, left: 48 }
@@ -86,15 +86,10 @@ function _getScore(s) {
   return label === 'female' ? 50 + Math.min(conf, 1) * 50 : 50 - Math.min(conf, 1) * 50
 }
 
-/** Blue(0) → violet(50) → rose(100). */
+/** Blue(0) → violet(50) → rose(100). Delegates to shared util (strips alpha). */
 function _scoreToColor(score) {
-  const t = Math.max(0, Math.min(100, score)) / 100
-  if (t <= 0.5) {
-    const s = t * 2
-    return `rgb(${Math.round(59 + s * 80)},${Math.round(130 - s * 38)},246)`
-  }
-  const s = (t - 0.5) * 2
-  return `rgb(${Math.round(139 + s * 105)},${Math.round(92 - s * 29)},${Math.round(246 - s * 152)})`
+  // _scoreToColorUtil returns rgba(); strip the alpha for compatibility with _withAlpha
+  return _scoreToColorUtil(score).replace(/,[\d.]+\)$/, ')').replace('rgba', 'rgb')
 }
 
 /** Inject alpha into an rgb() string. */
@@ -227,6 +222,27 @@ function _draw() {
     }
 
     if (isSelected || isHovered) ctx.restore()
+
+    // Range extent line — shows min/max voiced segment score for selected session
+    if (isSelected && s.analysis) {
+      const voicedScores = s.analysis
+        .filter(seg => seg.label === 'male' || seg.label === 'female')
+        .map(seg => {
+          const c = seg.confidence ?? 0.5
+          return seg.label === 'female' ? 50 + c * 50 : 50 - c * 50
+        })
+      if (voicedScores.length > 1) {
+        const yTop    = _scoreToY(Math.max(...voicedScores), plotTop, plotBottom)
+        const yBottom = _scoreToY(Math.min(...voicedScores), plotTop, plotBottom)
+        const cx = (plotLeft + plotRight) / 2
+        ctx.save()
+        ctx.strokeStyle = _withAlpha(color, 0.35)
+        ctx.lineWidth = 1
+        ctx.setLineDash([2, 3])
+        ctx.beginPath(); ctx.moveTo(cx, yTop); ctx.lineTo(cx, yBottom); ctx.stroke()
+        ctx.restore()
+      }
+    }
 
     // Score label to the right of plot
     const dev      = Math.round(Math.abs(score - 50) * 2)

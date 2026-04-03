@@ -57,7 +57,19 @@ async function _stripMetadata(file) {
     const ctx      = new (window.AudioContext || window.webkitAudioContext)()
     const audioBuf = await ctx.decodeAudioData(arrayBuf)
     await ctx.close()
-    return new File([_encodeWAV(audioBuf)], file.name, { type: 'audio/wav' })
+
+    // 压缩格式解码为 PCM WAV 后体积会暴增（10-20 倍），
+    // 如果解码后超过原始大小的 5 倍就放弃剥离，直接用原始文件。
+    const estimatedBytes = 44 + audioBuf.length * audioBuf.numberOfChannels * 2
+    if (estimatedBytes > file.size * 5) {
+      console.info('[声音分析鸭] 解码后体积过大（%s MB → %s MB），跳过元数据剥离',
+        (file.size / 1024 / 1024).toFixed(1),
+        (estimatedBytes / 1024 / 1024).toFixed(1))
+      return file
+    }
+
+    const strippedName = file.name.replace(/\.[^.]+$/, '') + '.wav'
+    return new File([_encodeWAV(audioBuf)], strippedName, { type: 'audio/wav' })
   } catch (err) {
     console.warn('[声音分析鸭] 元数据剥离失败，使用原始文件:', err)
     return file

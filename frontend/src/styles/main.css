@@ -1051,6 +1051,42 @@ body {
   opacity: 0.65;
 }
 
+/* Confidence micro-bar in segment list */
+.segment-conf-bar {
+  width: 28px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 99px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+.segment-conf-bar::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  width: calc(var(--conf, 0.5) * 100%);
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Certainty tag badge in metrics panel */
+.certainty-tag {
+  text-align: center;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  margin-top: 6px;
+  letter-spacing: 0.03em;
+}
+
+
 /* Segment label in right panel header */
 .mc-segment-label {
   font-size: 0.72rem;
@@ -1255,4 +1291,61 @@ body {
   color: var(--text-muted);
   text-align: center;
   letter-spacing: 0.02em;
+}
+
+/* ── Recorder UI ──────────────────────────────────────── */
+.upload-divider {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; max-width: 200px;
+  color: var(--text-muted); font-size: 0.72rem;
+}
+.upload-divider::before, .upload-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+.recorder-mic-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  color: var(--text-secondary); font: inherit; font-size: 0.82rem;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.recorder-mic-btn:hover {
+  background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border);
+}
+
+.recorder-active-ui {
+  display: flex; align-items: center; gap: 10px;
+}
+
+.recorder-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #e05252; flex-shrink: 0;
+  animation: rec-pulse 1.2s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1);    }
+  50%      { opacity: 0.4; transform: scale(0.75); }
+}
+
+.recorder-timer {
+  font-size: 0.85rem; font-variant-numeric: tabular-nums;
+  color: var(--text-primary); font-weight: 500; min-width: 2.8ch;
+}
+
+.recorder-stop-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  color: var(--text-secondary); font: inherit; font-size: 0.80rem;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.recorder-stop-btn:hover {
+  background: rgba(224, 82, 82, 0.08); color: #e05252; border-color: rgba(224, 82, 82, 0.3);
 }

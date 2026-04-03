@@ -110,20 +110,26 @@ export function renderSegments(analysis) {
     duration.textContent = fmt(dur)
 
     // Acoustic indicator dot (shows that Engine B data is available)
+    item.appendChild(swatch)
+    item.appendChild(label)
+    item.appendChild(time)
+    item.appendChild(duration)
+
     if (hasAcoustics) {
       const dot = document.createElement('span')
       dot.className = 'segment-acoustic-dot'
       dot.title = '含声学分析'
-      item.appendChild(swatch)
-      item.appendChild(label)
-      item.appendChild(time)
-      item.appendChild(duration)
       item.appendChild(dot)
-    } else {
-      item.appendChild(swatch)
-      item.appendChild(label)
-      item.appendChild(time)
-      item.appendChild(duration)
+    }
+
+    // Confidence micro-bar for voiced segments
+    const voiced = seg.label === 'female' || seg.label === 'male'
+    if (voiced && seg.confidence != null) {
+      const bar = document.createElement('div')
+      bar.className = 'segment-conf-bar'
+      bar.style.setProperty('--conf', seg.confidence)
+      bar.title = `置信度 ${Math.round(seg.confidence * 100)}%`
+      item.appendChild(bar)
     }
 
     item.addEventListener('click', () => {

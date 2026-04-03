@@ -8,7 +8,8 @@ import { renderStats, renderSegments,
          highlightActiveSegment,
          resetResults }                      from './modules/results.js'
 import { renderMetricsPanel,
-         clearMetricsPanel }                 from './modules/metrics-panel.js'
+         clearMetricsPanel,
+         renderConfidenceDistribution }      from './modules/metrics-panel.js'
 import { initScatter, addSession,
          loadAllSessions, selectSession,
          clearAllSessions, removeSession as scatterRemoveSession,
@@ -16,6 +17,7 @@ import { initScatter, addSession,
 import { loadSessions, saveSession,
          clearSessions, removeSession as storeRemoveSession } from './modules/session-store.js'
 import { nextSessionColor }                  from './utils.js'
+import { setupRecorder }                      from './modules/recorder.js'
 
 // ─── State ────────────────────────────────────────────────────
 // phases: idle | loaded | analyzing | results
@@ -244,18 +246,19 @@ async function onMultipleFilesSelected(files) {
 // ─── Uploaders ────────────────────────────────────────────────
 async function initUploaders() {
   let allowConcurrent = false
+  let maxFileSizeMb = 200
   try {
     const cfg = await fetch('/api/config').then(r => r.json())
-    allowConcurrent = cfg.allow_concurrent ?? false
+    allowConcurrent = cfg.allow_concurrent ?? (cfg.max_concurrent > 1)
+    maxFileSizeMb = cfg.max_file_size_mb ?? 200
   } catch (_) {}
 
-  const maxBytes = allowConcurrent ? undefined : RESTRICTED_MAX_BYTES
+  const maxBytes = maxFileSizeMb * 1024 * 1024
 
   // 更新上传区提示文字
   const hint = document.querySelector('.upload-hint')
   if (hint) {
-    const sizeLabel = allowConcurrent ? '200 MB' : '5 MB'
-    hint.textContent = `支持 MP3 · WAV · OGG · M4A · FLAC · 最大 ${sizeLabel}`
+    hint.textContent = `支持 MP3 · WAV · OGG · M4A · FLAC · 最大 ${maxFileSizeMb} MB`
   }
 
   setupUploader({
@@ -264,6 +267,11 @@ async function initUploaders() {
     onError:  msg => showToast(msg, 'error'),
     multiple: allowConcurrent,
     maxBytes,
+  })
+
+  setupRecorder({
+    onFile:  onFileSelected,
+    onError: msg => showToast(msg, 'error'),
   })
 
   // Scatter panel upload button (always available, single file only)
@@ -346,6 +354,7 @@ $('analyze-btn')?.addEventListener('click', async () => {
 // ─── Segment select → metrics panel ──────────────────────────
 document.addEventListener('segment-select', e => {
   renderMetricsPanel(e.detail.segment)
+  renderConfidenceDistribution(e.detail.segment)
 })
 
 // ─── Scatter dot click → restore session ────────────────────

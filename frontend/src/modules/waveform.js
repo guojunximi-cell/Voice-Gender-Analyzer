@@ -1,5 +1,5 @@
 import WaveSurfer from 'wavesurfer.js'
-import { resolveCSSVar, LABEL_META } from '../utils.js'
+import { resolveCSSVar, LABEL_META, certaintTag } from '../utils.js'
 
 // ─── Color map ────────────────────────────────────────────────
 const LABEL_VARS = {
@@ -53,12 +53,15 @@ function _renderOverlay() {
     const w       = Math.max(2, ((seg.end_time - seg.start_time) / duration) * W)
     const voiced  = seg.label === 'male' || seg.label === 'female'
 
-    // Full-height tint
-    const tint = _svgRect(x, 0, w, BAND_Y, color, 0.13)
+    // Full-height tint — opacity encodes confidence
+    const baseOpacity = voiced ? 0.07 + Math.min(seg.confidence ?? 0.5, 1) * 0.20 : 0.10
+    const tint = _svgRect(x, 0, w, BAND_Y, color, baseOpacity)
+    tint.dataset.baseOpacity = baseOpacity
     svg.appendChild(tint)
 
-    // Bottom band
-    const band = _svgRect(x, BAND_Y, w, BAND_H, color, 1, 2)
+    // Bottom band — also modulated by confidence
+    const bandOpacity = voiced ? 0.55 + Math.min(seg.confidence ?? 0.5, 1) * 0.45 : 1.0
+    const band = _svgRect(x, BAND_Y, w, BAND_H, color, bandOpacity, 2)
     svg.appendChild(band)
 
     // Make voiced segments clickable on the waveform
@@ -69,10 +72,13 @@ function _renderOverlay() {
       hit.setAttribute('data-index', idx)
 
       hit.addEventListener('mouseenter', () => {
-        tint.setAttribute('opacity', 0.22)
+        tint.setAttribute('opacity', Math.min(+tint.dataset.baseOpacity + 0.09, 0.35))
         if (_tooltip) {
           const meta = LABEL_META[seg.label] || { zh: seg.label }
-          _tooltip.textContent = `${meta.zh}  ${fmt(seg.start_time)}–${fmt(seg.end_time)}`
+          const tag  = certaintTag(seg)
+          _tooltip.textContent = tag
+            ? `${meta.zh}  ${fmt(seg.start_time)}–${fmt(seg.end_time)}  · ${tag}`
+            : `${meta.zh}  ${fmt(seg.start_time)}–${fmt(seg.end_time)}`
           const containerW = $('waveform-container').clientWidth
           const centerPct  = ((x + w / 2) / containerW) * 100
           _tooltip.style.left = `${centerPct}%`
@@ -81,14 +87,14 @@ function _renderOverlay() {
       })
 
       hit.addEventListener('mouseleave', () => {
-        if (tint !== _selectedTint) tint.setAttribute('opacity', 0.13)
+        if (tint !== _selectedTint) tint.setAttribute('opacity', tint.dataset.baseOpacity)
         if (_tooltip) _tooltip.classList.remove('visible')
       })
 
       hit.addEventListener('click', (e) => {
         e.stopPropagation()
         // Clear previous selection
-        if (_selectedTint && _selectedTint !== tint) _selectedTint.setAttribute('opacity', 0.13)
+        if (_selectedTint && _selectedTint !== tint) _selectedTint.setAttribute('opacity', _selectedTint.dataset.baseOpacity)
         tint.setAttribute('opacity', 0.30)
         _selectedTint = tint
         document.dispatchEvent(new CustomEvent('segment-select', {

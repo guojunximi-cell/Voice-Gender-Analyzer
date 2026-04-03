@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3)",
+      "Bash(python3 -c \"import inaSpeechSegmenter.segmenter as seg_module; import inspect; print\\(inspect.getsource\\(seg_module.Segmenter.segment_feats\\)\\)\")"
+    ]
+  }
+}

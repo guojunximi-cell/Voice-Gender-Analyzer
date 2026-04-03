@@ -26,63 +26,11 @@
 | 前端 | Vanilla JS + Vite + WaveSurfer.js |
 | 后端 | Python · FastAPI · Uvicorn |
 | 引擎 | inaSpeechSegmenter |
-| 预训练模型 | `interspeech2023_cvfr.hdf5` |
-
-## 目录结构
-
-```
-├── 📄 核心文件
-│   ├── acoustic_analyzer.py      # 声学分析器主模块
-│   ├── main.py                   # 程序入口
-│   ├── interspeech2023_cvfr.hdf5 # 模型权重文件
-│   ├── Dockerfile
-│   ├── railway.toml              # Railway 部署配置
-│   ├── README.md
-│   ├── requirements.txt
-│   ├── requirements-prod.txt
-│   └── .gitignore
-│
-├── 📁 frontend/                  # 前端 (Vite + wavesurfer.js)
-│   ├── index.html
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── vite.config.js
-│   ├── src/
-│   │   ├── modules/
-│   │   ├── styles/
-│   │   ├── main.js
-│   │   └── utils.js
-│   └── node_modules/
-│
-├── 📁 inaSpeechSegmenter-interspeech23/   # 语音分割子项目
-│   ├── inaSpeechSegmenter/       # Python 包源码
-│   ├── media/                    # 测试媒体文件
-│   ├── scripts/
-│   ├── tutorials/
-│   ├── .github/workflows/
-│   ├── setup.py
-│   ├── Dockerfile
-│   ├── LICENSE
-│   └── README.md
-│
-├── 📁 scripts/                   # 脚本目录
-├── 📁 output/                    # 输出目录
-│   └── .gitkeep
-```
 
 
 ## 运行
 
-```bash
-# 终端 1：启动后端
-# 首次运行会自动下载 inaSpeechSegmenter 的 CNN 模型（约 50MB）
-python main.py
-
-# 终端 2：启动前端开发服务器
-cd frontend
-npm run dev
-```
-访问端口即可使用。
+请见 部署.txt
 
 ## 声明
 

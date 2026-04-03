@@ -78,7 +78,10 @@ _queue_depth    = 0
 _queue_lock     = asyncio.Lock()
 
 # ─── 安全配置 ──────────────────────────────────────────────────
-MAX_FILE_SIZE_BYTES = int(os.environ.get("MAX_FILE_SIZE_MB", "5")) * 1024 * 1024
+MAX_FILE_SIZE_MB    = int(os.environ.get("MAX_FILE_SIZE_MB", "200"))
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+# 注意：前端 stripMetadata 会把压缩音频解码为未压缩 PCM WAV 再上传，
+# 因此后端限制需容纳解码后的体积（通常比原始文件大 10-20 倍）。
 
 # IP 速率限制：滑动窗口计数器
 RATE_LIMIT_MAX_CALLS = int(os.environ.get("RATE_LIMIT_MAX_CALLS", "10"))
@@ -203,7 +206,12 @@ else:
 # ─── 配置接口 ──────────────────────────────────────────────────
 @app.get("/api/config")
 def get_config():
-    return {"max_concurrent": MAX_CONCURRENT, "max_queue_depth": MAX_QUEUE_DEPTH}
+    return {
+        "max_concurrent": MAX_CONCURRENT,
+        "max_queue_depth": MAX_QUEUE_DEPTH,
+        "allow_concurrent": MAX_CONCURRENT > 1,
+        "max_file_size_mb": MAX_FILE_SIZE_MB,
+    }
 
 
 # ─── 核心接口 ──────────────────────────────────────────────────
@@ -309,6 +317,7 @@ async def _do_analyze(file: UploadFile):
             start_time = seg_item[1]
             end_time = seg_item[2]
             ina_confidence = seg_item[3] if len(seg_item) > 3 else None
+            confidence_frames = seg_item[4] if len(seg_item) > 4 else None
             duration = end_time - start_time
             acoustics = None
 
@@ -333,6 +342,7 @@ async def _do_analyze(file: UploadFile):
             analysis_data.append({
                 "label":      label,
                 "confidence": confidence,
+                "confidence_frames": confidence_frames,
                 "start_time": round(float(start_time), 2),
                 "end_time":   round(float(end_time),   2),
                 "duration":   round(float(duration),   2),
