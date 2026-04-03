@@ -91,7 +91,7 @@ _ip_call_times: dict = defaultdict(list)
 _ip_rate_lock = asyncio.Lock()
 
 # 允许的文件扩展名白名单（第一道防线）
-_ALLOWED_EXTENSIONS = {'.wav', '.mp3', '.flac', '.ogg', '.opus', '.m4a', '.aac', '.aiff', '.au', '.caf'}
+_ALLOWED_EXTENSIONS = {'.wav', '.mp3', '.flac', '.ogg', '.opus', '.m4a', '.aac', '.aiff', '.au', '.caf', '.webm'}
 
 
 def _is_valid_audio_magic(data: bytes) -> bool:
@@ -124,6 +124,9 @@ def _is_valid_audio_magic(data: bytes) -> bool:
         return True
     # AU / SND
     if data[0:4] == b'.snd':
+        return True
+    # WebM / Matroska (EBML header)
+    if data[0:4] == b'\x1a\x45\xdf\xa3':
         return True
     return False
 
