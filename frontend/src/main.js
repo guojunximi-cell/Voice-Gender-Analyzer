@@ -422,14 +422,18 @@ function initScatterFromStorage() {
   const leftHeader = leftPanel?.querySelector('.panel-header')
   if (!leftPanel || !leftHeader) return
 
+  // Start expanded on mobile so the chart is visible by default
+  if (mq.matches) leftPanel.classList.add('panel-expanded')
+
   leftHeader.addEventListener('click', () => {
     if (!mq.matches) return
     leftPanel.classList.toggle('panel-expanded')
   })
 
-  // Reset on resize to desktop
+  // Reset on resize to desktop; expand when entering mobile
   mq.addEventListener('change', e => {
     if (!e.matches) leftPanel.classList.remove('panel-expanded')
+    else leftPanel.classList.add('panel-expanded')
   })
 })()
 

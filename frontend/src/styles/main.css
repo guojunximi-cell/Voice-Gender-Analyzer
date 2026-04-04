@@ -1263,7 +1263,8 @@ body {
     transition: max-height 300ms ease;
   }
   .panel-left.panel-expanded .scatter-wrap {
-    max-height: 300px;
+    max-height: 260px;
+    min-height: 180px;
   }
   .panel-left .panel-header {
     cursor: pointer;
