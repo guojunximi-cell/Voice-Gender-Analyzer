@@ -44,6 +44,7 @@
   <aside class="panel panel-left">
     <div class="panel-header">
       <span class="panel-title">历史分析</span>
+      <span class="panel-collapse-chevron" aria-hidden="true"></span>
       <div class="panel-header-actions">
         <!-- Upload new file (available at all times) -->
         <label class="icon-btn" title="上传新文件" id="scatter-upload-label">
@@ -198,6 +199,12 @@
         </div>
       </div>
     </section>
+
+    <!-- Mobile tabs (visible only on narrow screens) -->
+    <div class="mobile-tabs" id="mobile-tabs" hidden>
+      <button class="mobile-tab active" data-tab="segments">分段详情</button>
+      <button class="mobile-tab" data-tab="metrics">声学特征</button>
+    </div>
 
     <!-- Segment list -->
     <section id="segments-section" class="card" hidden>

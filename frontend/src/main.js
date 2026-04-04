@@ -415,6 +415,87 @@ function initScatterFromStorage() {
   if (stored.length) loadAllSessions(stored)
 }
 
+// ─── Mobile: collapsible left panel ──────────────────────────
+;(function initMobilePanel() {
+  const mq = matchMedia('(max-width: 780px)')
+  const leftPanel = document.querySelector('.panel-left')
+  const leftHeader = leftPanel?.querySelector('.panel-header')
+  if (!leftPanel || !leftHeader) return
+
+  leftHeader.addEventListener('click', () => {
+    if (!mq.matches) return
+    leftPanel.classList.toggle('panel-expanded')
+  })
+
+  // Reset on resize to desktop
+  mq.addEventListener('change', e => {
+    if (!e.matches) leftPanel.classList.remove('panel-expanded')
+  })
+})()
+
+// ─── Mobile: tabs for segments / metrics ─────────────────────
+;(function initMobileTabs() {
+  const mq = matchMedia('(max-width: 780px)')
+  const tabBar = $('mobile-tabs')
+  const segSection = $('segments-section')
+  const rightPanel = document.querySelector('.panel-right')
+  if (!tabBar || !rightPanel) return
+
+  const tabs = tabBar.querySelectorAll('.mobile-tab')
+  let activeTab = 'segments'
+
+  function applyTab(tab) {
+    activeTab = tab
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab))
+    if (!mq.matches) {
+      // Desktop: show everything
+      segSection?.classList.remove('mobile-hidden')
+      rightPanel.classList.remove('mobile-hidden')
+      return
+    }
+    if (tab === 'segments') {
+      segSection?.classList.remove('mobile-hidden')
+      rightPanel.classList.add('mobile-hidden')
+    } else {
+      segSection?.classList.add('mobile-hidden')
+      rightPanel.classList.remove('mobile-hidden')
+    }
+  }
+
+  tabBar.addEventListener('click', e => {
+    const btn = e.target.closest('.mobile-tab')
+    if (!btn) return
+    applyTab(btn.dataset.tab)
+  })
+
+  // Show tab bar when stats are visible (results phase)
+  const observer = new MutationObserver(() => {
+    const statsVisible = !$('stats-section')?.hidden
+    tabBar.hidden = !statsVisible
+    if (statsVisible && mq.matches) applyTab(activeTab)
+  })
+  const statsEl = $('stats-section')
+  if (statsEl) observer.observe(statsEl, { attributes: true, attributeFilter: ['hidden'] })
+
+  // Auto-switch to metrics when a segment is clicked on mobile
+  document.addEventListener('segment-select', () => {
+    if (mq.matches) {
+      applyTab('metrics')
+      rightPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  })
+
+  // Reset on resize to desktop
+  mq.addEventListener('change', e => {
+    if (!e.matches) {
+      segSection?.classList.remove('mobile-hidden')
+      rightPanel.classList.remove('mobile-hidden')
+    } else {
+      applyTab(activeTab)
+    }
+  })
+})()
+
 // ─── Boot ─────────────────────────────────────────────────────
 initTheme()
 setPhase('idle')

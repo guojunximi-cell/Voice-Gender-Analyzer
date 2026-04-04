@@ -1232,16 +1232,100 @@ body {
 @media (max-width: 780px) {
   .app-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: 220px auto;
+    grid-template-rows: auto auto auto;
     height: auto;
     overflow: visible;
   }
-  .panel-left  { height: 220px; border-right: none; border-bottom: 1px solid var(--border); }
-  .panel-right { border-left: none; border-top: 1px solid var(--border); }
-  .stats-grid  { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .stat-pct    { font-size: 1.3rem; }
-  .stat-card   { padding: 14px 12px 10px; }
+  .panel-center { order: 1; }
+  .panel-right  { order: 2; border-left: none; border-top: 1px solid var(--border); }
+  .panel-left   { order: 3; height: auto; border-right: none; border-top: 1px solid var(--border); }
+  .stats-grid   { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat-pct     { font-size: 1.3rem; }
+  .stat-card    { padding: 14px 12px 10px; }
   .mc-cards-row { grid-template-columns: 1fr 1fr; }
+
+  /* Compact metrics placeholder */
+  .metrics-placeholder {
+    height: auto;
+    padding: 16px;
+    flex-direction: row;
+    gap: 8px;
+    min-height: 0;
+  }
+  .metrics-placeholder svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .metrics-placeholder span { font-size: 0.78rem; }
+  .metrics-placeholder span br { display: none; }
+
+  /* Collapsible left panel */
+  .panel-left .scatter-wrap {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 300ms ease;
+  }
+  .panel-left.panel-expanded .scatter-wrap {
+    max-height: 300px;
+  }
+  .panel-left .panel-header {
+    cursor: pointer;
+  }
+  .panel-collapse-chevron {
+    display: inline-block;
+    font-size: 0.8rem;
+    transition: transform 200ms ease;
+    color: var(--text-muted);
+    margin-left: 4px;
+  }
+  .panel-collapse-chevron::after { content: '›'; }
+  .panel-left.panel-expanded .panel-collapse-chevron {
+    transform: rotate(90deg);
+  }
+
+  /* Touch-friendly targets */
+  .icon-btn { padding: 10px; min-width: 44px; min-height: 44px; justify-content: center; }
+  .segment-item { min-height: 44px; padding: 10px; }
+  .play-btn { width: 44px; height: 44px; }
+  .btn-primary { padding: 12px 20px; }
+  .seek-thumb { width: 18px; height: 18px; }
+  .seek-track { height: 6px; }
+  .seek-bar { height: 28px; }
+  .mc-collapsible-header { min-height: 44px; padding: 10px 12px; }
+  .recorder-mic-btn { padding: 10px 16px; }
+
+  /* Mobile tabs */
+  .mobile-tabs {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .mobile-tab {
+    flex: 1;
+    padding: 10px 8px;
+    background: var(--bg-secondary);
+    border: none;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+    min-height: 44px;
+  }
+  .mobile-tab + .mobile-tab { border-left: 1px solid var(--border); }
+  .mobile-tab.active {
+    background: var(--surface);
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .mobile-tab:hover:not(.active) {
+    background: var(--surface-hover);
+    color: var(--text-secondary);
+  }
+
+  /* When metrics tab is active, hide segments; when segments tab active, hide right panel */
+  .panel-right.mobile-hidden { display: none; }
+  #segments-section.mobile-hidden { display: none !important; }
 }
 
 /* ============================================================
@@ -1348,4 +1432,44 @@ body {
 }
 .recorder-stop-btn:hover {
   background: rgba(224, 82, 82, 0.08); color: #e05252; border-color: rgba(224, 82, 82, 0.3);
+}
+
+/* ============================================================
+   MOBILE: hide elements on desktop
+   ============================================================ */
+.panel-collapse-chevron { display: none; }
+.mobile-tabs { display: none; }
+
+/* ============================================================
+   PHONE BREAKPOINT (480px)
+   ============================================================ */
+@media (max-width: 480px) {
+  .panel-center { padding: 12px 12px 40px; }
+  .upload-zone { padding: 28px 16px; }
+  .upload-title { font-size: 0.9rem; }
+  .upload-hint { font-size: 0.72rem; }
+  .stats-grid { grid-template-columns: 1fr; gap: 8px; }
+  .stat-pct { font-size: 1.1rem; }
+  .stat-card { padding: 12px 10px 10px; }
+  .controls {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .controls .btn-primary {
+    order: 10;
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .mc-cards-row { grid-template-columns: 1fr; }
+  .toast {
+    max-width: calc(100vw - 32px);
+    left: 16px;
+    right: 16px;
+    transform: translateY(20px);
+  }
+  .toast.show {
+    transform: translateY(0);
+  }
+  .header-inner { padding: 0 16px; }
 }
