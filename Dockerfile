@@ -23,8 +23,8 @@ COPY inaSpeechSegmenter-interspeech23/ ./inaSpeechSegmenter-interspeech23/
 RUN pip install --no-cache-dir ./inaSpeechSegmenter-interspeech23/
 
 # ── Install remaining Python dependencies ─────────────────────
-COPY requirements-prod.txt .
-RUN pip install --no-cache-dir -r requirements-prod.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ── Pre-download AI models (baked into image, no cold-start delay) ──
 RUN python -c "from inaSpeechSegmenter import Segmenter; Segmenter(detect_gender=True); print('Models ready')"

@@ -78,10 +78,10 @@ _queue_depth    = 0
 _queue_lock     = asyncio.Lock()
 
 # ─── 安全配置 ──────────────────────────────────────────────────
-MAX_FILE_SIZE_MB    = int(os.environ.get("MAX_FILE_SIZE_MB", "200"))
+MAX_FILE_SIZE_MB    = int(os.environ.get("MAX_FILE_SIZE_MB", "10"))
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
-# 注意：前端 stripMetadata 会把压缩音频解码为未压缩 PCM WAV 再上传，
-# 因此后端限制需容纳解码后的体积（通常比原始文件大 10-20 倍）。
+
+MAX_AUDIO_DURATION_SEC = int(os.environ.get("MAX_AUDIO_DURATION_SEC", "180"))  # 最多 3 分钟
 
 # IP 速率限制：滑动窗口计数器
 RATE_LIMIT_MAX_CALLS = int(os.environ.get("RATE_LIMIT_MAX_CALLS", "10"))
@@ -214,6 +214,7 @@ def get_config():
         "max_queue_depth": MAX_QUEUE_DEPTH,
         "allow_concurrent": MAX_CONCURRENT > 1,
         "max_file_size_mb": MAX_FILE_SIZE_MB,
+        "max_audio_duration_sec": MAX_AUDIO_DURATION_SEC,
     }
 
 
@@ -294,6 +295,20 @@ async def _do_analyze(file: UploadFile):
         except Exception as e:
             logger.warning("ffmpeg 转码失败，回退至原始文件 [Task: %s]: %s", task_id, e)
             analysis_path = tmp_path
+
+        # ── 时长限制 ───────────────────────────────────────────
+        try:
+            audio_duration = librosa.get_duration(filename=analysis_path)
+            if audio_duration > MAX_AUDIO_DURATION_SEC:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"音频时长 {audio_duration:.0f} 秒，超过 {MAX_AUDIO_DURATION_SEC} 秒（{MAX_AUDIO_DURATION_SEC // 60} 分钟）限制"
+                )
+            logger.info("音频时长 %.1f 秒 [Task: %s]", audio_duration, task_id)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning("无法获取音频时长 [Task: %s]: %s", task_id, e)
 
         # ── Engine A: 时间分段 ─────────────────────────────────
         if seg is None:

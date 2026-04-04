@@ -1,7 +1,7 @@
 const ACCEPTED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4',
                         'audio/x-m4a', 'audio/m4a', 'audio/flac', 'audio/aac', 'audio/webm']
 const ACCEPTED_EXTS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.opus', '.aiff', '.au', '.caf', '.webm']
-export const DEFAULT_MAX_BYTES = 200 * 1024 * 1024  // 200 MB（并发模式）
+export const DEFAULT_MAX_BYTES = 5 * 1024 * 1024    // 5 MB
 export const RESTRICTED_MAX_BYTES = 5 * 1024 * 1024 // 5 MB（非并发模式）
 
 export function validateFile(file, maxBytes = DEFAULT_MAX_BYTES) {

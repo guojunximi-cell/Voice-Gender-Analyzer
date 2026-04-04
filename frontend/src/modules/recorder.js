@@ -14,6 +14,7 @@ export function setupRecorder({ onFile, onError }) {
   micBtn.addEventListener('click',  e => { e.stopPropagation(); _start() })
   stopBtn.addEventListener('click', e => { e.stopPropagation(); _stop()  })
 
+  const MAX_RECORD_SEC = 180  // 最多录制 3 分钟
   let _mr = null, _chunks = [], _stream = null, _timer = null, _secs = 0
 
   async function _start() {
@@ -44,6 +45,7 @@ export function setupRecorder({ onFile, onError }) {
     _timer = setInterval(() => {
       _secs++
       timerEl.textContent = `${Math.floor(_secs / 60)}:${String(_secs % 60).padStart(2, '0')}`
+      if (_secs >= MAX_RECORD_SEC) _stop()
     }, 1000)
   }
 

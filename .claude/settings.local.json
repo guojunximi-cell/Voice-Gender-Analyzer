@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(ls E:/ai/VGA_v2/*.py)"
-    ]
-  }
-}

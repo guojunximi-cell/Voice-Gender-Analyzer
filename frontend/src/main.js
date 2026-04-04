@@ -246,11 +246,13 @@ async function onMultipleFilesSelected(files) {
 // ─── Uploaders ────────────────────────────────────────────────
 async function initUploaders() {
   let allowConcurrent = false
-  let maxFileSizeMb = 200
+  let maxFileSizeMb = 5
+  let maxDurationSec = 180
   try {
     const cfg = await fetch('/api/config').then(r => r.json())
     allowConcurrent = cfg.allow_concurrent ?? (cfg.max_concurrent > 1)
-    maxFileSizeMb = cfg.max_file_size_mb ?? 200
+    maxFileSizeMb = cfg.max_file_size_mb ?? 5
+    maxDurationSec = cfg.max_audio_duration_sec ?? 180
   } catch (_) {}
 
   const maxBytes = maxFileSizeMb * 1024 * 1024
@@ -258,7 +260,7 @@ async function initUploaders() {
   // 更新上传区提示文字
   const hint = document.querySelector('.upload-hint')
   if (hint) {
-    hint.textContent = `支持 MP3 · WAV · OGG · M4A · FLAC · 最大 ${maxFileSizeMb} MB`
+    hint.textContent = `支持 MP3 · WAV · OGG · M4A · FLAC · 最大 ${maxFileSizeMb} MB / ${Math.floor(maxDurationSec / 60)} 分钟`
   }
 
   setupUploader({

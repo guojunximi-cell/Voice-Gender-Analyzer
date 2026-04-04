@@ -5,7 +5,7 @@
 const _controllers = new Set()
 
 const TIMEOUT_MS = 120_000      // 2 minutes
-const STRIP_MAX_BYTES = 50 * 1024 * 1024  // skip stripping for files > 50 MB
+const STRIP_MAX_BYTES = 5 * 1024 * 1024   // skip stripping for files > 5 MB
 
 // ─── Metadata stripping ──────────────────────────────────────
 // Decode audio with AudioContext, re-encode as bare 16-bit PCM WAV.
