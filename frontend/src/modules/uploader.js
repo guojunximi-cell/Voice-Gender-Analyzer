@@ -6,6 +6,7 @@ export const RESTRICTED_MAX_BYTES = 5 * 1024 * 1024 // 5 MB（非并发模式）
 
 export function validateFile(file, maxBytes = DEFAULT_MAX_BYTES) {
   if (!file) return 'No file selected'
+  if (file.size === 0) return '文件内容为空，请重新选择。'
 
   const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
   const isAudio = file.type.startsWith('audio/') || ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTS.includes(ext)

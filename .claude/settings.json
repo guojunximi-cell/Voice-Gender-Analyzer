@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /e/ai/VGA_v2 -type f \\\\\\( -name \"*.js\" -o -name \"*.py\" \\\\\\) ! -path \"*/venv/*\" ! -path \"*/node_modules/*\" -exec grep -l \"不支持\" {} \\\\;)"
+    ]
+  }
+}

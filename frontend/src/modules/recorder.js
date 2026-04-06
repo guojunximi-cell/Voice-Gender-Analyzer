@@ -65,6 +65,7 @@ export function setupRecorder({ onFile, onError }) {
     const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const file = new File(_chunks, `录音-${ts}${ext}`, { type: mime })
     _mr = null; _chunks = []
+    if (file.size === 0) { onError('录音内容为空，请重新录制'); return }
     onFile(file)
   }
 
