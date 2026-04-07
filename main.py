@@ -287,12 +287,18 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
     )
 
     if wants_stream:
+        # Read file content eagerly here — UploadFile's SpooledTemporaryFile
+        # may be closed after this function returns, before the lazy streaming
+        # generator gets a chance to call file.read(), causing "read of closed file".
+        _stream_content = await files[0].read()
+        _stream_filename = files[0].filename or "upload"
+
         async def _guarded_stream():
             """Hold semaphore & queue slot for the full streaming lifetime."""
             global _queue_depth
             try:
                 async with _processing_sem:
-                    async for chunk in _do_analyze_stream(files[0]):
+                    async for chunk in _do_analyze_stream(_stream_filename, _stream_content):
                         yield chunk
             finally:
                 async with _queue_lock:
@@ -317,19 +323,19 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
 
 
 
-async def _do_analyze_stream(file: UploadFile):
+async def _do_analyze_stream(filename: str, content: bytes):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     task_id = uuid.uuid4().hex[:8]
     logger.info("收到文件 [Task: %s] (大小待测量)", task_id)
 
-    file_ext = os.path.splitext(file.filename)[1].lower() or ".wav"
+    file_ext = os.path.splitext(filename)[1].lower() or ".wav"
 
     tmp_path = None
     mp3_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
             tmp_path = tmp.name   # 在写入之前赋值，确保 finally 能清理
-            tmp.write(await file.read())
+            tmp.write(content)
         # ── 转码：统一为 64kbps 单声道 MP3，降低后续 I/O 开销 ──
         yield _sse_event({"type": "progress", "pct": 5, "msg": "鸭鸭正在处理音频…"})
         loop = asyncio.get_running_loop()
@@ -498,7 +504,7 @@ async def _do_analyze_stream(file: UploadFile):
 
         result = {
             "status":   "success",
-            "filename": file.filename,
+            "filename": filename,
             "summary": {
                 "total_female_time_sec":  round(total_female_sec, 2),
                 "total_male_time_sec":    round(total_male_sec,   2),
@@ -527,8 +533,10 @@ async def _do_analyze_stream(file: UploadFile):
 
 async def _do_analyze(file: UploadFile):
     """Non-streaming wrapper: consumes the stream generator, returns the final result."""
+    content = await file.read()
+    filename = file.filename or "upload"
     last_result = None
-    async for event_str in _do_analyze_stream(file):
+    async for event_str in _do_analyze_stream(filename, content):
         line = event_str.strip()
         if line.startswith("data: "):
             payload = json.loads(line[6:])
