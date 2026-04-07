@@ -133,6 +133,10 @@ function _finishDuck() {
 // ── Hide duck immediately (error / cancel) ──────────────────
 function _hideDuck() {
   _stopEngineAInterp()
+  // Also cancel fake animation if running
+  cancelAnimationFrame(_duckRaf)
+  clearInterval(_duckMsgTimer)
+  _duckRaf = null
   const bar  = $('duck-progress')
   const fill = $('duck-fill')
   const emoji = $('duck-emoji')
@@ -142,8 +146,13 @@ function _hideDuck() {
   emoji.style.left = '3%'
 }
 
-// ── Fake animation (batch mode only) ────────────────────────
+// ── Fake animation (initial wait + batch mode) ──────────────
 function _startDuckFake() {
+  // Cancel any previous fake animation before starting a new one
+  cancelAnimationFrame(_duckRaf)
+  clearInterval(_duckMsgTimer)
+  _duckRaf = null
+
   const bar   = $('duck-progress')
   const fill  = $('duck-fill')
   const emoji = $('duck-emoji')
@@ -210,7 +219,7 @@ function setPhase(next) {
     if (icon) icon.style.display = analyzing ? 'none' : ''
   }
 
-  if (next === 'analyzing') _setDuckProgress(0, '准备中…')
+  if (next === 'analyzing') _startDuckFake()
   else if (next === 'results') _finishDuck()
   else if (!_batchInProgress) _hideDuck()
 }
@@ -365,6 +374,13 @@ $('analyze-btn')?.addEventListener('click', async () => {
   try {
     const data = await analyzeAudio(currentFile, {
       onProgress(pct, msg) {
+        // First real SSE event: stop fake animation and switch to real progress
+        if (_duckRaf !== null) {
+          cancelAnimationFrame(_duckRaf)
+          clearInterval(_duckMsgTimer)
+          _duckRaf = null
+        }
+
         if (pct > 10) _stopEngineAInterp()
 
         if (pct === 10) {
