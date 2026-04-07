@@ -4,7 +4,7 @@
 
 const _controllers = new Set()
 
-const TIMEOUT_MS = 120_000      // 2 minutes
+const TIMEOUT_MS = 360_000      // 6 minutes (Railway CPU is slower than local)
 const STRIP_MAX_BYTES = 5 * 1024 * 1024   // skip stripping for files > 5 MB
 
 // ─── Metadata stripping ──────────────────────────────────────

@@ -364,7 +364,14 @@ async def _do_analyze_stream(file: UploadFile):
             raise RuntimeError("Engine A (inaSpeechSegmenter) 未能成功加载，无法分析")
         yield _sse_event({"type": "progress", "pct": 10, "msg": "鸭鸭正在聆听声纹…（此步骤较慢）"})
         logger.info("Engine A 分析中... [Task: %s]", task_id)
-        segmentation_result = await loop.run_in_executor(None, seg, analysis_path)
+        # 用 keepalive ping 防止 Railway 代理因长时间无数据而关闭 SSE 连接
+        _seg_fut = loop.run_in_executor(None, seg, analysis_path)
+        while not _seg_fut.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(_seg_fut), timeout=15)
+            except asyncio.TimeoutError:
+                yield _sse_event({"type": "progress", "pct": 10, "msg": "鸭鸭正在聆听声纹…（此步骤较慢）"})
+        segmentation_result = await _seg_fut
         # segmentation_result: [('male'|'female'|..., start, end), ...]
 
         yield _sse_event({"type": "progress", "pct": 50, "msg": "鸭鸭听完了！正在整理笔记…"})

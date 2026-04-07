@@ -424,6 +424,7 @@ $('analyze-btn')?.addEventListener('click', async () => {
   } catch (err) {
     if (err.name === 'AbortError') {
       if (phase === 'analyzing') setPhase('loaded')
+      showToast('分析超时，请尝试较短的音频文件', 'error')
       return
     }
     showToast(`分析失败：${err.message}`, 'error')
