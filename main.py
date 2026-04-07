@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import subprocess
@@ -39,7 +40,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List
 import uvicorn
@@ -88,7 +89,7 @@ RATE_LIMIT_MAX_CALLS = int(os.environ.get("RATE_LIMIT_MAX_CALLS", "10"))
 RATE_LIMIT_WINDOW_SEC = int(os.environ.get("RATE_LIMIT_WINDOW_SEC", "60"))
 
 _ip_call_times: dict = defaultdict(list)
-_ip_rate_lock = asyncio.Lock()
+_ip_rate_locks: dict = defaultdict(asyncio.Lock)  # 每个 IP 独立锁，避免全局串行化
 
 # 允许的文件扩展名白名单（第一道防线）
 _ALLOWED_EXTENSIONS = {'.wav', '.mp3', '.flac', '.ogg', '.opus', '.m4a', '.aac', '.aiff', '.au', '.caf', '.webm'}
@@ -131,6 +132,11 @@ def _is_valid_audio_magic(data: bytes) -> bool:
     return False
 
 
+def _sse_event(data: dict) -> str:
+    """Format a dict as an SSE data line."""
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 def _transcode_to_mp3(in_path: str, out_path: str) -> None:
     """将任意音频格式转码为 64kbps 单声道 22050Hz MP3，减少分析时的 I/O 开销。"""
     subprocess.run(
@@ -151,12 +157,17 @@ def _transcode_to_mp3(in_path: str, out_path: str) -> None:
 
 async def _check_rate_limit(ip: str) -> None:
     """滑动窗口速率限制；超限时抛出 429"""
-    async with _ip_rate_lock:
+    async with _ip_rate_locks[ip]:
         now = time.monotonic()
         cutoff = now - RATE_LIMIT_WINDOW_SEC
         # 清理窗口期外的旧记录
-        _ip_call_times[ip] = [t for t in _ip_call_times[ip] if t > cutoff]
-        if len(_ip_call_times[ip]) >= RATE_LIMIT_MAX_CALLS:
+        recent = [t for t in _ip_call_times[ip] if t > cutoff]
+        if not recent:
+            _ip_call_times.pop(ip, None)
+            recent = []
+        else:
+            _ip_call_times[ip] = recent
+        if len(recent) >= RATE_LIMIT_MAX_CALLS:
             raise HTTPException(
                 status_code=429,
                 detail=f"请求过于频繁：每 {RATE_LIMIT_WINDOW_SEC} 秒最多允许 {RATE_LIMIT_MAX_CALLS} 次请求，请稍后再试"
@@ -187,7 +198,7 @@ app = FastAPI(title="VFP Voice Analysis API", version="2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -224,7 +235,14 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
     global _queue_depth
 
     # ── 1. IP 速率限制 ─────────────────────────────────────────
-    client_ip = request.client.host
+    # 优先从 X-Forwarded-For 获取真实 IP（反向代理场景），回退到 request.client
+    _forwarded = request.headers.get("x-forwarded-for")
+    if _forwarded:
+        client_ip = _forwarded.split(",")[0].strip()
+    elif request.client:
+        client_ip = request.client.host
+    else:
+        client_ip = "unknown"
     await _check_rate_limit(client_ip)
 
     # ── 2. 文件安全校验 ────────────────────────────────────────
@@ -262,6 +280,31 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
             )
         _queue_depth += 1
 
+    # ── 4. SSE 流式响应（单文件 + Accept: text/event-stream）──
+    wants_stream = (
+        len(files) == 1
+        and "text/event-stream" in request.headers.get("accept", "")
+    )
+
+    if wants_stream:
+        async def _guarded_stream():
+            """Hold semaphore & queue slot for the full streaming lifetime."""
+            global _queue_depth
+            try:
+                async with _processing_sem:
+                    async for chunk in _do_analyze_stream(files[0]):
+                        yield chunk
+            finally:
+                async with _queue_lock:
+                    _queue_depth -= 1
+
+        return StreamingResponse(
+            _guarded_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    # ── 5. 经典 JSON 响应（批量 / 不支持 SSE 的客户端）────────
     try:
         # 获取信号量 → 同时最多 MAX_CONCURRENT 个请求在处理
         async with _processing_sem:
@@ -274,22 +317,25 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
 
 
 
-async def _do_analyze(file: UploadFile):
+async def _do_analyze_stream(file: UploadFile):
+    """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     task_id = uuid.uuid4().hex[:8]
     logger.info("收到文件 [Task: %s] (大小待测量)", task_id)
 
     file_ext = os.path.splitext(file.filename)[1].lower() or ".wav"
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
-
+    tmp_path = None
     mp3_path = None
     try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
+            tmp_path = tmp.name   # 在写入之前赋值，确保 finally 能清理
+            tmp.write(await file.read())
         # ── 转码：统一为 64kbps 单声道 MP3，降低后续 I/O 开销 ──
+        yield _sse_event({"type": "progress", "pct": 5, "msg": "鸭鸭正在处理音频…"})
+        loop = asyncio.get_running_loop()
         mp3_path = tmp_path + '_normalized.mp3'
         try:
-            _transcode_to_mp3(tmp_path, mp3_path)
+            await loop.run_in_executor(None, _transcode_to_mp3, tmp_path, mp3_path)
             analysis_path = mp3_path
             logger.info("已转码为标准化 MP3 [Task: %s]", task_id)
         except Exception as e:
@@ -297,8 +343,11 @@ async def _do_analyze(file: UploadFile):
             analysis_path = tmp_path
 
         # ── 时长限制 ───────────────────────────────────────────
+        yield _sse_event({"type": "progress", "pct": 8, "msg": "鸭鸭在检查音频时长…"})
         try:
-            audio_duration = librosa.get_duration(filename=analysis_path)
+            audio_duration = await loop.run_in_executor(
+                None, lambda: librosa.get_duration(path=analysis_path)
+            )
             if audio_duration > MAX_AUDIO_DURATION_SEC:
                 raise HTTPException(
                     status_code=413,
@@ -313,10 +362,12 @@ async def _do_analyze(file: UploadFile):
         # ── Engine A: 时间分段 ─────────────────────────────────
         if seg is None:
             raise RuntimeError("Engine A (inaSpeechSegmenter) 未能成功加载，无法分析")
+        yield _sse_event({"type": "progress", "pct": 10, "msg": "鸭鸭正在聆听声纹…（此步骤较慢）"})
         logger.info("Engine A 分析中... [Task: %s]", task_id)
-        loop = asyncio.get_running_loop()
         segmentation_result = await loop.run_in_executor(None, seg, analysis_path)
         # segmentation_result: [('male'|'female'|..., start, end), ...]
+
+        yield _sse_event({"type": "progress", "pct": 50, "msg": "鸭鸭听完了！正在整理笔记…"})
 
         analysis_data    = []
         total_female_sec = 0.0
@@ -324,12 +375,23 @@ async def _do_analyze(file: UploadFile):
         voiced_acoustics = []   # [(acoustics_dict, duration_sec), ...]
 
         # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
+        yield _sse_event({"type": "progress", "pct": 55, "msg": "鸭鸭正在载入音频…"})
         try:
             logger.info("正在将音频载入内存以供 Engine B 切片 [Task: %s]...", task_id)
-            y_full, sr_full = librosa.load(analysis_path, sr=22050, mono=True)
+            y_full, sr_full = await loop.run_in_executor(
+                None, lambda: librosa.load(analysis_path, sr=22050, mono=True)
+            )
         except Exception as e:
             logger.warning("librosa 读取音频失败 [Task: %s]: %s", task_id, e)
             y_full, sr_full = None, 22050
+
+        # Pre-count voiced segments for Engine B progress
+        total_voiced = sum(
+            1 for s in segmentation_result
+            if s[0] in ("female", "male") and (s[2] - s[1]) >= 0.5
+        ) if y_full is not None else 0
+        voiced_idx = 0
+
         for seg_item in segmentation_result:
             label = seg_item[0]
             start_time = seg_item[1]
@@ -341,14 +403,23 @@ async def _do_analyze(file: UploadFile):
 
             # ── Engine B: 声学分析（仅对有声语音段）────────────
             if label in ("female", "male") and duration >= 0.5 and y_full is not None:
+                voiced_idx += 1
+                pct = 55 + (voiced_idx / max(total_voiced, 1)) * 40
+                yield _sse_event({
+                    "type": "progress",
+                    "pct": round(pct, 1),
+                    "msg": f"鸭鸭在分析第 {voiced_idx}/{total_voiced} 段…",
+                })
                 try:
                     # 直接在内存中对 NumPy 数组进行切片，速度极快
                     start_sample = int(float(start_time) * sr_full)
                     end_sample   = int(float(end_time) * sr_full)
                     y_seg = y_full[start_sample:end_sample]
-                    
+
                     if len(y_seg) > 0:
-                        acoustics = analyze_segment(y_seg, sr_full)
+                        acoustics = await loop.run_in_executor(
+                            None, analyze_segment, y_seg, sr_full
+                        )
                     if acoustics:
                         voiced_acoustics.append((acoustics, duration))
                 except Exception as e:
@@ -373,6 +444,7 @@ async def _do_analyze(file: UploadFile):
                 total_male_sec += duration
 
         # ── 全局汇总统计 ───────────────────────────────────────
+        yield _sse_event({"type": "progress", "pct": 98, "msg": "鸭鸭快好了…"})
         total_voice_sec  = total_female_sec + total_male_sec
         female_ratio     = (total_female_sec / total_voice_sec) if total_voice_sec > 0 else 0.0
 
@@ -417,7 +489,7 @@ async def _do_analyze(file: UploadFile):
             task_id, len(analysis_data), overall_f0, overall_gender_score, female_ratio * 100,
         )
 
-        return {
+        result = {
             "status":   "success",
             "filename": file.filename,
             "summary": {
@@ -431,15 +503,33 @@ async def _do_analyze(file: UploadFile):
             },
             "analysis": analysis_data,
         }
+        yield _sse_event({"type": "result", "pct": 100, "data": result})
 
+    except HTTPException as e:
+        logger.error("分析失败 [Task: %s]: %s", task_id, e.detail)
+        yield _sse_event({"type": "error", "msg": e.detail})
     except Exception as e:
         logger.error("分析失败 [Task: %s]: %s", task_id, e)
-        return {"status": "error", "message": str(e)}
+        yield _sse_event({"type": "error", "msg": str(e)})
 
     finally:
         for p in (tmp_path, mp3_path):
             if p and os.path.exists(p):
                 os.remove(p)
+
+
+async def _do_analyze(file: UploadFile):
+    """Non-streaming wrapper: consumes the stream generator, returns the final result."""
+    last_result = None
+    async for event_str in _do_analyze_stream(file):
+        line = event_str.strip()
+        if line.startswith("data: "):
+            payload = json.loads(line[6:])
+            if payload.get("type") == "result":
+                last_result = payload["data"]
+            elif payload.get("type") == "error":
+                return {"status": "error", "message": payload["msg"]}
+    return last_result or {"status": "error", "message": "未收到分析结果"}
 
 
 if __name__ == "__main__":

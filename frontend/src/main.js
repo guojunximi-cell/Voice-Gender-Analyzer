@@ -60,6 +60,7 @@ $('theme-toggle')?.addEventListener('click', () => {
 })
 
 // ─── Duck progress bar ───────────────────────────────────────
+// Fake animation messages (batch mode only)
 const _DUCK_MESSAGES = [
   '正在聆听声纹…',
   '鸭鸭努力工作中…',
@@ -70,8 +71,79 @@ const _DUCK_MESSAGES = [
 ]
 let _duckRaf = null
 let _duckMsgTimer = null
+let _engineAInterp = null
 
-function _startDuck() {
+// ── Real progress: set duck bar to exact percentage ──────────
+function _setDuckProgress(pct, msg) {
+  const bar   = $('duck-progress')
+  const fill  = $('duck-fill')
+  const emoji = $('duck-emoji')
+  const label = $('duck-label')
+  if (!fill) return
+
+  bar.hidden = false
+  fill.style.width = pct + '%'
+  emoji.style.left = Math.max(3, Math.min(97, pct)) + '%'
+  if (msg && label) label.textContent = msg
+}
+
+// ── Engine A interpolation (slow visual hint while Engine A blocks) ──
+function _startEngineAInterp() {
+  _stopEngineAInterp()
+  const start = Date.now()
+  const FROM = 10, TO = 45
+  const DURATION_MS = 90_000
+
+  function tick() {
+    const elapsed = Date.now() - start
+    const t = Math.min(1, Math.sqrt(elapsed / DURATION_MS))
+    const pct = FROM + t * (TO - FROM)
+    _setDuckProgress(pct, null)
+    _engineAInterp = requestAnimationFrame(tick)
+  }
+  _engineAInterp = requestAnimationFrame(tick)
+}
+
+function _stopEngineAInterp() {
+  if (_engineAInterp) {
+    cancelAnimationFrame(_engineAInterp)
+    _engineAInterp = null
+  }
+}
+
+// ── Finish duck: snap to 100% then hide ─────────────────────
+function _finishDuck() {
+  _stopEngineAInterp()
+  const bar   = $('duck-progress')
+  const fill  = $('duck-fill')
+  const emoji = $('duck-emoji')
+  const label = $('duck-label')
+  if (!fill) return
+
+  fill.style.width  = '100%'
+  emoji.style.left  = '97%'
+  if (label) label.textContent = '分析完成 🎉'
+  setTimeout(() => {
+    if (bar) bar.hidden = true
+    fill.style.width  = '0%'
+    emoji.style.left  = '3%'
+  }, 800)
+}
+
+// ── Hide duck immediately (error / cancel) ──────────────────
+function _hideDuck() {
+  _stopEngineAInterp()
+  const bar  = $('duck-progress')
+  const fill = $('duck-fill')
+  const emoji = $('duck-emoji')
+  if (!fill) return
+  if (bar) bar.hidden = true
+  fill.style.width = '0%'
+  emoji.style.left = '3%'
+}
+
+// ── Fake animation (batch mode only) ────────────────────────
+function _startDuckFake() {
   const bar   = $('duck-progress')
   const fill  = $('duck-fill')
   const emoji = $('duck-emoji')
@@ -79,13 +151,12 @@ function _startDuck() {
   if (!bar) return
 
   bar.hidden = false
-  fill.style.transition = ''
   fill.style.width  = '0%'
   emoji.style.left  = '3%'
 
   const start = Date.now()
   const MAX_PCT = 88
-  const DURATION_MS = 100_000   // reach ~88% in ~100s
+  const DURATION_MS = 100_000
 
   function tick() {
     const elapsed = Date.now() - start
@@ -96,7 +167,6 @@ function _startDuck() {
   }
   _duckRaf = requestAnimationFrame(tick)
 
-  // Rotate messages
   let msgIdx = 0
   label.textContent = _DUCK_MESSAGES[0]
   _duckMsgTimer = setInterval(() => {
@@ -105,34 +175,15 @@ function _startDuck() {
   }, 4000)
 }
 
-function _stopDuck(success = true) {
+function _stopDuckFake(success = true) {
   cancelAnimationFrame(_duckRaf)
   clearInterval(_duckMsgTimer)
   _duckRaf = null
 
-  const bar   = $('duck-progress')
-  const fill  = $('duck-fill')
-  const emoji = $('duck-emoji')
-  const label = $('duck-label')
-  if (!fill) return
-
   if (success) {
-    fill.style.transition  = 'width 0.4s ease'
-    emoji.style.transition = 'left 0.4s ease'
-    fill.style.width  = '100%'
-    emoji.style.left  = '97%'
-    if (label) label.textContent = '分析完成 🎉'
-    setTimeout(() => {
-      if (bar) bar.hidden = true
-      fill.style.transition  = ''
-      emoji.style.transition = ''
-      fill.style.width  = '0%'
-      emoji.style.left  = '3%'
-    }, 800)
+    _finishDuck()
   } else {
-    if (bar) bar.hidden = true
-    fill.style.width  = '0%'
-    emoji.style.left  = '3%'
+    _hideDuck()
   }
 }
 
@@ -159,9 +210,9 @@ function setPhase(next) {
     if (icon) icon.style.display = analyzing ? 'none' : ''
   }
 
-  if (next === 'analyzing') _startDuck()
-  else if (next === 'results') _stopDuck(true)
-  else if (!_batchInProgress) _stopDuck(false)
+  if (next === 'analyzing') _setDuckProgress(0, '准备中…')
+  else if (next === 'results') _finishDuck()
+  else if (!_batchInProgress) _hideDuck()
 }
 
 // ─── File loaded ──────────────────────────────────────────────
@@ -223,22 +274,22 @@ async function onMultipleFilesSelected(files) {
     const icon = $('analyze-btn').querySelector('svg')
     if (icon) icon.style.display = 'none'
   }
-  _startDuck()
+  _startDuckFake()
 
-  const results = await Promise.allSettled(files.map(f => _silentAnalyzeAndSave(f)))
-  const ok = results.filter(r => r.status === 'fulfilled' && r.value).length
+  // 分批发送请求（每次最多 2 个），避免同时发出所有请求导致服务器 503
+  const BATCH_SIZE = 2
+  let ok = 0
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const batch = files.slice(i, i + BATCH_SIZE)
+    const results = await Promise.allSettled(batch.map(f => _silentAnalyzeAndSave(f)))
+    ok += results.filter(r => r.status === 'fulfilled' && r.value).length
+  }
 
   _batchInProgress = false
-  _stopDuck(ok > 0)
+  _stopDuckFake(ok > 0)
 
-  // 恢复按钮到 loaded 状态（第一个文件仍可单独分析）
-  if ($('analyze-text'))    $('analyze-text').textContent = '开始分析'
-  if ($('analyze-spinner')) $('analyze-spinner').hidden   = true
-  if ($('analyze-btn')) {
-    $('analyze-btn').disabled = false
-    const icon = $('analyze-btn').querySelector('svg')
-    if (icon) icon.style.display = ''
-  }
+  // 批量完成后标记为 results 状态，防止用户重复分析第一个文件
+  setPhase('results')
 
   showToast(`批量分析完成：${ok} / ${files.length} 个成功`)
 }
@@ -312,7 +363,18 @@ $('analyze-btn')?.addEventListener('click', async () => {
   clearMetricsPanel()
 
   try {
-    const data = await analyzeAudio(currentFile)
+    const data = await analyzeAudio(currentFile, {
+      onProgress(pct, msg) {
+        if (pct > 10) _stopEngineAInterp()
+
+        if (pct === 10) {
+          _setDuckProgress(10, msg)
+          _startEngineAInterp()
+        } else {
+          _setDuckProgress(pct, msg)
+        }
+      },
+    })
     analysisData = data
 
     // Draw timeline overlay on waveform
@@ -328,7 +390,7 @@ $('analyze-btn')?.addEventListener('click', async () => {
     if (data.summary.overall_f0_median_hz != null)
     {
       const session = {
-        id:           Date.now().toString(),
+        id:           Date.now().toString() + Math.random().toString(36).slice(2, 8),
         filename:     data.filename,
         f0_median:    data.summary.overall_f0_median_hz,
         gender_score: data.summary.overall_gender_score,

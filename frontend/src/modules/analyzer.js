@@ -52,11 +52,11 @@ async function _stripMetadata(file) {
     console.info('[声音分析鸭] 文件较大，跳过元数据剥离:', file.name)
     return file
   }
+  let ctx = null
   try {
     const arrayBuf = await file.arrayBuffer()
-    const ctx      = new (window.AudioContext || window.webkitAudioContext)()
+    ctx = new (window.AudioContext || window.webkitAudioContext)()
     const audioBuf = await ctx.decodeAudioData(arrayBuf)
-    await ctx.close()
 
     // 压缩格式解码为 PCM WAV 后体积会暴增（10-20 倍），
     // 如果解码后超过原始大小的 5 倍就放弃剥离，直接用原始文件。
@@ -73,25 +73,76 @@ async function _stripMetadata(file) {
   } catch (err) {
     console.warn('[声音分析鸭] 元数据剥离失败，使用原始文件:', err)
     return file
+  } finally {
+    if (ctx) try { await ctx.close() } catch (_) {}
   }
+}
+
+// ─── SSE stream reader ───────────────────────────────────────
+
+async function _readSSEStream(response, onProgress) {
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let resultData = null
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+
+      let boundary
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        const eventText = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+
+        for (const line of eventText.split('\n')) {
+          if (!line.startsWith('data: ')) continue
+          const payload = JSON.parse(line.slice(6))
+
+          if (payload.type === 'progress') {
+            onProgress(payload.pct, payload.msg)
+          } else if (payload.type === 'result') {
+            onProgress(100, '分析完成 🎉')
+            resultData = payload.data
+          } else if (payload.type === 'error') {
+            throw new Error(payload.msg || '后端分析出错')
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  if (!resultData) throw new Error('未收到分析结果')
+  if (resultData.status === 'error') throw new Error(resultData.message || '后端分析出错')
+  return resultData
 }
 
 // ─────────────────────────────────────────────────────────────
 
-export async function analyzeAudio(file) {
+export async function analyzeAudio(file, { onProgress } = {}) {
   const controller = new AbortController()
   _controllers.add(controller)
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
   const strippedFile = await _stripMetadata(file)
   const formData = new FormData()
+  // 超时从 fetch 开始计时，不包含元数据剥离耗时
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
   formData.append('files', strippedFile)
+
+  const headers = {}
+  if (onProgress) headers['Accept'] = 'text/event-stream'
 
   try {
     const response = await fetch('/api/analyze-voice', {
       method: 'POST',
       body: formData,
       signal: controller.signal,
+      headers,
     })
 
     clearTimeout(timeoutId)
@@ -105,6 +156,12 @@ export async function analyzeAudio(file) {
       throw new Error(msg)
     }
 
+    // SSE streaming mode
+    if (onProgress && response.headers.get('content-type')?.includes('text/event-stream')) {
+      return await _readSSEStream(response, onProgress)
+    }
+
+    // Classic JSON mode (batch / fallback)
     const data = await response.json()
 
     if (data.status === 'error') {

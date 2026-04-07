@@ -1037,6 +1037,20 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.gender-ref-score {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+}
+
+.mc-subscores {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
 /* Segment acoustic dot indicator */
 .segment-acoustic-dot {
   width: 6px;
@@ -1350,6 +1364,7 @@ body {
   background: linear-gradient(90deg, var(--accent-subtle), var(--accent));
   border-radius: 99px;
   pointer-events: none;
+  transition: width 0.5s ease-out;
 }
 
 .duck-emoji {
@@ -1362,6 +1377,7 @@ body {
   pointer-events: none;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
   animation: duck-bob 0.55s ease-in-out infinite alternate;
+  transition: left 0.5s ease-out;
 }
 
 @keyframes duck-bob {

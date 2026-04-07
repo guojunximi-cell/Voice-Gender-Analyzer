@@ -18,13 +18,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# ── Install inaSpeechSegmenter from local source ──────────────
-COPY inaSpeechSegmenter-interspeech23/ ./inaSpeechSegmenter-interspeech23/
-RUN pip install --no-cache-dir ./inaSpeechSegmenter-interspeech23/
-
-# ── Install remaining Python dependencies ─────────────────────
+# ── Install Python dependencies (PyPI) ────────────────────────
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# ── Install inaSpeechSegmenter from local source (AFTER PyPI) ─
+# Must come after requirements.txt so our patched version
+# (with per-frame confidence data) overwrites the stock PyPI build.
+COPY inaSpeechSegmenter-interspeech23/ ./inaSpeechSegmenter-interspeech23/
+RUN pip install --no-cache-dir --force-reinstall --no-deps ./inaSpeechSegmenter-interspeech23/
 
 # ── Pre-download AI models (baked into image, no cold-start delay) ──
 RUN python -c "from inaSpeechSegmenter import Segmenter; Segmenter(detect_gender=True); print('Models ready')"
