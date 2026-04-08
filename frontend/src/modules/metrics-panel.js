@@ -140,9 +140,9 @@ export function renderMetricsPanel(segment) {
   const conf = segment.confidence != null ? segment.confidence : (a.gender_score / 100)
   renderGenderBar(conf, segment.label)
 
-  // Reference: Engine B acoustic gender_score
-  const refEl = document.getElementById('mc-gender-score-ref')
-  if (refEl) refEl.textContent = a.gender_score != null ? `${Math.round(a.gender_score)}%` : '—'
+  // Engine B 已永久下线，不再更新声学评分展示
+  // const refEl = document.getElementById('mc-gender-score-ref')
+  // if (refEl) refEl.textContent = a.gender_score != null ? `${Math.round(a.gender_score)}%` : '—'
 
   // ── Sub-scores ───────────────────────────────────────────
   renderSubScores(a)

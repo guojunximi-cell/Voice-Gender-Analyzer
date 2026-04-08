@@ -1,3 +1,5 @@
+# NOTE: Engine B (声学分析 / inaSpeechSegmenter acoustic gender_score) 已于 2026-04-07 永久下线。
+#       UI 层已移除相关展示，后端分析逻辑暂时保留但结果不再对外呈现。
 import asyncio
 import json
 import logging

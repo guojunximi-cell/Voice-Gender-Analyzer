@@ -22,6 +22,13 @@
       </svg>
       <span>声音分析鸭</span>
     </a>
+    <button id="help-toggle" class="icon-btn" aria-label="使用帮助">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    </button>
     <button id="theme-toggle" class="icon-btn" aria-label="切换主题">
       <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/>
@@ -309,7 +316,8 @@
             </div>
           </div>
           <div class="gender-score-display" id="mc-gender-score">—</div>
-          <div class="gender-ref-score">声学评分 (Engine B): <span id="mc-gender-score-ref">—</span></div>
+          <!-- Engine B 已永久下线，隐藏声学评分展示 -->
+          <div class="gender-ref-score" hidden>声学评分 (Engine B): <span id="mc-gender-score-ref">—</span></div>
           <div id="mc-certainty-tag" class="certainty-tag" hidden></div>
           <div id="mc-subscores" class="mc-subscores"></div>
         </div>
@@ -328,6 +336,113 @@
 
 <!-- Toast -->
 <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+<!-- 帮助说明浮层 -->
+<div id="help-modal" class="vga-help-modal card">
+  <div class="vga-help-header">
+    <span>🦆 声音分析鸭 · 使用说明</span>
+    <button id="help-close" class="icon-btn" aria-label="关闭">✕</button>
+  </div>
+  <section class="vga-help-section">
+    <h4>这是什么？</h4>
+    <p>上传或录制一段音频，自动分析声音中的性别声学特征，输出 AI 分类置信度与多维声学评分，适合声音训练参考。</p>
+  </section>
+  <section class="vga-help-section">
+    <h4>如何使用？</h4>
+    <ol>
+      <li>拖拽音频文件 / 点击上传 / 点击麦克风录音</li>
+      <li>点击「开始分析」，等待鸭子跑完进度条</li>
+      <li>在右侧面板查看声学指标，点击音段查看详情</li>
+    </ol>
+  </section>
+  <section class="vga-help-section">
+    <h4>结果怎么看？</h4>
+    <dl>
+      <dt>Engine A · 分类置信度</dt>
+      <dd>AI 神经网络对「女声/男声」的判断置信度，越高说明声音特征越典型。</dd>
+      <dt>Engine B · 声学评分</dt>
+      <dd>由音高 (45%)、共振峰 (30%)、共鸣 (15%)、频谱倾斜 (10%) 加权合成的 0–100 分，100 分为最女性化声学特征。</dd>
+      <dt>音高（F0）</dt>
+      <dd>说话基频中位数，以 165 Hz 为中性分界，越高越偏女性化。</dd>
+      <dt>共振峰（F1/F2/F3）</dt>
+      <dd>声道共鸣频率。F2 是核心女性化指标，高于 1400 Hz 偏女性化。</dd>
+      <dt>频谱倾斜</dt>
+      <dd>高频能量衰减速率。-2 dB/oct 偏女性化，-7 dB/oct 偏男性化。</dd>
+    </dl>
+  </section>
+</div>
+<style>
+  .vga-help-modal {
+    display: none;
+    position: fixed;
+    top: 56px;
+    right: 16px;
+    width: 360px;
+    max-height: calc(100vh - 72px);
+    overflow-y: auto;
+    padding: 18px 20px 20px;
+    z-index: 9998;
+  }
+  .vga-help-modal.show {
+    display: block;
+    animation: vgaPopIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .vga-help-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .vga-help-section {
+    margin-bottom: 14px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .vga-help-section h4 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .vga-help-section p,
+  .vga-help-section ol,
+  .vga-help-section dd {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0 0 6px 0;
+  }
+  .vga-help-section ol { padding-left: 18px; }
+  .vga-help-section dl { margin: 0; }
+  .vga-help-section dt {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 8px;
+  }
+</style>
+<script>
+  (function () {
+    const helpToggle = document.getElementById('help-toggle');
+    const helpModal  = document.getElementById('help-modal');
+    const helpClose  = document.getElementById('help-close');
+    helpToggle.addEventListener('click', () => helpModal.classList.toggle('show'));
+    helpClose.addEventListener('click',  () => helpModal.classList.remove('show'));
+    document.addEventListener('click', (e) => {
+      if (helpModal.classList.contains('show') &&
+          !helpModal.contains(e.target) &&
+          e.target !== helpToggle &&
+          !helpToggle.contains(e.target)) {
+        helpModal.classList.remove('show');
+      }
+    });
+  })();
+</script>
 
 <style>
   .upload-privacy-badge {
