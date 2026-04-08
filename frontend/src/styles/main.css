@@ -1251,8 +1251,9 @@ body {
     overflow: visible;
   }
   .panel-center { order: 1; }
-  .panel-right  { order: 2; border-left: none; border-top: 1px solid var(--border); }
-  .panel-left   { order: 3; height: auto; border-right: none; border-top: 1px solid var(--border); }
+  .panel-left   { order: 2; height: auto; border-right: none; border-top: 1px solid var(--border); }
+  .panel-right  { order: 3; border-left: none; border-top: 1px solid var(--border); }
+  .upload-zone  { padding: 36px 20px; }
   .stats-grid   { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .stat-pct     { font-size: 1.3rem; }
   .stat-card    { padding: 14px 12px 10px; }
