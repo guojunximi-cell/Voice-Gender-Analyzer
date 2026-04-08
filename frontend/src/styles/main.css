@@ -143,6 +143,11 @@ body {
 .logo:hover {
   opacity: 0.75;
 }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 /* ============================================================
    MAIN LAYOUT

@@ -22,6 +22,7 @@
       </svg>
       <span>声音分析鸭</span>
     </a>
+    <div class="header-actions">
     <button id="help-toggle" class="icon-btn" aria-label="使用帮助">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="12" cy="12" r="10"/>
@@ -41,6 +42,7 @@
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
       </svg>
     </button>
+    </div>
   </div>
 </header>
 
@@ -316,8 +318,7 @@
             </div>
           </div>
           <div class="gender-score-display" id="mc-gender-score">—</div>
-          <!-- Engine B 已永久下线，隐藏声学评分展示 -->
-          <div class="gender-ref-score" hidden>声学评分 (Engine B): <span id="mc-gender-score-ref">—</span></div>
+          <div class="gender-ref-score">声学评分 (Engine B): <span id="mc-gender-score-ref">—</span></div>
           <div id="mc-certainty-tag" class="certainty-tag" hidden></div>
           <div id="mc-subscores" class="mc-subscores"></div>
         </div>
