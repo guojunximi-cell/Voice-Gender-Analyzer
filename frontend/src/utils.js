@@ -40,6 +40,18 @@ export function resolveCSSVar(varName) {
     .trim()
 }
 
+// ─── Tier → color (5 discrete levels, 1=masculine → 5=feminine) ──
+const _TIER_COLORS = [
+  'rgba(37,99,235,0.9)',    // 1: Deep Blue  — typical masculine
+  'rgba(96,165,250,0.9)',   // 2: Light Blue — masculine-leaning
+  'rgba(139,92,246,0.9)',   // 3: Purple     — neutral / androgynous
+  'rgba(244,114,182,0.9)', // 4: Light Pink  — feminine-leaning
+  'rgba(219,39,119,0.9)',  // 5: Deep Pink   — typical feminine
+]
+export function tierToColor(tier) {
+  return _TIER_COLORS[Math.max(1, Math.min(5, tier || 3)) - 1]
+}
+
 // ─── Score → color (Blue→Violet→Rose gradient, score 0–100) ──
 export function scoreToColor(score) {
   const t = Math.max(0, Math.min(score, 100)) / 100

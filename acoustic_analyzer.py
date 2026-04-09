@@ -135,16 +135,16 @@ def _extract_formants(y: np.ndarray, sr: int) -> tuple[int | None, int | None, i
 
     f1 = int(round(float(np.median(frames_f1)))) if len(frames_f1) >= 3 else None
     f2 = int(round(float(np.median(frames_f2)))) if len(frames_f2) >= 3 else None
-    f3 = int(round(float(np.median(frames_f3)))) if len(frames_f3) >= 3 else None
+    f3 = int(round(float(np.median(frames_f3)))) if len(frames_f3) >= 2 else None
 
     return f1, f2, f3
 
 
-# ─── Spectral Tilt ───────────────────────────────────────────
+# ─── Spectral Tilt (dB/octave) ───────────────────────────────
 def _compute_spectral_tilt(y: np.ndarray, sr: int) -> float | None:
     """
     Spectral tilt = slope of log-power spectrum vs. log-frequency (dB/octave).
-    Negative = more low-frequency energy (masculine); less negative = more feminine.
+    Kept for backward compatibility; not used in tier scoring.
     """
     n_fft = min(2048, len(y) // 2 * 2)
     if n_fft < 128:
@@ -169,18 +169,63 @@ def _compute_spectral_tilt(y: np.ndarray, sr: int) -> float | None:
     return round(slope, 2)
 
 
+# ─── H1–H2 Harmonic Difference ───────────────────────────────
+def _compute_h1_h2(y: np.ndarray, sr: int, f0_hz: float) -> float | None:
+    """
+    H1–H2: amplitude difference (dB) between the first and second harmonics.
+    Higher values → more breathiness / feminine vocal quality.
+    Uses peak search within ±15 Hz of each harmonic target.
+    """
+    n_fft = 4096  # fixed size for consistent frequency resolution (~5.4 Hz/bin at 22050 Hz)
+
+    try:
+        spectrum = np.abs(np.fft.rfft(y, n=n_fft)) ** 2
+        freqs    = np.fft.rfftfreq(n_fft, 1.0 / sr)
+
+        window_hz = max(20.0, f0_hz * 0.25)  # proportional to F0; at least 20 Hz
+
+        def _peak_amp(target_hz: float) -> float | None:
+            mask = np.abs(freqs - target_hz) < window_hz
+            if not np.any(mask):
+                return None
+            return float(np.sqrt(np.max(spectrum[mask])))
+
+        h1 = _peak_amp(f0_hz)
+        h2 = _peak_amp(2.0 * f0_hz)
+
+        if h1 is None or h2 is None or h1 < 1e-10 or h2 < 1e-10:
+            return None
+
+        return round(20.0 * np.log10(h1 / h2), 2)
+    except Exception:
+        return None
+
+
 # ─── VTL / Resonance ─────────────────────────────────────────
+def _compute_vtl_cm(f3_hz: int | None, f2_hz: int | None = None) -> float | None:
+    """
+    Estimates vocal tract length via quarter-wave formula.
+    Primary:  F3-based  L = 5c / (4·F3)   (most accurate)
+    Fallback: F2-based  L = 3c / (4·F2)   (when F3 unavailable)
+    Typical range: female ~13–15 cm, male ~17–19 cm.
+    """
+    if f3_hz and f3_hz > 200:
+        return round((5.0 * SPEED_OF_SOUND_CM_S) / (4.0 * f3_hz), 2)
+    if f2_hz and f2_hz > 200:
+        vtl = (3.0 * SPEED_OF_SOUND_CM_S) / (4.0 * f2_hz)
+        return round(vtl, 2) if 10.0 < vtl < 25.0 else None
+    return None
+
+
 def _compute_resonance(f3_hz: int | None, f0_median: float | None) -> float:
     """
-    Estimates vocal tract length from F3 (quarter-wave formula) and maps
-    it to a 0–100% resonance score (100 = most feminine).
+    Maps VTL (from F3) to a 0–100% resonance score (100 = most feminine).
     Falls back to F0-based estimate if F3 is unavailable.
     """
     f0 = f0_median or 150.0
+    vtl_cm = _compute_vtl_cm(f3_hz)
 
-    if f3_hz and f3_hz > 200:
-        # F3 = 5c / (4L)  →  L = 5c / (4 * F3)
-        vtl_cm = (5.0 * SPEED_OF_SOUND_CM_S) / (4.0 * f3_hz)
+    if vtl_cm is not None:
         # Typical VTL: female ~13–15 cm, male ~17–19 cm
         vtl_score = 1.0 - (vtl_cm - 13.0) / (19.0 - 13.0)
         vtl_score = max(0.0, min(1.0, vtl_score))
@@ -198,7 +243,7 @@ def _compute_resonance(f3_hz: int | None, f0_median: float | None) -> float:
     return round(blended * 100.0, 1)
 
 
-# ─── Individual Scores ───────────────────────────────────────
+# ─── Individual Scores (0–100, used for composite gender_score) ──
 def _score_pitch(f0_hz: float) -> float:
     """Sigmoid centered at 165 Hz (transition zone between male/female ranges)."""
     return round(_sigmoid((f0_hz - 165.0) / 35.0) * 100.0, 1)
@@ -218,14 +263,80 @@ def _score_formants(f2_hz: int | None, f3_hz: int | None) -> float:
     return round(f2_score, 1)
 
 
-def _score_spectral_tilt(tilt: float | None) -> float:
+def _score_spectral_tilt(h1_h2_db: float | None) -> float:
     """
-    Maps dB/octave slope to 0–100 score.
-    -2 dB/oct → ~85 (feminine), -4 → ~50 (neutral), -7 → ~15 (masculine).
+    Maps H1–H2 difference (dB) to 0–100 score.
+    Center at ~5.5 dB (neutral); <1 dB → masculine, >11 dB → feminine.
     """
-    if tilt is None:
+    if h1_h2_db is None:
         return 50.0
-    return round(_sigmoid((tilt + 4.0) / 1.2) * 100.0, 1)
+    return round(_sigmoid((h1_h2_db - 5.5) / 3.0) * 100.0, 1)
+
+
+# ─── 5-Tier Color Classification (1=masculine → 5=feminine) ──
+def _tier_pitch(f0_hz: float) -> int:
+    """Map F0 (Hz) to 5-tier gender color class."""
+    if f0_hz < 120: return 1
+    if f0_hz < 155: return 2
+    if f0_hz < 185: return 3
+    if f0_hz < 225: return 4
+    return 5
+
+
+def _tier_formants(f1: int | None, f2: int | None, f3: int | None) -> int:
+    """
+    Weighted formant tier: F2 primary (0.5), F1 and F3 secondary (0.25 each).
+    Based on v2.0 ranges: F2 boundaries at 1400/1600/1900/2200 Hz.
+    """
+    def _f1t(v: int) -> int:
+        if v < 550: return 1
+        if v < 620: return 2
+        if v < 670: return 3
+        if v < 750: return 4
+        return 5
+
+    def _f2t(v: int) -> int:
+        if v < 1400: return 1
+        if v < 1600: return 2
+        if v < 1900: return 3
+        if v < 2200: return 4
+        return 5
+
+    def _f3t(v: int) -> int:
+        if v < 2500: return 1
+        if v < 2700: return 2
+        if v < 2950: return 3
+        if v < 3200: return 4
+        return 5
+
+    total, weight = 0.0, 0.0
+    if f2 is not None:
+        total += _f2t(f2) * 0.50; weight += 0.50
+    if f1 is not None:
+        total += _f1t(f1) * 0.25; weight += 0.25
+    if f3 is not None:
+        total += _f3t(f3) * 0.25; weight += 0.25
+    if weight == 0.0:
+        return 3
+    return max(1, min(5, round(total / weight)))
+
+
+def _tier_vtl(vtl_cm: float) -> int:
+    """Map VTL (cm) to 5-tier gender color class."""
+    if vtl_cm > 17.5: return 1
+    if vtl_cm > 16.5: return 2
+    if vtl_cm > 15.5: return 3
+    if vtl_cm > 14.5: return 4
+    return 5
+
+
+def _tier_h1_h2(h1_h2_db: float) -> int:
+    """Map H1–H2 difference (dB) to 5-tier gender color class."""
+    if h1_h2_db < 1:  return 1
+    if h1_h2_db < 4:  return 2
+    if h1_h2_db < 7:  return 3
+    if h1_h2_db < 11: return 4
+    return 5
 
 
 def _composite_score(
@@ -279,34 +390,50 @@ def analyze_segment(y: np.ndarray, sr: int) -> dict | None:
     # ── Formants ────────────────────────────────────────────
     f1, f2, f3 = _extract_formants(y, sr)
 
-    # ── Spectral Tilt ────────────────────────────────────────
+    # ── Spectral Tilt (dB/oct, kept for reference) ───────────
     tilt = _compute_spectral_tilt(y, sr)
 
-    # ── Resonance ────────────────────────────────────────────
+    # ── H1–H2 Harmonic Difference ────────────────────────────
+    h1_h2 = _compute_h1_h2(y, sr, f0_median)
+
+    # ── Resonance / VTL ──────────────────────────────────────
+    vtl_cm    = _compute_vtl_cm(f3, f2)
     resonance = _compute_resonance(f3, f0_median)
 
-    # ── Scores ───────────────────────────────────────────────
+    # ── Scores (0–100, used for composite gender_score) ──────
     pitch_score    = _score_pitch(f0_median)
     formant_score  = _score_formants(f2, f3)
-    tilt_score     = _score_spectral_tilt(tilt)
+    tilt_score     = _score_spectral_tilt(h1_h2)   # now H1–H2 based
     resonance_score = resonance   # already 0–100
 
     gender_score = _composite_score(
         pitch_score, formant_score, resonance_score, tilt_score
     )
 
+    # ── 5-Tier Color Classes ──────────────────────────────────
+    pitch_tier   = _tier_pitch(f0_median)
+    formant_tier = _tier_formants(f1, f2, f3)
+    vtl_tier     = _tier_vtl(vtl_cm) if vtl_cm is not None else 3
+    tilt_tier    = _tier_h1_h2(h1_h2) if h1_h2 is not None else 3
+
     return {
-        "f0_median_hz":       f0_median,
-        "f0_std_hz":          f0_std,
-        "f1_hz":              f1,
-        "f2_hz":              f2,
-        "f3_hz":              f3,
+        "f0_median_hz":         f0_median,
+        "f0_std_hz":            f0_std,
+        "f1_hz":                f1,
+        "f2_hz":                f2,
+        "f3_hz":                f3,
         "spectral_tilt_db_oct": tilt,
-        "resonance_pct":      resonance,
-        "gender_score":       gender_score,
-        "pitch_score":        pitch_score,
-        "formant_score":      formant_score,
-        "resonance_score":    resonance_score,
-        "tilt_score":         tilt_score,
-        "voiced_frames":      voiced_frames,
+        "h1_h2_db":             h1_h2,
+        "vtl_cm":               vtl_cm,
+        "resonance_pct":        resonance,
+        "gender_score":         gender_score,
+        "pitch_score":          pitch_score,
+        "formant_score":        formant_score,
+        "resonance_score":      resonance_score,
+        "tilt_score":           tilt_score,
+        "pitch_tier":           pitch_tier,
+        "formant_tier":         formant_tier,
+        "vtl_tier":             vtl_tier,
+        "tilt_tier":            tilt_tier,
+        "voiced_frames":        voiced_frames,
     }

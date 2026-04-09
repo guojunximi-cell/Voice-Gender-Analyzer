@@ -3,7 +3,7 @@
  * Called whenever a segment is clicked (waveform overlay or list item).
  */
 
-import { sigmaRescale, LABEL_META, scoreToColor, certaintTag } from '../utils.js'
+import { sigmaRescale, LABEL_META, scoreToColor, tierToColor, certaintTag } from '../utils.js'
 
 // ─── Animated number counter ──────────────────────────────────
 function animNum(el, target, suffix = '', duration = 600) {
@@ -26,36 +26,107 @@ function animBar(el, pct, delay = 0) {
 }
 
 // ─── Sub-score row builder ────────────────────────────────────
+// Each entry defines physical measurement display for a slider track.
+// rawKey: actual measured value from acoustics (Hz / cm / dB)
+// tierKey: 1–5 tier returned by backend for color
+// range: [min, max] of the physical scale shown on the track
+// logScale: use log2 mapping for position (pitch)
+// reversed: higher raw value = left (masculine) side (VTL)
+// ticks: tier boundary values for tick mark positions
 const SUB_SCORE_DEFS = [
-  { key: 'pitch_score',     label: '音高',   weight: '45%' },
-  { key: 'formant_score',   label: '共振峰', weight: '30%' },
-  { key: 'resonance_score', label: '共鸣',   weight: '15%' },
-  { key: 'tilt_score',      label: '倾斜',   weight: '10%' },
+  {
+    label: '音高',
+    rawKey: 'f0_median_hz', tierKey: 'pitch_tier',
+    unit: 'Hz', range: [80, 280], logScale: true, reversed: false,
+    ticks: [120, 155, 185, 225],
+    fmt: v => `${Math.round(v)} Hz`,
+  },
+  {
+    label: '共振峰',
+    rawKey: 'f2_hz', tierKey: 'formant_tier',
+    unit: 'Hz', range: [1000, 2500], logScale: false, reversed: false,
+    ticks: [1400, 1600, 1900, 2200],
+    fmt: v => `${Math.round(v)} Hz`,
+  },
+  {
+    label: '共鸣',
+    rawKey: 'vtl_cm', tierKey: 'vtl_tier',
+    unit: 'cm', range: [12, 20], logScale: false, reversed: true,
+    ticks: [17.5, 16.5, 15.5, 14.5],
+    fmt: v => `${v.toFixed(1)} cm`,
+  },
+  {
+    label: '倾斜',
+    rawKey: 'h1_h2_db', tierKey: 'tilt_tier',
+    unit: 'dB', range: [-2, 15], logScale: false, reversed: false,
+    ticks: [1, 4, 7, 11],
+    fmt: v => `${v.toFixed(1)} dB`,
+  },
 ]
+
+function _physicalToPercent(def, rawVal) {
+  if (rawVal == null) return 50
+  const [lo, hi] = def.range
+  let pct
+  if (def.logScale) {
+    const logMin = Math.log2(lo), logMax = Math.log2(hi)
+    const logVal = Math.log2(Math.max(lo, Math.min(hi, rawVal)))
+    pct = (logVal - logMin) / (logMax - logMin) * 100
+  } else {
+    pct = (Math.max(lo, Math.min(hi, rawVal)) - lo) / (hi - lo) * 100
+  }
+  return def.reversed ? 100 - pct : pct
+}
 
 function renderSubScores(a) {
   const el = document.getElementById('mc-subscores')
   if (!el) return
   el.innerHTML = ''
+
   for (const def of SUB_SCORE_DEFS) {
-    const val = a[def.key] ?? null
+    const rawVal = a[def.rawKey] ?? null
+    const tier   = a[def.tierKey] ?? null
+    const color  = tierToColor(tier)
+    const pct    = _physicalToPercent(def, rawVal)
+    const valStr = rawVal != null ? def.fmt(rawVal) : `— ${def.unit}`
+
+    // Build tick mark HTML at tier boundary positions
+    const ticksHtml = def.ticks.map(t => {
+      const tp = _physicalToPercent(def, t)
+      return `<div class="src-tick" style="left:${tp.toFixed(1)}%"></div>`
+    }).join('')
+
     const row = document.createElement('div')
-    row.className = 'subscore-row'
+    row.className = 'src-row'
     row.innerHTML = `
-      <span class="subscore-label">${def.label} <span class="subscore-weight">(${def.weight})</span></span>
-      <div class="subscore-bar-wrap">
-        <div class="subscore-bar-fill" style="width:0%"></div>
+      <div class="src-header">
+        <span class="src-label">${def.label}</span>
+        <span class="src-val">${valStr}</span>
       </div>
-      <span class="subscore-val">${val != null ? Math.round(val) + '%' : '—'}</span>
+      <div class="src-track-wrap">
+        <div class="src-track">
+          ${ticksHtml}
+          <div class="src-marker" style="left:50%;background:${color}"></div>
+        </div>
+      </div>
     `
     el.appendChild(row)
-    if (val != null) {
+
+    if (rawVal != null) {
       requestAnimationFrame(() => {
-        const fill = row.querySelector('.subscore-bar-fill')
-        if (fill) fill.style.width = `${val}%`
+        const marker = row.querySelector('.src-marker')
+        if (marker) marker.style.left = `${Math.max(0, Math.min(100, pct))}%`
       })
     }
   }
+
+  const legend = document.createElement('div')
+  legend.className = 'src-zone-legend'
+  legend.innerHTML = `
+    <span class="src-legend-male">♂ 男性化</span>
+    <span class="src-legend-female">♀ 女性化</span>
+  `
+  el.appendChild(legend)
 }
 
 // ─── Gender spectrum bar ──────────────────────────────────────
@@ -118,11 +189,11 @@ export function renderMetricsPanel(segment) {
   setFormant('mc-f2', a.f2_hz)
   setFormant('mc-f3', a.f3_hz)
 
-  // ── Spectral Tilt ────────────────────────────────────────
+  // ── Spectral Tilt (H1–H2) ───────────────────────────────
   const tiltEl = document.getElementById('mc-tilt-val')
   if (tiltEl) {
-    tiltEl.textContent = a.spectral_tilt_db_oct != null
-      ? `${a.spectral_tilt_db_oct.toFixed(1)} dB/oct`
+    tiltEl.textContent = a.h1_h2_db != null
+      ? `${a.h1_h2_db.toFixed(1)} dB`
       : '—'
   }
 
@@ -139,9 +210,6 @@ export function renderMetricsPanel(segment) {
   // ── Gender score bar (Engine A confidence as primary) ────
   const conf = segment.confidence != null ? segment.confidence : (a.gender_score / 100)
   renderGenderBar(conf, segment.label)
-
-  const refEl = document.getElementById('mc-gender-score-ref')
-  if (refEl) refEl.textContent = a.gender_score != null ? `${Math.round(a.gender_score)}%` : '—'
 
   // ── Sub-scores ───────────────────────────────────────────
   renderSubScores(a)

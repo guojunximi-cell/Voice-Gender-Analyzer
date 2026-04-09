@@ -1,5 +1,7 @@
 # NOTE: Engine B (声学分析 / inaSpeechSegmenter acoustic gender_score) 已于 2026-04-07 永久下线。
 #       UI 层已移除相关展示，后端分析逻辑暂时保留但结果不再对外呈现。
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'inaSpeechSegmenter-interspeech23'))
 import asyncio
 import json
 import logging
@@ -151,6 +153,7 @@ def _transcode_to_mp3(in_path: str, out_path: str) -> None:
             '-f', 'mp3',
             out_path,
         ],
+        
         check=True,
         timeout=120,
         capture_output=True,
@@ -188,6 +191,15 @@ async def lifespan(_app: FastAPI):
         loop = asyncio.get_event_loop()
         seg = await loop.run_in_executor(None, lambda: Segmenter(detect_gender=True))
         logger.info("Engine A (inaSpeechSegmenter) 加载完毕")
+        # ── logit 模型诊断 ──
+        if seg is not None and hasattr(seg, 'gender'):
+            _g = seg.gender
+            _last3 = [(type(l).__name__, getattr(l, 'name', '?')) for l in _g.nn.layers[-3:]]
+            logger.info("[Gender诊断] 最后3层: %s", _last3)
+            logger.info("[Gender诊断] logit_model=%s  pen_model=%s  dense_W=%s",
+                        getattr(_g, '_logit_model', 'MISSING') is not None,
+                        getattr(_g, '_pen_model', 'MISSING') is not None,
+                        getattr(_g, '_dense_W', None).shape if getattr(_g, '_dense_W', None) is not None else None)
     except Exception as e:
         logger.error("Engine A 加载失败: %s", e)
         seg = None

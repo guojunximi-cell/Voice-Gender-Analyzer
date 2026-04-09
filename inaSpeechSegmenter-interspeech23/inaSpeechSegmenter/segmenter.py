@@ -116,6 +116,47 @@ class DnnSegmenter:
         self.nn = keras.models.load_model(model_path, compile=False)
         self.nn.run_eagerly = False
         self.batch_size = batch_size
+        # ── 构建 logit 子模型（softmax 前的原始分数），用于真正的温度缩放 ──────
+        self._logit_model  = None   # Case A: standalone softmax layer
+        self._pen_model    = None   # Case B: Dense+softmax
+        self._dense_W      = None
+        self._dense_b      = None
+        import os as _os
+        _dbg_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', 'ina_debug.log')
+        def _dbg(msg):
+            try:
+                with open(_dbg_path, 'a', encoding='utf-8') as _f:
+                    _f.write(msg + '\n')
+                    _f.flush()
+            except Exception:
+                pass
+        _dbg(f'=== {self.__class__.__name__} __init__ ===')
+        _dbg(f'model layers count: {len(self.nn.layers)}')
+        try:
+            last     = self.nn.layers[-1]
+            ltype    = type(last).__name__.lower()
+            act      = last.get_config().get('activation', '')
+            if isinstance(act, dict):
+                act  = act.get('class_name', '')
+            act_str  = str(act).lower()
+            _dbg(f'last layer: type={ltype!r}  activation={act_str!r}')
+            _dbg(f'all layers: {[type(l).__name__ for l in self.nn.layers]}')
+
+            if ltype in ('activation', 'softmax'):
+                self._logit_model = keras.Model(inputs=self.nn.inputs,
+                                                outputs=self.nn.layers[-2].output)
+                _dbg('logit path: Case A (standalone softmax)')
+
+            elif ltype == 'dense' and act_str == 'softmax':
+                self._pen_model = keras.Model(inputs=self.nn.inputs,
+                                              outputs=self.nn.layers[-2].output)
+                self._dense_W, self._dense_b = last.get_weights()
+                _dbg(f'logit path: Case B (Dense+softmax)  W={self._dense_W.shape}')
+            else:
+                _dbg(f'logit path: FALLBACK (no match)')
+        except Exception as e:
+            _dbg(f'logit model init ERROR: {e}')
+        # ───────────────────────────────────────────────────────────────────────
 
     def __call__(self, mspec, lseg, difflen = 0):
         """
@@ -151,9 +192,51 @@ class DnnSegmenter:
             model_in_rank = len(self.nn.input_shape)
             if batch.ndim < model_in_rank:
                 batch = batch[:, np.newaxis, :, :]   # (n, 1, 68, nmel)
-            rawpred = self.nn.predict(batch, batch_size=self.batch_size, verbose=0)
-            if rawpred.ndim == 3:                    # (n, 1, n_classes) → (n, n_classes)
-                rawpred = rawpred.squeeze(axis=1)
+            _T = getattr(self, 'confidence_temperature', 8.0)
+
+            # ── 温度缩放：三条路径，按可用性依次降级 ──────────────────────────
+            logits = None
+            if _T != 1.0:
+                if self._logit_model is not None:
+                    # Case A: standalone softmax → sub-model 直出 logits
+                    logits = self._logit_model.predict(batch, batch_size=self.batch_size, verbose=0)
+                    if logits.ndim == 3:
+                        logits = logits.squeeze(axis=1)
+
+                elif self._pen_model is not None:
+                    # Case B: Dense+softmax → penultimate 输出再手动 W@x+b
+                    pen = self._pen_model.predict(batch, batch_size=self.batch_size, verbose=0)
+                    if pen.ndim == 3:
+                        pen = pen.squeeze(axis=1)
+                    logits = pen @ self._dense_W + self._dense_b
+
+            if logits is not None:
+                if not getattr(self, '_logit_diag_done', False):
+                    import os as _os2
+                    _dp = _os2.path.join(_os2.path.dirname(_os2.path.abspath(__file__)), '..', '..', 'ina_debug.log')
+                    try:
+                        with open(_dp, 'a', encoding='utf-8') as _f2:
+                            _f2.write(f'[{self.__class__.__name__}] logit range: '
+                                      f'min={float(logits.min()):.3f}  max={float(logits.max()):.3f}  '
+                                      f'std={float(logits.std()):.3f}  T={_T}\n')
+                    except Exception:
+                        pass
+                    self._logit_diag_done = True
+                logits = logits / _T
+                logits -= logits.max(axis=-1, keepdims=True)   # 数值稳定
+                rawpred = np.exp(logits)
+                rawpred /= rawpred.sum(axis=-1, keepdims=True)
+            else:
+                # 降级：softmax 上的近似温度缩放（仍比不做好）
+                rawpred = self.nn.predict(batch, batch_size=self.batch_size, verbose=0)
+                if rawpred.ndim == 3:
+                    rawpred = rawpred.squeeze(axis=1)
+                if _T != 1.0:
+                    lp = np.log(np.clip(rawpred, 1e-10, 1.0)) / _T
+                    lp -= lp.max(axis=-1, keepdims=True)
+                    rawpred = np.exp(lp)
+                    rawpred /= rawpred.sum(axis=-1, keepdims=True)
+            # ───────────────────────────────────────────────────────────────────
         gc.collect()
             
         ret = []

@@ -318,7 +318,6 @@
             </div>
           </div>
           <div class="gender-score-display" id="mc-gender-score">—</div>
-          <div class="gender-ref-score">声学评分 (Engine B): <span id="mc-gender-score-ref">—</span></div>
           <div id="mc-certainty-tag" class="certainty-tag" hidden></div>
           <div id="mc-subscores" class="mc-subscores"></div>
         </div>
@@ -361,14 +360,14 @@
     <dl>
       <dt>Engine A · 分类置信度</dt>
       <dd>AI 神经网络对「女声/男声」的判断置信度，越高说明声音特征越典型。</dd>
-      <dt>Engine B · 声学评分</dt>
-      <dd>由音高 (45%)、共振峰 (30%)、共鸣 (15%)、频谱倾斜 (10%) 加权合成的 0–100 分，100 分为最女性化声学特征。</dd>
       <dt>音高（F0）</dt>
-      <dd>说话基频中位数，以 165 Hz 为中性分界，越高越偏女性化。</dd>
+      <dd>说话基频中位数。&lt;120 Hz 典型男性，155–185 Hz 中性区，&gt;225 Hz 典型女性。</dd>
       <dt>共振峰（F1/F2/F3）</dt>
-      <dd>声道共鸣频率。F2 是核心女性化指标，高于 1400 Hz 偏女性化。</dd>
-      <dt>频谱倾斜</dt>
-      <dd>高频能量衰减速率。-2 dB/oct 偏女性化，-7 dB/oct 偏男性化。</dd>
+      <dd>声道共鸣频率。F2 &lt;1400 Hz 偏男性，1600–1900 Hz 中性区，&gt;2200 Hz 偏女性。</dd>
+      <dt>共鸣（声道长度）</dt>
+      <dd>由 F3 推算的声道长度。&gt;17.5 cm 典型男性，15.5–16.5 cm 中性区，&lt;14.5 cm 典型女性。</dd>
+      <dt>倾斜（H1–H2）</dt>
+      <dd>第一与第二谐波幅度差。&lt;1 dB 紧声/男性化，4–7 dB 中性，&gt;11 dB 气声/女性化。</dd>
     </dl>
   </section>
 </div>
