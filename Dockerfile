@@ -1,53 +1,68 @@
-# ── Stage 1: Build frontend ───────────────────────────────────
-FROM node:20-slim AS frontend-builder
-WORKDIR /app
-COPY frontend/package*.json ./
-RUN npm ci
-COPY frontend/ ./
-RUN npm run build
-# Output: /app/dist/
+WORKDIR /build
+
+# ── Stage 1: Node runtime ─────────────────────────────────────
+FROM node:24-alpine AS node-base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+FROM node-base AS web-deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    --mount=type=bind,source=pnpm-lock.yaml,target=pnpm-lock.yaml \
+    --mount=type=bind,source=pnpm-workspace.yaml,target=pnpm-workspace.yaml \
+    --mount=type=bind,source=package.json,target=package.json \
+    --mount=type=bind,source=web/package.json,target=web/package.json \
+    pnpm install --prod --frozen-lockfile
 
 # ── Stage 2: Python runtime ───────────────────────────────────
-FROM python:3.11-slim
+FROM ghcr.io/astral-sh/uv:alpine AS py-base
+ENV UV_NO_DEV=1
 
-# ── System deps ───────────────────────────────────────────────
+FROM py-base as backend-deps
+RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project
+
+# ── Stage 3: Build ────────────────────────────────────────────
+COPY . /build
+
+FROM node-base AS web-build
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile \
+    && pnpm run build:web
+
+FROM py-base AS backend-build
+RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
+    uv sync --locked
+
+RUN python ./scripts/init_iss_model.py
+
+
+# ── Prepare Image ─────────────────────────────────────────────
+From alpine:latest
+WORKDIR /
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# COPY --from=web-build /build/web/node_modules /web/node_modules
+COPY --from=web-build /build/web/dist /web
 
-# ── Install Python dependencies (PyPI) ────────────────────────
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=backend-build /build/.venv /.venv
+COPY --from=backend-build /build/backend /backend
+COPY --from=backend-build /build/*.hdf5 /
 
-# ── Install inaSpeechSegmenter from local source (AFTER PyPI) ─
-# Must come after requirements.txt so our patched version
-# (with per-frame confidence data) overwrites the stock PyPI build.
-COPY inaSpeechSegmenter-interspeech23/ ./inaSpeechSegmenter-interspeech23/
-RUN pip install --no-cache-dir --force-reinstall --no-deps ./inaSpeechSegmenter-interspeech23/
 
-# ── Pre-download AI models (baked into image, no cold-start delay) ──
-RUN python -c "from inaSpeechSegmenter import Segmenter; Segmenter(detect_gender=True); print('Models ready')"
+# ── Run Project ───────────────────────────────────────────────
+ENV GUNICORN_BIND=0.0.0.0:8000
 
-# ── Copy built frontend ───────────────────────────────────────
-COPY --from=frontend-builder /app/dist ./frontend/dist
-
-# ── Copy application code ─────────────────────────────────────
-COPY main.py acoustic_analyzer.py ./
-
-# ── Railway injects $PORT at runtime ──────────────────────────
-ENV PORT=8000
-
-# gunicorn + uvicorn workers: 1 worker keeps a single model in memory
-# Increase --workers if Railway plan has enough RAM (each worker ~1–2 GB)
-CMD gunicorn main:app \
-        --worker-class uvicorn.workers.UvicornWorker \
-        --workers 1 \
-        --bind 0.0.0.0:$PORT \
-        --timeout 300 \
-        --graceful-timeout 30 \
+CMD gunicorn backend:app \
+        --bind $GUNICORN_BIND \
         --keep-alive 5 \
-        --access-logfile - \
-        --error-logfile -
+        --access-logfile=None \
+        --error-logfile - \
+        --proxy_headers=True \
+        --forwarded_allow_ips="*"

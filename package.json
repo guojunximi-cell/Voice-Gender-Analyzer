@@ -1,0 +1,22 @@
+{
+  "name": "voice-gender-analysis",
+  "version": "0.1.0",
+  "description": "基于深度学习与声学特征分析的音频性别识别 Web 应用",
+  "homepage": "https://github.com/guojunximi-cell/Voice-Gender-Analyzer",
+  "license": "MPL-2.0",
+  "private": true,
+
+  "author": { "name": "guojun", "email": "fanhenna@outlook.com" },
+  "contributors": [
+    { "name":" k3-cat", "email": "fanhenna@outlook.com" }
+  ],
+
+  "workspaces": [
+    "web"
+  ],
+
+  "scripts": {
+    "dev:web": "pnpm --filter ./web run dev",
+    "build:web": "pnpm --filter ./web run build"
+  }
+}

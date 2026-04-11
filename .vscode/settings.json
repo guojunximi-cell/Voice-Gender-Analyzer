@@ -1,0 +1,8 @@
+{
+  "python.analysis.extraPaths": [
+    "backend/inaSpeechSegmenter"
+  ],
+  "cSpell.words": [
+    "kbps"
+  ]
+}

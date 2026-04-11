@@ -1,0 +1,14 @@
+{
+	"printWidth": 120,
+	"quoteProps": "consistent",
+	"singleQuote": false,
+	"semi": true,
+	"trailingComma": "all",
+	"useTabs": true,
+
+	"plugins": ["@ianvs/prettier-plugin-sort-imports"],
+	"importOrder": ["^@?(?!\/)[a-z]+", "", "^[.]+/"],
+	"importOrderParserPlugins": ["typescript", "jsx", "decorators-legacy"],
+	"importOrderTypeScriptVersion": "5.0.0",
+	"importOrderCaseSensitive": false
+}

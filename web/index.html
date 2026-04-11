@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<script>
+			(function () {
+				var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
+				document.documentElement.setAttribute("data-theme", t);
+			})();
+		</script>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>声音分析鸭 — 声音性别分析</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+		<link rel="stylesheet" href="/src/styles/main.css" />
+	</head>
+	<body>
+		<!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+		<header class="header">
+			<div class="header-inner">
+				<a
+					class="logo"
+					href="https://github.com/guojunximi-cell/Voice-Gender-Analyzer"
+					target="_blank"
+					rel="noopener noreferrer"
+					aria-label="声音分析鸭 GitHub 仓库"
+				>
+					<svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+						<circle cx="11" cy="11" r="10" stroke="currentColor" stroke-width="1.5" />
+						<path
+							d="M6 11 Q8.5 6 11 11 Q13.5 16 16 11"
+							stroke="currentColor"
+							stroke-width="1.5"
+							fill="none"
+							stroke-linecap="round"
+						/>
+					</svg>
+					<span>声音分析鸭</span>
+				</a>
+				<div class="header-actions">
+					<button id="help-toggle" class="icon-btn" aria-label="使用帮助">
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+						>
+							<circle cx="12" cy="12" r="10" />
+							<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+							<line x1="12" y1="17" x2="12.01" y2="17" />
+						</svg>
+					</button>
+					<button id="theme-toggle" class="icon-btn" aria-label="切换主题">
+						<svg
+							class="icon-sun"
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+						>
+							<circle cx="12" cy="12" r="4" />
+							<line x1="12" y1="2" x2="12" y2="4" />
+							<line x1="12" y1="20" x2="12" y2="22" />
+							<line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+							<line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+							<line x1="2" y1="12" x2="4" y2="12" />
+							<line x1="20" y1="12" x2="22" y2="12" />
+							<line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+							<line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+						</svg>
+						<svg
+							class="icon-moon"
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+						>
+							<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+						</svg>
+					</button>
+				</div>
+			</div>
+		</header>
+
+		<!-- ══════════════════════════ THREE-PANEL LAYOUT ════════════════════════ -->
+		<div class="app-layout">
+			<!-- ══ LEFT PANEL: Scatter plot ════════════════════════════════════════ -->
+			<aside class="panel panel-left">
+				<div class="panel-header">
+					<span class="panel-title">历史分析</span>
+					<span class="panel-collapse-chevron" aria-hidden="true"></span>
+					<div class="panel-header-actions">
+						<!-- Upload new file (available at all times) -->
+						<label class="icon-btn" title="上传新文件" id="scatter-upload-label">
+							<input
+								type="file"
+								id="scatter-file-input"
+								accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac,.opus,.aiff,.au,.caf,.webm"
+								hidden
+							/>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 16 16"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+							>
+								<path d="M8 11V3M4 7l4-4 4 4" />
+								<path d="M2 13h12" />
+							</svg>
+						</label>
+						<button id="delete-session-btn" class="icon-btn" title="删除此记录" hidden>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 16 16"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+							>
+								<path d="M3 3l10 10M13 3L3 13" />
+							</svg>
+						</button>
+						<button id="clear-sessions-btn" class="icon-btn" title="清空历史">
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 16 16"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M3 4h10M6 4V3h4v1M5 4l.5 9h5L11 4" />
+							</svg>
+						</button>
+					</div>
+				</div>
+				<div class="scatter-wrap">
+					<canvas id="scatter-canvas"></canvas>
+				</div>
+			</aside>
+
+			<!-- ══ CENTER PANEL: Waveform + Stats + Segments ═══════════════════════ -->
+			<main class="panel panel-center">
+				<!-- Upload Zone (shown when no file is loaded) -->
+				<section id="upload-section" class="card upload-zone">
+					<input
+						type="file"
+						id="file-input"
+						accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac,.opus,.aiff,.au,.caf,.webm"
+						hidden
+					/>
+					<div class="upload-icon">
+						<svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+							<rect width="40" height="40" rx="12" fill="var(--accent-subtle)" />
+							<path
+								d="M20 26V14M14 20l6-6 6 6"
+								stroke="var(--accent)"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+							<path d="M13 29h14" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" />
+						</svg>
+					</div>
+					<p class="upload-title">拖拽音频文件到此处</p>
+					<p class="upload-subtitle">或 <button class="link-btn" id="browse-btn">点击选择文件</button></p>
+					<p class="upload-hint">支持 MP3 · WAV · OGG · M4A · FLAC · 最大 5 MB / 3 分钟</p>
+
+					<!-- 录音 -->
+					<div class="upload-divider"><span>或</span></div>
+
+					<div class="recorder-idle-ui" id="recorder-idle-ui">
+						<button class="recorder-mic-btn" id="recorder-mic-btn" type="button" aria-label="开始录制">
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+								<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+								<line x1="12" y1="19" x2="12" y2="23" />
+								<line x1="8" y1="23" x2="16" y2="23" />
+							</svg>
+							<span>录制声音</span>
+						</button>
+					</div>
+
+					<div class="recorder-active-ui" id="recorder-active-ui" hidden>
+						<span class="recorder-dot" aria-hidden="true"></span>
+						<span class="recorder-timer" id="recorder-timer">0:00</span>
+						<button class="recorder-stop-btn" id="recorder-stop-btn" type="button" aria-label="停止录制">
+							<svg width="9" height="9" viewBox="0 0 10 10">
+								<rect width="10" height="10" rx="2" fill="currentColor" />
+							</svg>
+							<span>停止</span>
+						</button>
+					</div>
+
+					<p class="upload-privacy-badge">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+							<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+						</svg>
+						<span>您的文件将被严格阅后即焚，上传时不会保留任何特征数据</span>
+					</p>
+				</section>
+
+				<!-- Player (shown after file is loaded) -->
+				<section id="player-section" class="card player-card" hidden>
+					<div class="file-info">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 16 16"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.2"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M3 2h7l3 3v9H3V2z" />
+							<path d="M9 2v4h3" />
+						</svg>
+						<span id="file-name" class="file-name">—</span>
+						<button id="change-file-btn" class="link-btn small">更换文件</button>
+					</div>
+					<div id="waveform-container" class="waveform-container">
+						<div id="waveform"></div>
+						<svg id="segment-overlay" class="segment-overlay" aria-hidden="true"></svg>
+						<div id="seg-tooltip" class="waveform-tooltip" aria-hidden="true"></div>
+						<div id="waveform-loading" class="waveform-loading">
+							<div class="skeleton-wave"></div>
+						</div>
+					</div>
+					<div class="controls">
+						<button id="play-btn" class="play-btn" disabled aria-label="播放">
+							<svg class="icon-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+								<path d="M4 2.5l9 5.5-9 5.5V2.5z" />
+							</svg>
+							<svg class="icon-pause" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" hidden>
+								<rect x="3" y="2" width="4" height="12" rx="1" />
+								<rect x="9" y="2" width="4" height="12" rx="1" />
+							</svg>
+						</button>
+						<span id="current-time" class="time-label">0:00</span>
+						<div id="seek-bar" class="seek-bar" role="slider" aria-label="播放进度">
+							<div class="seek-track">
+								<div id="seek-progress" class="seek-progress"></div>
+								<div id="seek-thumb" class="seek-thumb"></div>
+							</div>
+						</div>
+						<span id="total-time" class="time-label">0:00</span>
+						<button id="analyze-btn" class="btn-primary" disabled>
+							<svg
+								width="13"
+								height="13"
+								viewBox="0 0 14 14"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.8"
+								stroke-linecap="round"
+							>
+								<circle cx="7" cy="7" r="5.5" />
+								<path d="M5 7l1.5 1.5L9 5" />
+							</svg>
+							<span id="analyze-text">开始分析</span>
+							<span id="analyze-spinner" class="spinner" hidden></span>
+						</button>
+					</div>
+
+					<!-- Duck progress bar -->
+					<div id="duck-progress" class="duck-progress" hidden>
+						<div class="duck-track">
+							<div id="duck-fill" class="duck-fill"></div>
+							<span id="duck-emoji" class="duck-emoji">🦆</span>
+						</div>
+						<span id="duck-label" class="duck-label">正在分析…</span>
+					</div>
+				</section>
+
+				<!-- Stats cards -->
+				<section id="stats-section" class="stats-section" hidden>
+					<div class="stats-grid">
+						<div class="stat-card stat-male">
+							<div class="stat-dot"></div>
+							<div class="stat-label">男声</div>
+							<div class="stat-pct" id="male-pct">—</div>
+							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="male-bar" style="width: 0%"></div></div>
+							<div class="stat-duration" id="male-duration">—</div>
+						</div>
+						<div class="stat-card stat-female">
+							<div class="stat-dot"></div>
+							<div class="stat-label">女声</div>
+							<div class="stat-pct" id="female-pct">—</div>
+							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="female-bar" style="width: 0%"></div></div>
+							<div class="stat-duration" id="female-duration">—</div>
+						</div>
+						<div class="stat-card stat-other">
+							<div class="stat-dot"></div>
+							<div class="stat-label">其他</div>
+							<div class="stat-pct" id="other-pct">—</div>
+							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="other-bar" style="width: 0%"></div></div>
+							<div class="stat-duration" id="other-duration">—</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- Mobile tabs (visible only on narrow screens) -->
+				<div class="mobile-tabs" id="mobile-tabs" hidden>
+					<button class="mobile-tab active" data-tab="segments">分段详情</button>
+					<button class="mobile-tab" data-tab="metrics">声学特征</button>
+				</div>
+
+				<!-- Segment list -->
+				<section id="segments-section" class="card" hidden>
+					<div class="section-header">
+						<h2 class="section-title">分段详情</h2>
+						<span id="segment-count" class="badge">—</span>
+					</div>
+					<div id="segments-list" class="segments-list"></div>
+				</section>
+			</main>
+
+			<!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
+			<aside class="panel panel-right">
+				<div class="panel-header">
+					<span class="panel-title">声学特征</span>
+					<span id="mc-segment-label" class="mc-segment-label"></span>
+				</div>
+
+				<div id="metrics-empty" class="metrics-placeholder">
+					<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true">
+						<circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5" />
+						<path
+							d="M10 16 Q13 10 16 16 Q19 22 22 16"
+							stroke="currentColor"
+							stroke-width="1.5"
+							fill="none"
+							stroke-linecap="round"
+						/>
+					</svg>
+					<span>点击音段<br />查看声学特征</span>
+				</div>
+
+				<div id="metrics-content" hidden>
+					<!-- F0 + Resonance cards side by side -->
+					<div class="mc-cards-row">
+						<div class="mc-card">
+							<div class="mc-card-title">基频 PITCH</div>
+							<div class="mc-card-big" id="mc-f0-median">— Hz</div>
+							<div class="mc-card-sub" id="mc-f0-std">±— Hz</div>
+						</div>
+						<div class="mc-card">
+							<div class="mc-card-title">共鸣 RESONANCE</div>
+							<div class="mc-card-big" id="mc-res-val">—%</div>
+							<div class="mc-res-bar-wrap">
+								<div class="mc-res-bar-fill" id="mc-res-bar" style="width: 0%"></div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Collapsible: Confidence timeline -->
+					<details class="mc-collapsible" id="mc-dist-section" hidden>
+						<summary class="mc-collapsible-header">置信度时间线</summary>
+						<div class="mc-collapsible-body">
+							<canvas id="mc-dist-canvas" height="64" style="width: 100%; display: block; border-radius: 6px"></canvas>
+						</div>
+					</details>
+
+					<!-- Collapsible: Pitch range -->
+					<details class="mc-collapsible" open>
+						<summary class="mc-collapsible-header">音高范围 (80~320 Hz)</summary>
+						<div class="mc-collapsible-body">
+							<div class="pitch-range-bar">
+								<div class="pitch-zone pitch-zone-male" title="男性 85~155 Hz"></div>
+								<div class="pitch-zone pitch-zone-overlap" title="中间 145~185 Hz"></div>
+								<div class="pitch-zone pitch-zone-female" title="女性 175~255 Hz"></div>
+								<div class="pitch-indicator" id="mc-pitch-indicator"></div>
+							</div>
+							<div class="pitch-range-labels">
+								<span>80</span><span>120</span><span>160</span> <span>200</span><span>240</span><span>280</span
+								><span>320</span>
+							</div>
+							<div class="pitch-legend">
+								<span class="legend-male">♂ 85~155 Hz</span>
+								<span class="legend-neutral">♂♀ 145~185 Hz</span>
+								<span class="legend-female">♀ 175~255 Hz</span>
+							</div>
+						</div>
+					</details>
+
+					<!-- Collapsible: Formants + Spectral Tilt -->
+					<details class="mc-collapsible" open>
+						<summary class="mc-collapsible-header">共振峰 / 频谱倾斜</summary>
+						<div class="mc-collapsible-body">
+							<div class="formants-grid">
+								<div class="formant-row"><span class="fn-label">F1</span><span class="fn-val" id="mc-f1">—</span></div>
+								<div class="formant-row"><span class="fn-label">F2</span><span class="fn-val" id="mc-f2">—</span></div>
+								<div class="formant-row"><span class="fn-label">F3</span><span class="fn-val" id="mc-f3">—</span></div>
+								<div class="formant-row">
+									<span class="fn-label">倾斜</span><span class="fn-val" id="mc-tilt-val">—</span>
+								</div>
+							</div>
+						</div>
+					</details>
+
+					<!-- Collapsible: Gender expression (Engine A as primary) -->
+					<details class="mc-collapsible" open>
+						<summary class="mc-collapsible-header">综合性别表达</summary>
+						<div class="mc-collapsible-body">
+							<div class="gender-primary-label">分类置信度 (Engine A · inaSpeechSegmenter)</div>
+							<div class="gender-spectrum">
+								<div class="gender-track">
+									<div class="gender-thumb" id="mc-gender-thumb" style="left: 50%"></div>
+								</div>
+								<div class="gender-labels">
+									<span>♂ 男性化</span>
+									<span>中性</span>
+									<span>♀ 女性化</span>
+								</div>
+							</div>
+							<div class="gender-score-display" id="mc-gender-score">—</div>
+							<div id="mc-certainty-tag" class="certainty-tag" hidden></div>
+							<div id="mc-subscores" class="mc-subscores"></div>
+						</div>
+					</details>
+
+					<!-- Disclaimer -->
+					<p class="mc-disclaimer">
+						本工具的神经网络驱动的分类器由开源项目提供，真挚的感谢前辈在酷儿语音分析领域的贡献。
+						<br />
+						<br />
+						<a href="https://github.com/ina-foss/inaSpeechSegmenter" target="_blank" rel="noopener"
+							>inaSpeechSegmenter</a
+						>（Doukhan et al., ICASSP 2018, IEEE）
+					</p>
+				</div>
+				<!-- /metrics-content -->
+			</aside>
+		</div>
+		<!-- /app-layout -->
+
+		<!-- Toast -->
+		<div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+		<!-- 帮助说明浮层 -->
+		<div id="help-modal" class="vga-help-modal card">
+			<div class="vga-help-header">
+				<span>🦆 声音分析鸭 · 使用说明</span>
+				<button id="help-close" class="icon-btn" aria-label="关闭">✕</button>
+			</div>
+			<section class="vga-help-section">
+				<h4>这是什么？</h4>
+				<p>上传或录制一段音频，自动分析声音中的性别声学特征，输出 AI 分类置信度与多维声学评分，适合声音训练参考。</p>
+			</section>
+			<section class="vga-help-section">
+				<h4>如何使用？</h4>
+				<ol>
+					<li>拖拽音频文件 / 点击上传 / 点击麦克风录音</li>
+					<li>点击「开始分析」，等待鸭子跑完进度条</li>
+					<li>在右侧面板查看声学指标，点击音段查看详情</li>
+				</ol>
+			</section>
+			<section class="vga-help-section">
+				<h4>结果怎么看？</h4>
+				<dl>
+					<dt>Engine A · 分类置信度</dt>
+					<dd>AI 神经网络对「女声/男声」的判断置信度，越高说明声音特征越典型。</dd>
+					<dt>音高（F0）</dt>
+					<dd>说话基频中位数。&lt;120 Hz 典型男性，155~185 Hz 中性区，&gt;225 Hz 典型女性。</dd>
+					<dt>共振峰（F1/F2/F3）</dt>
+					<dd>声道共鸣频率。F2 &lt;1400 Hz 偏男性，1600~1900 Hz 中性区，&gt;2200 Hz 偏女性。</dd>
+					<dt>共鸣（声道长度）</dt>
+					<dd>由 F3 推算的声道长度。&gt;17.5 cm 典型男性，15.5~16.5 cm 中性区，&lt;14.5 cm 典型女性。</dd>
+					<dt>倾斜（H1~H2）</dt>
+					<dd>第一与第二谐波幅度差。&lt;1 dB 紧声/男性化，4~7 dB 中性，&gt;11 dB 气声/女性化。</dd>
+				</dl>
+			</section>
+		</div>
+		<style>
+			.vga-help-modal {
+				display: none;
+				position: fixed;
+				top: 56px;
+				right: 16px;
+				width: 360px;
+				max-height: calc(100vh - 72px);
+				overflow-y: auto;
+				padding: 18px 20px 20px;
+				z-index: 9998;
+			}
+			.vga-help-modal.show {
+				display: block;
+				animation: vgaPopIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+			}
+			.vga-help-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 14px;
+				font-size: 0.875rem;
+				font-weight: 600;
+				color: var(--text-primary);
+			}
+			.vga-help-section {
+				margin-bottom: 14px;
+				border-top: 1px solid var(--border);
+				padding-top: 12px;
+			}
+			.vga-help-section h4 {
+				font-size: 0.8rem;
+				font-weight: 600;
+				color: var(--text-secondary);
+				margin: 0 0 8px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+			.vga-help-section p,
+			.vga-help-section ol,
+			.vga-help-section dd {
+				font-size: 0.82rem;
+				color: var(--text-secondary);
+				line-height: 1.6;
+				margin: 0 0 6px 0;
+			}
+			.vga-help-section ol {
+				padding-left: 18px;
+			}
+			.vga-help-section dl {
+				margin: 0;
+			}
+			.vga-help-section dt {
+				font-size: 0.82rem;
+				font-weight: 600;
+				color: var(--text-primary);
+				margin-top: 8px;
+			}
+		</style>
+		<script>
+			(function () {
+				const helpToggle = document.getElementById("help-toggle");
+				const helpModal = document.getElementById("help-modal");
+				const helpClose = document.getElementById("help-close");
+				helpToggle.addEventListener("click", () => helpModal.classList.toggle("show"));
+				helpClose.addEventListener("click", () => helpModal.classList.remove("show"));
+				document.addEventListener("click", (e) => {
+					if (
+						helpModal.classList.contains("show") &&
+						!helpModal.contains(e.target) &&
+						e.target !== helpToggle &&
+						!helpToggle.contains(e.target)
+					) {
+						helpModal.classList.remove("show");
+					}
+				});
+			})();
+		</script>
+
+		<style>
+			.upload-privacy-badge {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 6px;
+				margin-top: 12px;
+				font-size: 0.75rem;
+				color: var(--text-muted);
+			}
+		</style>
+
+		<!-- 💬 意见反馈悬浮窗 -->
+		<style>
+			.vga-feedback-btn {
+				position: fixed;
+				bottom: 28px;
+				right: 28px;
+				width: 44px;
+				height: 44px;
+				background: var(--accent);
+				color: #fff;
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+				border: none;
+				box-shadow: var(--shadow-md);
+				transition:
+					transform var(--transition),
+					background var(--transition),
+					box-shadow var(--transition);
+				z-index: 9999;
+			}
+			.vga-feedback-btn:hover {
+				background: var(--accent-hover);
+				transform: translateY(-2px);
+				box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+			}
+			.vga-feedback-modal {
+				display: none;
+				position: fixed;
+				bottom: 86px;
+				right: 28px;
+				width: 320px;
+				padding: 18px 20px 16px;
+				z-index: 9999;
+			}
+			.vga-feedback-modal.show {
+				display: block;
+				animation: vgaPopIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+			}
+			@keyframes vgaPopIn {
+				0% {
+					transform: translateY(16px) scale(0.96);
+					opacity: 0;
+				}
+				100% {
+					transform: translateY(0) scale(1);
+					opacity: 1;
+				}
+			}
+			.vga-feedback-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 14px;
+				font-size: 0.875rem;
+				font-weight: 600;
+				color: var(--text-primary);
+			}
+			.vga-feedback-input {
+				width: 100%;
+				box-sizing: border-box;
+				border: 1px solid var(--border-strong);
+				border-radius: var(--radius-sm);
+				padding: 9px 11px;
+				margin-bottom: 10px;
+				font-size: 0.875rem;
+				font-family: inherit;
+				background: var(--bg-secondary);
+				color: var(--text-primary);
+				outline: none;
+				transition:
+					border-color var(--transition),
+					background var(--transition);
+			}
+			.vga-feedback-input::placeholder {
+				color: var(--text-muted);
+			}
+			.vga-feedback-input:focus {
+				border-color: var(--accent);
+				background: var(--surface);
+			}
+			textarea.vga-feedback-input {
+				resize: none;
+				height: 96px;
+			}
+			.vga-feedback-footer {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-top: 2px;
+			}
+			.vga-char-count {
+				font-size: 0.78rem;
+				color: var(--text-muted);
+				font-variant-numeric: tabular-nums;
+			}
+		</style>
+
+		<button class="vga-feedback-btn" onclick="toggleVgaFeedback()" aria-label="意见反馈">
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path
+					d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+				/>
+			</svg>
+		</button>
+		<div class="vga-feedback-modal card" id="vgaFeedbackModal">
+			<div class="vga-feedback-header">
+				<span>意见反馈</span>
+				<button class="icon-btn" onclick="toggleVgaFeedback()" aria-label="关闭">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.6"
+						stroke-linecap="round"
+					>
+						<path d="M3 3l10 10M13 3L3 13" />
+					</svg>
+				</button>
+			</div>
+			<form id="vgaFeedbackForm" action="https://formspree.io/f/xreolvln" method="POST">
+				<input type="email" name="email" class="vga-feedback-input" placeholder="您的邮箱（选填）" />
+				<textarea
+					id="vgaFeedbackMsg"
+					name="message"
+					class="vga-feedback-input"
+					placeholder="输入您的反馈或建议..."
+					maxlength="500"
+					required
+				></textarea>
+				<div class="vga-feedback-footer">
+					<span class="vga-char-count" id="vgaCharCount">0 / 500</span>
+					<button type="submit" class="btn-primary" id="vgaSubmitBtn" disabled>发送</button>
+				</div>
+			</form>
+		</div>
+
+		<script>
+			function toggleVgaFeedback() {
+				document.getElementById("vgaFeedbackModal").classList.toggle("show");
+			}
+
+			// 动态更新字数并控制发送按钮状态
+			const msgInput = document.getElementById("vgaFeedbackMsg");
+			const charCount = document.getElementById("vgaCharCount");
+			const submitBtn = document.getElementById("vgaSubmitBtn");
+
+			msgInput.addEventListener("input", function () {
+				const len = this.value.length;
+				charCount.textContent = `${len} / 500`;
+				// 去除两端空格后如果为空，则禁用按钮
+				submitBtn.disabled = this.value.trim().length === 0;
+			});
+
+			document.getElementById("vgaFeedbackForm").addEventListener("submit", async function (e) {
+				e.preventDefault(); // 阻止默认的表单跳转
+				const form = e.target;
+				submitBtn.textContent = "发送中...";
+				submitBtn.disabled = true;
+
+				try {
+					const response = await fetch(form.action, {
+						method: form.method,
+						body: new FormData(form),
+						headers: { Accept: "application/json" },
+					});
+					if (response.ok) {
+						submitBtn.textContent = "发送成功";
+						form.reset();
+						charCount.textContent = "0 / 500";
+						setTimeout(() => {
+							toggleVgaFeedback();
+							submitBtn.textContent = "发送";
+							submitBtn.disabled = true;
+						}, 2000);
+					} else {
+						throw new Error("Network response was not ok");
+					}
+				} catch (error) {
+					submitBtn.textContent = "发送失败";
+					// 如果失败，恢复按钮状态（取决于文本框是否有值）
+					setTimeout(() => {
+						submitBtn.textContent = "发送";
+						submitBtn.disabled = msgInput.value.trim().length === 0;
+					}, 3000);
+				}
+			});
+		</script>
+		<!-- 💬 意见反馈结束 -->
+
+		<script type="module" src="/src/main.js"></script>
+	</body>
+</html>
