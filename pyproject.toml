@@ -1,0 +1,34 @@
+[project]
+name = "voice-gender-analyzer"
+version = "0.1.0"
+description = "基于深度学习与声学特征分析的音频性别识别 Web 应用"
+license = "MPL-2.0"
+readme = "README.md"
+
+authors = [
+    { name = "guojun", email = "fanhenna@outlook.com" },
+    { name = "k3-cat", email = "k3-cat@outlook.com" },
+]
+
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.135.3",
+    "librosa>=0.11.0",
+    "numpy>=2.4.4",
+    "scipy>=1.17.1",
+    "uvicorn[standard]>=0.44.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/guojunximi-cell/Voice-Gender-Analyzer"
+
+[dependency-groups]
+inaspeechsegmenter = [
+    "numpy>=2.4.4",
+    "onnxruntime-gpu>=1.24.4",
+    "pandas>=3.0.2",
+    "pyannote-core>=6.0.1",
+    "pytextgrid>=0.1.4",
+    "scikit-image>=0.26.0",
+    "tensorflow-cpu>=2.21.0",
+]

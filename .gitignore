@@ -6,8 +6,8 @@ venv/
 .venv/
 
 # Node.js
-frontend/node_modules/
-frontend/dist/
+**/node_modules/
+web/dist/
 
 # Output files
 output/*
@@ -23,8 +23,10 @@ output/*
 # OS / IDE
 .DS_Store
 Thumbs.db
-.vscode/
 .idea/
 
 # Logs
 *.log
+
+# Models
+*.hdf5
