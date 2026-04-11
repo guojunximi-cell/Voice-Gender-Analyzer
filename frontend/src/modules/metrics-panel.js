@@ -137,8 +137,7 @@ function renderSubScores(a) {
 // confidence: 0–1 from Engine A; label: 'female'|'male'
 function renderGenderBar(confidence, label) {
   const thumb   = document.getElementById('mc-gender-thumb')
-  const scoreEl = document.getElementById('mc-gender-score')
-  if (!thumb || !scoreEl) return
+  if (!thumb) return
 
   const scaledConf = Math.min(confidence, 1)
   const pct = label === 'female'
@@ -147,10 +146,6 @@ function renderGenderBar(confidence, label) {
 
   requestAnimationFrame(() => { thumb.style.left = `${pct}%` })
   thumb.dataset.gender = label
-
-  const pctDisplay = Math.min(Math.round(confidence * 100), 100)
-  const symbol = label === 'female' ? '♀' : '♂'
-  scoreEl.textContent = `${pctDisplay}% ${symbol}`
 }
 
 // ─── Public: render metrics for a segment ────────────────────
@@ -192,6 +187,27 @@ export function renderMetricsPanel(segment) {
   setFormant('mc-f1', a.f1_hz)
   setFormant('mc-f2', a.f2_hz)
   setFormant('mc-f3', a.f3_hz)
+
+  // ── F2 top card ──────────────────────────────────────────
+  const f2CardEl = document.getElementById('mc-f2-card')
+  const f2RefEl  = document.getElementById('mc-f2-card-ref')
+  if (f2CardEl) f2CardEl.textContent = a.f2_hz != null ? `${Math.round(a.f2_hz)} Hz` : '— Hz'
+  if (f2RefEl) {
+    if (a.f2_hz != null) {
+      const hz = a.f2_hz
+      let label, color
+      if      (hz < 1400) { label = '典型男性区'; color = 'rgba(59,130,246,0.9)'  }
+      else if (hz < 1600) { label = '偏男性化';   color = 'rgba(59,130,246,0.9)'  }
+      else if (hz < 1900) { label = '中性区';     color = 'var(--text-muted)'     }
+      else if (hz < 2200) { label = '偏女性化';   color = 'rgba(236,72,153,0.9)'  }
+      else                { label = '典型女性区'; color = 'rgba(236,72,153,0.9)'  }
+      f2RefEl.textContent = label
+      f2RefEl.style.color = color
+    } else {
+      f2RefEl.textContent = '—'
+      f2RefEl.style.color = ''
+    }
+  }
 
   // ── Spectral Tilt (H1–H2) ───────────────────────────────
   // const tiltEl = document.getElementById('mc-tilt-val')

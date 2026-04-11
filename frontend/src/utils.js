@@ -57,14 +57,22 @@ export function tierToColor(tier) {
 }
 
 // ─── Score → color (Blue→Violet→Rose gradient, score 0–100) ──
+// Radiation centers at 25% (♂) and 75% (♀): colors peak there and
+// fade toward the neutral midpoint (50%) and toward the extremes (0/100).
 export function scoreToColor(score) {
   const t = Math.max(0, Math.min(score, 100)) / 100
   if (t <= 0.5) {
-    const s = t * 2
-    return `rgba(${Math.round(59 + s * 80)},${Math.round(130 - s * 38)},246,0.85)`
+    // Male side — hue interpolates blue→violet, alpha peaks at t=0.25
+    const s     = t * 2                       // 0→1 across blue half
+    const dist  = Math.abs(t - 0.25) * 4     // 0 at center, 1 at edges
+    const alpha = (0.85 - dist * 0.35).toFixed(2)
+    return `rgba(${Math.round(59 + s * 80)},${Math.round(130 - s * 38)},246,${alpha})`
   }
-  const s = (t - 0.5) * 2
-  return `rgba(${Math.round(139 + s * 105)},${Math.round(92 - s * 29)},${Math.round(246 - s * 152)},0.85)`
+  // Female side — hue interpolates violet→rose, alpha peaks at t=0.75
+  const s     = (t - 0.5) * 2
+  const dist  = Math.abs(t - 0.75) * 4
+  const alpha = (0.85 - dist * 0.35).toFixed(2)
+  return `rgba(${Math.round(139 + s * 105)},${Math.round(92 - s * 29)},${Math.round(246 - s * 152)},${alpha})`
 }
 
 // ─── Certainty tag (Chinese) for a voiced segment ────────────

@@ -254,7 +254,9 @@
           <div class="mc-card-sub"  id="mc-f0-std">±— Hz</div>
         </div>
         <div class="mc-card">
-          <div class="mc-card-title">共鸣 RESONANCE</div>
+          <div class="mc-card-title">F2 共振峰</div>
+          <div class="mc-card-big" id="mc-f2-card">— Hz</div>
+          <div class="mc-card-sub" id="mc-f2-card-ref">—</div>
         </div>
       </div>
 
@@ -290,13 +292,12 @@
 
       <!-- Collapsible: Formants + Spectral Tilt -->
       <details class="mc-collapsible" open>
-        <summary class="mc-collapsible-header">共振峰 / 频谱倾斜</summary>
+        <summary class="mc-collapsible-header">共振峰</summary>
         <div class="mc-collapsible-body">
           <div class="formants-grid">
             <div class="formant-row"><span class="fn-label">F1</span><span class="fn-val" id="mc-f1">—</span></div>
             <div class="formant-row"><span class="fn-label">F2</span><span class="fn-val" id="mc-f2">—</span></div>
             <div class="formant-row"><span class="fn-label">F3</span><span class="fn-val" id="mc-f3">—</span></div>
-            <div class="formant-row"><span class="fn-label">倾斜</span><span class="fn-val" id="mc-tilt-val">—</span></div>
           </div>
         </div>
       </details>
@@ -316,7 +317,6 @@
               <span>♀ 女性化</span>
             </div>
           </div>
-          <div class="gender-score-display" id="mc-gender-score">—</div>
           <div id="mc-certainty-tag" class="certainty-tag" hidden></div>
           <div id="mc-subscores" class="mc-subscores"></div>
         </div>
@@ -362,11 +362,9 @@
       <dt>音高（F0）</dt>
       <dd>说话基频中位数。&lt;120 Hz 典型男性，155–185 Hz 中性区，&gt;225 Hz 典型女性。</dd>
       <dt>共振峰（F1/F2/F3）</dt>
-      <dd>声道共鸣频率。F2 &lt;1400 Hz 偏男性，1600–1900 Hz 中性区，&gt;2200 Hz 偏女性。</dd>
-      <dt>共鸣（声道长度）</dt>
-      <dd>由 F3 推算的声道长度。&gt;17.5 cm 典型男性，15.5–16.5 cm 中性区，&lt;14.5 cm 典型女性。</dd>
-      <dt>倾斜（H1–H2）</dt>
-      <dd>第一与第二谐波幅度差。&lt;1 dB 紧声/男性化，4–7 dB 中性，&gt;11 dB 气声/女性化。</dd>
+      <dd>声道共鸣频率，反映声道形态。</dd>
+      <dt>F2（第二共振峰）</dt>
+      <dd>声道女性化的核心指标。&lt;1400 Hz 典型男声，1400–1600 偏男，1600–1900 中性区，1900–2200 偏女，&gt;2200 Hz 典型女声。</dd>
     </dl>
   </section>
 </div>

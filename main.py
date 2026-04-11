@@ -54,6 +54,64 @@ import uvicorn
 
 from inaSpeechSegmenter import Segmenter
 
+# ─── 声学特征提取 ──────────────────────────────────────────────
+MIN_ACOUSTICS_DUR = 0.5  # 短于此时长（秒）的片段不提取声学特征
+
+
+def _value_to_tier(value, thresholds):
+    """将标量映射到 1–5 级（给定 4 个升序阈值）。value 为 None 时返回 None。"""
+    if value is None:
+        return None
+    for i, t in enumerate(thresholds):
+        if value < t:
+            return i + 1
+    return 5
+
+
+def _extract_acoustics(y_full: np.ndarray, sr: int, start: float, end: float):
+    """提取单个有声片段的声学特征（F0、共振峰、级别分类）。
+    片段过短或提取失败时返回 None。
+    """
+    if (end - start) < MIN_ACOUSTICS_DUR:
+        return None
+    y = y_full[int(start * sr):int(end * sr)]
+    if len(y) < int(MIN_ACOUSTICS_DUR * sr):
+        return None
+    result = {}
+
+    # ── F0（基频）：使用 pyin 算法 ────────────────────────────
+    try:
+        f0, voiced_flag, _ = librosa.pyin(y, fmin=65.0, fmax=500.0, sr=sr)
+        voiced_f0 = f0[voiced_flag & ~np.isnan(f0)]
+        if len(voiced_f0) > 0:
+            result['f0_median_hz'] = round(float(np.median(voiced_f0)), 1)
+            result['f0_std_hz']    = round(float(np.std(voiced_f0)), 1) if len(voiced_f0) > 1 else 0.0
+        else:
+            result['f0_median_hz'] = result['f0_std_hz'] = None
+    except Exception:
+        result['f0_median_hz'] = result['f0_std_hz'] = None
+
+    # ── 共振峰：LPC 法估计 F1/F2/F3 ──────────────────────────
+    try:
+        y_pre = librosa.effects.preemphasis(y)
+        order = int(2 + sr / 1000)          # ≈ 24 @ 22050 Hz
+        a     = librosa.lpc(y_pre, order=order)
+        roots = np.roots(a)
+        roots = roots[np.imag(roots) >= 0]
+        freqs = np.sort(np.angle(roots) * (sr / (2 * np.pi)))
+        fmts  = freqs[(freqs > 300) & (freqs < 4000)]
+        result['f1_hz'] = round(float(fmts[0])) if len(fmts) > 0 else None
+        result['f2_hz'] = round(float(fmts[1])) if len(fmts) > 1 else None
+        result['f3_hz'] = round(float(fmts[2])) if len(fmts) > 2 else None
+    except Exception:
+        result['f1_hz'] = result['f2_hz'] = result['f3_hz'] = None
+
+    # ── 级别分类（与 metrics-panel.js SUB_SCORE_DEFS 一致）───
+    result['pitch_tier']   = _value_to_tier(result['f0_median_hz'], [120, 155, 185, 225])
+    result['formant_tier'] = _value_to_tier(result.get('f2_hz'),    [1400, 1600, 1900, 2200])
+    return result
+
+
 # ─── 日志配置 ──────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -396,7 +454,17 @@ async def _do_analyze_stream(filename: str, content: bytes):
         segmentation_result = await _seg_fut
         # segmentation_result: [('male'|'female'|..., start, end), ...]
 
-        yield _sse_event({"type": "progress", "pct": 50, "msg": "鸭鸭听完了！正在整理笔记…"})
+        yield _sse_event({"type": "progress", "pct": 50, "msg": "鸭鸭听完了！正在提取声学特征…"})
+
+        # ── 加载音频（一次性），供声学特征提取使用 ────────────
+        y_full, sr_full = None, 22050
+        try:
+            y_full, sr_full = await loop.run_in_executor(
+                None, lambda: librosa.load(analysis_path, sr=22050, mono=True)
+            )
+            logger.info("librosa 加载完毕 [Task: %s]", task_id)
+        except Exception as e:
+            logger.warning("librosa.load 失败，跳过声学特征 [Task: %s]: %s", task_id, e)
 
         analysis_data    = []
         total_female_sec = 0.0
@@ -413,6 +481,16 @@ async def _do_analyze_stream(filename: str, content: bytes):
             # 置信度：直接使用 Engine A (inaSpeechSegmenter) 的逐帧均值概率
             confidence = round(float(ina_confidence), 4) if ina_confidence is not None else None
 
+            # 声学特征（仅有声片段）
+            acoustics = None
+            if y_full is not None and label in ('male', 'female'):
+                try:
+                    acoustics = await loop.run_in_executor(
+                        None, _extract_acoustics, y_full, sr_full, start_time, end_time
+                    )
+                except Exception as e:
+                    logger.warning("声学特征提取失败 [Task: %s]: %s", task_id, e)
+
             analysis_data.append({
                 "label":      label,
                 "confidence": confidence,
@@ -420,12 +498,15 @@ async def _do_analyze_stream(filename: str, content: bytes):
                 "start_time": round(float(start_time), 2),
                 "end_time":   round(float(end_time),   2),
                 "duration":   round(float(duration),   2),
+                "acoustics":  acoustics,
             })
 
             if label == "female":
                 total_female_sec += duration
             elif label == "male":
                 total_male_sec += duration
+
+        yield _sse_event({"type": "progress", "pct": 90, "msg": "声学特征提取完毕，正在整理…"})
 
         # ── 全局汇总统计 ───────────────────────────────────────
         yield _sse_event({"type": "progress", "pct": 98, "msg": "鸭鸭快好了…"})

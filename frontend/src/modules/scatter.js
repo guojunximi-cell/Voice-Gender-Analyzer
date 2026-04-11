@@ -132,11 +132,13 @@ function _draw() {
   const lineColor = resolveCSSVar('--border')     || 'rgba(128,128,128,0.15)'
   const isSmall   = W < 260
 
-  // ── Background gradient (male=blue bottom → female=pink top) ──
+  // ── Background gradient — radiation centers at 1/4 (♂) and 3/4 (♀) ──
   const bg = ctx.createLinearGradient(0, plotBottom, 0, plotTop)
-  bg.addColorStop(0,   'rgba(59,130,246,0.09)')
-  bg.addColorStop(0.5, 'rgba(167,139,250,0.02)')
-  bg.addColorStop(1,   'rgba(244,63,94,0.09)')
+  bg.addColorStop(0,    'rgba(59,130,246,0.03)')
+  bg.addColorStop(0.25, 'rgba(59,130,246,0.12)')
+  bg.addColorStop(0.5,  'rgba(167,139,250,0.01)')
+  bg.addColorStop(0.75, 'rgba(244,63,94,0.12)')
+  bg.addColorStop(1,    'rgba(244,63,94,0.03)')
   ctx.fillStyle = bg
   ctx.fillRect(plotLeft, plotTop, plotW, plotBottom - plotTop)
 
