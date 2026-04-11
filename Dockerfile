@@ -1,10 +1,11 @@
+FROM alpine:latest as base
 WORKDIR /build
 
 # ── Stage 1: Node runtime ─────────────────────────────────────
-FROM node:24-alpine AS node-base
+FROM node:alpine AS node-base
 ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@latest --activate
+ENV PATH="${PNPM_HOME}:$PATH"
+RUN corepack enable
 
 FROM node-base AS web-deps
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
@@ -16,6 +17,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 
 # ── Stage 2: Python runtime ───────────────────────────────────
 FROM ghcr.io/astral-sh/uv:alpine AS py-base
+ENV UV_VENV_RELOCATABLE=1
 ENV UV_NO_DEV=1
 
 FROM py-base as backend-deps
@@ -25,23 +27,23 @@ RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
 # ── Stage 3: Build ────────────────────────────────────────────
-COPY . /build
-
 FROM node-base AS web-build
+COPY . /build
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile \
+    pnpm install --frozen-lockfile --no-editable \
     && pnpm run build:web
 
 FROM py-base AS backend-build
+COPY . /build
 RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
-    uv sync --locked
+    uv sync --locked --no-editable
 
-RUN python ./scripts/init_iss_model.py
+RUN uv run ./scripts/init_iss_model.py
+RUN uv run ./scripts/optimize_venv.py
 
 
 # ── Prepare Image ─────────────────────────────────────────────
-From alpine:latest
-WORKDIR /
+FROM base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
@@ -51,18 +53,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # COPY --from=web-build /build/web/node_modules /web/node_modules
 COPY --from=web-build /build/web/dist /web
 
-COPY --from=backend-build /build/.venv /.venv
+ENV PY_HOME="/.venv/bin"
+COPY --from=backend-build /build/.venv ${PY_HOME}
 COPY --from=backend-build /build/backend /backend
 COPY --from=backend-build /build/*.hdf5 /
 
 
 # ── Run Project ───────────────────────────────────────────────
+WORKDIR /
 ENV GUNICORN_BIND=0.0.0.0:8000
 
-CMD gunicorn backend:app \
-        --bind $GUNICORN_BIND \
-        --keep-alive 5 \
-        --access-logfile=None \
-        --error-logfile - \
-        --proxy_headers=True \
-        --forwarded_allow_ips="*"
+ENV PATH="${PY_HOME}:$PATH"
+CMD gunicorn voiceya:app \
+    --bind ${GUNICORN_BIND} \
+    --keep-alive 5 \
+    --access-logfile=None \
+    --error-logfile - \
+    --proxy_headers=True \
+    --forwarded_allow_ips="*"

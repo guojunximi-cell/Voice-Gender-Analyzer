@@ -17,7 +17,7 @@ logging.basicConfig(
     format="[%(levelname)s] %(name)s - %(message)s",
 )
 
-logger = logging.getLogger("vfp")
+logger = logging.getLogger("voiceya")
 
 
 @asynccontextmanager
