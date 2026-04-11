@@ -1,5 +1,8 @@
-# NOTE: Engine B (声学分析 / inaSpeechSegmenter acoustic gender_score) 已于 2026-04-07 永久下线。
-#       UI 层已移除相关展示，后端分析逻辑暂时保留但结果不再对外呈现。
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# NOTE: Engine B (acoustic_analyzer) 已于 2026-04-07 永久下线并完全移除。
 import sys, os as _os
 sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'inaSpeechSegmenter-interspeech23'))
 import asyncio
@@ -50,7 +53,6 @@ from typing import List
 import uvicorn
 
 from inaSpeechSegmenter import Segmenter
-from acoustic_analyzer import analyze_segment
 
 # ─── 日志配置 ──────────────────────────────────────────────────
 logging.basicConfig(
@@ -399,25 +401,6 @@ async def _do_analyze_stream(filename: str, content: bytes):
         analysis_data    = []
         total_female_sec = 0.0
         total_male_sec   = 0.0
-        voiced_acoustics = []   # [(acoustics_dict, duration_sec), ...]
-
-        # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
-        yield _sse_event({"type": "progress", "pct": 55, "msg": "鸭鸭正在载入音频…"})
-        try:
-            logger.info("正在将音频载入内存以供 Engine B 切片 [Task: %s]...", task_id)
-            y_full, sr_full = await loop.run_in_executor(
-                None, lambda: librosa.load(analysis_path, sr=22050, mono=True)
-            )
-        except Exception as e:
-            logger.warning("librosa 读取音频失败 [Task: %s]: %s", task_id, e)
-            y_full, sr_full = None, 22050
-
-        # Pre-count voiced segments for Engine B progress
-        total_voiced = sum(
-            1 for s in segmentation_result
-            if s[0] in ("female", "male") and (s[2] - s[1]) >= 0.5
-        ) if y_full is not None else 0
-        voiced_idx = 0
 
         for seg_item in segmentation_result:
             label = seg_item[0]
@@ -426,31 +409,6 @@ async def _do_analyze_stream(filename: str, content: bytes):
             ina_confidence = seg_item[3] if len(seg_item) > 3 else None
             confidence_frames = seg_item[4] if len(seg_item) > 4 else None
             duration = end_time - start_time
-            acoustics = None
-
-            # ── Engine B: 声学分析（仅对有声语音段）────────────
-            if label in ("female", "male") and duration >= 0.5 and y_full is not None:
-                voiced_idx += 1
-                pct = 55 + (voiced_idx / max(total_voiced, 1)) * 40
-                yield _sse_event({
-                    "type": "progress",
-                    "pct": round(pct, 1),
-                    "msg": f"鸭鸭在分析第 {voiced_idx}/{total_voiced} 段…",
-                })
-                try:
-                    # 直接在内存中对 NumPy 数组进行切片，速度极快
-                    start_sample = int(float(start_time) * sr_full)
-                    end_sample   = int(float(end_time) * sr_full)
-                    y_seg = y_full[start_sample:end_sample]
-
-                    if len(y_seg) > 0:
-                        acoustics = await loop.run_in_executor(
-                            None, analyze_segment, y_seg, sr_full
-                        )
-                    if acoustics:
-                        voiced_acoustics.append((acoustics, duration))
-                except Exception as e:
-                    logger.warning("Engine B 跳过 [Task: %s] [%.1f–%.1fs]: %s", task_id, start_time, end_time, e)
 
             # 置信度：直接使用 Engine A (inaSpeechSegmenter) 的逐帧均值概率
             confidence = round(float(ina_confidence), 4) if ina_confidence is not None else None
@@ -462,7 +420,6 @@ async def _do_analyze_stream(filename: str, content: bytes):
                 "start_time": round(float(start_time), 2),
                 "end_time":   round(float(end_time),   2),
                 "duration":   round(float(duration),   2),
-                "acoustics":  acoustics,
             })
 
             if label == "female":
@@ -474,30 +431,6 @@ async def _do_analyze_stream(filename: str, content: bytes):
         yield _sse_event({"type": "progress", "pct": 98, "msg": "鸭鸭快好了…"})
         total_voice_sec  = total_female_sec + total_male_sec
         female_ratio     = (total_female_sec / total_voice_sec) if total_voice_sec > 0 else 0.0
-
-        overall_f0             = None
-        overall_gender_score   = None
-
-        if voiced_acoustics:
-            # F0: 按时长加权均值
-            f0_pairs = [
-                (a["f0_median_hz"], d)
-                for a, d in voiced_acoustics
-                if a.get("f0_median_hz") is not None
-            ]
-            if f0_pairs:
-                total_w = sum(d for _, d in f0_pairs)
-                overall_f0 = int(round(sum(f * d for f, d in f0_pairs) / total_w))
-
-            # Gender score: 按 voiced_frames 加权均值
-            gs_pairs = [
-                (a["gender_score"], a.get("voiced_frames", 1))
-                for a, _ in voiced_acoustics
-                if a.get("gender_score") is not None
-            ]
-            if gs_pairs:
-                total_w = sum(w for _, w in gs_pairs)
-                overall_gender_score = round(sum(s * w for s, w in gs_pairs) / total_w, 1)
 
         # Overall Engine A confidence: weighted mean by duration for voiced segments
         conf_pairs = [
@@ -512,8 +445,8 @@ async def _do_analyze_stream(filename: str, content: bytes):
                 overall_confidence = round(sum(c * d for c, d in conf_pairs) / total_w, 4)
 
         logger.info(
-            "分析完成 [Task: %s] — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.1f%%",
-            task_id, len(analysis_data), overall_f0, overall_gender_score, female_ratio * 100,
+            "分析完成 [Task: %s] — %d 段，女性占比=%.1f%%",
+            task_id, len(analysis_data), female_ratio * 100,
         )
 
         result = {
@@ -523,8 +456,6 @@ async def _do_analyze_stream(filename: str, content: bytes):
                 "total_female_time_sec":  round(total_female_sec, 2),
                 "total_male_time_sec":    round(total_male_sec,   2),
                 "female_ratio":           round(female_ratio, 4),
-                "overall_f0_median_hz":   overall_f0,
-                "overall_gender_score":   overall_gender_score,
                 "overall_confidence":     overall_confidence,
                 "dominant_label":         ("female" if female_ratio >= 0.5 else "male") if total_voice_sec > 0 else None,
             },

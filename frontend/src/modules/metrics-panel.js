@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 /**
  * metrics-panel.js — Right panel: acoustic features of a selected segment.
  * Called whenever a segment is clicked (waveform overlay or list item).
@@ -20,10 +24,10 @@ function animNum(el, target, suffix = '', duration = 600) {
   requestAnimationFrame(tick)
 }
 
-function animBar(el, pct, delay = 0) {
-  if (!el) return
-  setTimeout(() => { el.style.width = `${Math.max(0, Math.min(100, pct))}%` }, delay)
-}
+// function animBar(el, pct, delay = 0) {
+//   if (!el) return
+//   setTimeout(() => { el.style.width = `${Math.max(0, Math.min(100, pct))}%` }, delay)
+// }
 
 // ─── Sub-score row builder ────────────────────────────────────
 // Each entry defines physical measurement display for a slider track.
@@ -48,20 +52,20 @@ const SUB_SCORE_DEFS = [
     ticks: [1400, 1600, 1900, 2200],
     fmt: v => `${Math.round(v)} Hz`,
   },
-  {
-    label: '共鸣',
-    rawKey: 'vtl_cm', tierKey: 'vtl_tier',
-    unit: 'cm', range: [12, 20], logScale: false, reversed: true,
-    ticks: [17.5, 16.5, 15.5, 14.5],
-    fmt: v => `${v.toFixed(1)} cm`,
-  },
-  {
-    label: '倾斜',
-    rawKey: 'h1_h2_db', tierKey: 'tilt_tier',
-    unit: 'dB', range: [-2, 15], logScale: false, reversed: false,
-    ticks: [1, 4, 7, 11],
-    fmt: v => `${v.toFixed(1)} dB`,
-  },
+  // {
+  //   label: '共鸣',
+  //   rawKey: 'vtl_cm', tierKey: 'vtl_tier',
+  //   unit: 'cm', range: [12, 20], logScale: false, reversed: true,
+  //   ticks: [17.5, 16.5, 15.5, 14.5],
+  //   fmt: v => `${v.toFixed(1)} cm`,
+  // },
+  // {
+  //   label: '倾斜',
+  //   rawKey: 'h1_h2_db', tierKey: 'tilt_tier',
+  //   unit: 'dB', range: [-2, 15], logScale: false, reversed: false,
+  //   ticks: [1, 4, 7, 11],
+  //   fmt: v => `${v.toFixed(1)} dB`,
+  // },
 ]
 
 function _physicalToPercent(def, rawVal) {
@@ -177,8 +181,8 @@ export function renderMetricsPanel(segment) {
   if (stdEl) stdEl.textContent = `±${a.f0_std_hz ?? '—'} Hz`
 
   // ── Resonance card ───────────────────────────────────────
-  animNum(document.getElementById('mc-res-val'), Math.round(a.resonance_pct), '%')
-  animBar(document.getElementById('mc-res-bar'), a.resonance_pct, 80)
+  // animNum(document.getElementById('mc-res-val'), Math.round(a.resonance_pct), '%')
+  // animBar(document.getElementById('mc-res-bar'), a.resonance_pct, 80)
 
   // ── Formants ─────────────────────────────────────────────
   const setFormant = (id, val) => {
@@ -190,12 +194,12 @@ export function renderMetricsPanel(segment) {
   setFormant('mc-f3', a.f3_hz)
 
   // ── Spectral Tilt (H1–H2) ───────────────────────────────
-  const tiltEl = document.getElementById('mc-tilt-val')
-  if (tiltEl) {
-    tiltEl.textContent = a.h1_h2_db != null
-      ? `${a.h1_h2_db.toFixed(1)} dB`
-      : '—'
-  }
+  // const tiltEl = document.getElementById('mc-tilt-val')
+  // if (tiltEl) {
+  //   tiltEl.textContent = a.h1_h2_db != null
+  //     ? `${a.h1_h2_db.toFixed(1)} dB`
+  //     : '—'
+  // }
 
   // ── Pitch range reference bar ────────────────────────────
   const pitchIndicator = document.getElementById('mc-pitch-indicator')

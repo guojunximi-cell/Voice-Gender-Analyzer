@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 const ACCEPTED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4',
                         'audio/x-m4a', 'audio/m4a', 'audio/flac', 'audio/aac', 'audio/webm']
 const ACCEPTED_EXTS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.opus', '.aiff', '.au', '.caf', '.webm']

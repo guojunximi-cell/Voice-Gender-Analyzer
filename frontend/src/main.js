@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import { setupUploader, validateFile,
          RESTRICTED_MAX_BYTES } from './modules/uploader.js'
 import { initWaveform, destroyWaveform,
