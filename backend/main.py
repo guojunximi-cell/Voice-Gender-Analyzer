@@ -1,7 +1,12 @@
 # NOTE: Engine B (声学分析 / inaSpeechSegmenter acoustic gender_score) 已于 2026-04-07 永久下线。
 #       UI 层已移除相关展示，后端分析逻辑暂时保留但结果不再对外呈现。
-import sys, os as _os
-sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'inaSpeechSegmenter-interspeech23'))
+import os as _os
+import sys
+
+sys.path.insert(
+    0,
+    _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "inaSpeechSegmenter-interspeech23"),
+)
 import asyncio
 import json
 import logging
@@ -10,47 +15,51 @@ import subprocess
 import tempfile
 import time
 import uuid
+from collections import defaultdict
+from contextlib import asynccontextmanager
+from typing import List
+
+import librosa
 import numpy as np
+import uvicorn
+from acoustic_analyzer import analyze_segment
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from inaSpeechSegmenter import Segmenter
 
 # numpy 2.x made np.stack/vstack/hstack reject generators; patch them early
 # so librosa/pyannote/inaSpeechSegmenter code that passes generator
 # expressions still works.  Root cause: pyannote viterbi.py calls
 # np.vstack(generator_expr) at lines 86 and 95.
-_orig_np_stack  = np.stack
+_orig_np_stack = np.stack
 _orig_np_vstack = np.vstack
 _orig_np_hstack = np.hstack
+
 
 def _np_stack_compat(arrays, *args, **kwargs):
     if not isinstance(arrays, (list, tuple)):
         arrays = list(arrays)
     return _orig_np_stack(arrays, *args, **kwargs)
 
+
 def _np_vstack_compat(tup, *args, **kwargs):
     if not isinstance(tup, (list, tuple)):
         tup = list(tup)
     return _orig_np_vstack(tup, *args, **kwargs)
+
 
 def _np_hstack_compat(tup, *args, **kwargs):
     if not isinstance(tup, (list, tuple)):
         tup = list(tup)
     return _orig_np_hstack(tup, *args, **kwargs)
 
-np.stack  = _np_stack_compat
+
+np.stack = _np_stack_compat
 np.vstack = _np_vstack_compat
 np.hstack = _np_hstack_compat
 
-import librosa
-from collections import defaultdict
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from typing import List
-import uvicorn
-
-from inaSpeechSegmenter import Segmenter
-from acoustic_analyzer import analyze_segment
 
 # ─── 日志配置 ──────────────────────────────────────────────────
 logging.basicConfig(
@@ -61,29 +70,18 @@ logging.basicConfig(
 logger = logging.getLogger("vfp")
 
 
-class _MaskIPFilter(logging.Filter):
-    """将 uvicorn 访问日志中的客户端 IP 替换为脱敏格式（保留前两段，后两段替换为 *）"""
-    def filter(self, record: logging.LogRecord) -> bool:
-        if hasattr(record, "client_addr"):
-            addr: str = record.client_addr          # e.g. "192.168.1.100:54321"
-            host, _, port = addr.rpartition(":")
-            parts = host.split(".")
-            if len(parts) == 4:
-                record.client_addr = f"{parts[0]}.{parts[1]}.*.*:{port}"
-        return True
-
 # ─── 并发控制 ──────────────────────────────────────────────────
 # 同时最多处理的请求数（超出时排队等待，而非拒绝）
-MAX_CONCURRENT  = int(os.environ.get("MAX_CONCURRENT", "2"))
+MAX_CONCURRENT = int(os.environ.get("MAX_CONCURRENT", "2"))
 # 排队等待的上限（超出时才返回 503）
 MAX_QUEUE_DEPTH = int(os.environ.get("MAX_QUEUE_DEPTH", "10"))
 
 _processing_sem = asyncio.Semaphore(MAX_CONCURRENT)
-_queue_depth    = 0
-_queue_lock     = asyncio.Lock()
+_queue_depth = 0
+_queue_lock = asyncio.Lock()
 
 # ─── 安全配置 ──────────────────────────────────────────────────
-MAX_FILE_SIZE_MB    = int(os.environ.get("MAX_FILE_SIZE_MB", "10"))
+MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", "10"))
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 MAX_AUDIO_DURATION_SEC = int(os.environ.get("MAX_AUDIO_DURATION_SEC", "180"))  # 最多 3 分钟
@@ -96,7 +94,19 @@ _ip_call_times: dict = defaultdict(list)
 _ip_rate_locks: dict = defaultdict(asyncio.Lock)  # 每个 IP 独立锁，避免全局串行化
 
 # 允许的文件扩展名白名单（第一道防线）
-_ALLOWED_EXTENSIONS = {'.wav', '.mp3', '.flac', '.ogg', '.opus', '.m4a', '.aac', '.aiff', '.au', '.caf', '.webm'}
+_ALLOWED_EXTENSIONS = {
+    ".wav",
+    ".mp3",
+    ".flac",
+    ".ogg",
+    ".opus",
+    ".m4a",
+    ".aac",
+    ".aiff",
+    ".au",
+    ".caf",
+    ".webm",
+}
 
 
 def _is_valid_audio_magic(data: bytes) -> bool:
@@ -104,34 +114,34 @@ def _is_valid_audio_magic(data: bytes) -> bool:
     if len(data) < 12:
         return False
     # WAV:  RIFF????WAVE
-    if data[0:4] == b'RIFF' and data[8:12] == b'WAVE':
+    if data[0:4] == b"RIFF" and data[8:12] == b"WAVE":
         return True
     # FLAC
-    if data[0:4] == b'fLaC':
+    if data[0:4] == b"fLaC":
         return True
     # OGG (Vorbis / Opus)
-    if data[0:4] == b'OggS':
+    if data[0:4] == b"OggS":
         return True
     # MP3 with ID3 tag
-    if data[0:3] == b'ID3':
+    if data[0:3] == b"ID3":
         return True
     # MP3 MPEG sync word (0xFF E2–FF)
     if data[0] == 0xFF and data[1] in (0xFB, 0xFA, 0xF3, 0xF2, 0xF1, 0xE3, 0xE2):
         return True
     # AIFF / AIFF-C:  FORM????AIFF|AIFC
-    if data[0:4] == b'FORM' and data[8:12] in (b'AIFF', b'AIFC'):
+    if data[0:4] == b"FORM" and data[8:12] in (b"AIFF", b"AIFC"):
         return True
     # M4A / AAC / MP4 audio:  ????ftyp
-    if data[4:8] == b'ftyp':
+    if data[4:8] == b"ftyp":
         return True
     # CAF (Core Audio Format)
-    if data[0:4] == b'caff':
+    if data[0:4] == b"caff":
         return True
     # AU / SND
-    if data[0:4] == b'.snd':
+    if data[0:4] == b".snd":
         return True
     # WebM / Matroska (EBML header)
-    if data[0:4] == b'\x1a\x45\xdf\xa3':
+    if data[0:4] == b"\x1a\x45\xdf\xa3":
         return True
     return False
 
@@ -145,15 +155,20 @@ def _transcode_to_mp3(in_path: str, out_path: str) -> None:
     """将任意音频格式转码为 64kbps 单声道 22050Hz MP3，减少分析时的 I/O 开销。"""
     subprocess.run(
         [
-            'ffmpeg', '-y',
-            '-i', in_path,
-            '-ar', '22050',  # 与 librosa.load sr=22050 一致，避免二次重采样
-            '-ac', '1',      # 单声道，分析引擎仅使用单声道
-            '-b:a', '64k',   # 64kbps CBR，人声分析完全够用
-            '-f', 'mp3',
+            "ffmpeg",
+            "-y",
+            "-i",
+            in_path,
+            "-ar",
+            "22050",  # 与 librosa.load sr=22050 一致，避免二次重采样
+            "-ac",
+            "1",  # 单声道，分析引擎仅使用单声道
+            "-b:a",
+            "64k",  # 64kbps CBR，人声分析完全够用
+            "-f",
+            "mp3",
             out_path,
         ],
-        
         check=True,
         timeout=120,
         capture_output=True,
@@ -175,35 +190,39 @@ async def _check_rate_limit(ip: str) -> None:
         if len(recent) >= RATE_LIMIT_MAX_CALLS:
             raise HTTPException(
                 status_code=429,
-                detail=f"请求过于频繁：每 {RATE_LIMIT_WINDOW_SEC} 秒最多允许 {RATE_LIMIT_MAX_CALLS} 次请求，请稍后再试"
+                detail=f"请求过于频繁：每 {RATE_LIMIT_WINDOW_SEC} 秒最多允许 {RATE_LIMIT_MAX_CALLS} 次请求，请稍后再试",
             )
         _ip_call_times[ip].append(now)
 
+
 seg = None
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     global seg
     # 在 lifespan 最早期挂载 IP 脱敏过滤器，确保覆盖所有访问日志
-    logging.getLogger("uvicorn.access").addFilter(_MaskIPFilter())
     logger.info("正在将 AI 模型载入内存...")
     try:
         loop = asyncio.get_event_loop()
         seg = await loop.run_in_executor(None, lambda: Segmenter(detect_gender=True))
         logger.info("Engine A (inaSpeechSegmenter) 加载完毕")
         # ── logit 模型诊断 ──
-        if seg is not None and hasattr(seg, 'gender'):
+        if seg is not None and hasattr(seg, "gender"):
             _g = seg.gender
-            _last3 = [(type(l).__name__, getattr(l, 'name', '?')) for l in _g.nn.layers[-3:]]
+            _last3 = [(type(l).__name__, getattr(l, "name", "?")) for l in _g.nn.layers[-3:]]
             logger.info("[Gender诊断] 最后3层: %s", _last3)
-            logger.info("[Gender诊断] logit_model=%s  pen_model=%s  dense_W=%s",
-                        getattr(_g, '_logit_model', 'MISSING') is not None,
-                        getattr(_g, '_pen_model', 'MISSING') is not None,
-                        getattr(_g, '_dense_W', None).shape if getattr(_g, '_dense_W', None) is not None else None)
+            logger.info(
+                "[Gender诊断] logit_model=%s  pen_model=%s  dense_W=%s",
+                getattr(_g, "_logit_model", "MISSING"),
+                getattr(_g, "_pen_model", "MISSING"),
+                _dense_W.shape if (_dense_W := getattr(_g, "_dense_W", None)) else None,
+            )
     except Exception as e:
         logger.error("Engine A 加载失败: %s", e)
         seg = None
     yield
+
 
 # 1. FastAPI 实例
 app = FastAPI(title="VFP Voice Analysis API", version="2.0", lifespan=lifespan)
@@ -223,9 +242,11 @@ if os.path.isdir(_DIST_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(_DIST_DIR, "assets")), name="assets")
 
     @app.get("/", include_in_schema=False)
-    def root():
+    def static_root():
         return FileResponse(os.path.join(_DIST_DIR, "index.html"))
+
 else:
+
     @app.get("/")
     def root():
         return {"status": "ok", "name": "VFP Voice Analysis API", "version": "2.0", "docs": "/docs"}
@@ -265,14 +286,13 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
         if ext not in _ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=415,
-                detail=f"上传的文件格式不受支持，仅接受: {', '.join(sorted(_ALLOWED_EXTENSIONS))}"
+                detail=f"上传的文件格式不受支持，仅接受: {', '.join(sorted(_ALLOWED_EXTENSIONS))}",
             )
 
         header = await f.read(12)
         if not _is_valid_audio_magic(header):
             raise HTTPException(
-                status_code=415,
-                detail="文件内容与声称的格式不符，请检查文件是否为有效音频"
+                status_code=415, detail="文件内容与声称的格式不符，请检查文件是否为有效音频"
             )
 
         # 文件大小限制（多读 1 字节判断是否超限，避免大文件载入内存）
@@ -280,7 +300,7 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
         if len(header) + len(rest) > MAX_FILE_SIZE_BYTES:
             raise HTTPException(
                 status_code=413,
-                detail=f"上传的音频文件超过 {MAX_FILE_SIZE_BYTES // (1024*1024)} MB 大小限制"
+                detail=f"上传的音频文件超过 {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB 大小限制",
             )
 
         await f.seek(0)
@@ -290,15 +310,12 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
         if _queue_depth >= MAX_QUEUE_DEPTH:
             raise HTTPException(
                 status_code=503,
-                detail=f"服务器繁忙，当前排队已达上限 ({MAX_QUEUE_DEPTH})，请稍后再试"
+                detail=f"服务器繁忙，当前排队已达上限 ({MAX_QUEUE_DEPTH})，请稍后再试",
             )
         _queue_depth += 1
 
     # ── 4. SSE 流式响应（单文件 + Accept: text/event-stream）──
-    wants_stream = (
-        len(files) == 1
-        and "text/event-stream" in request.headers.get("accept", "")
-    )
+    wants_stream = len(files) == 1 and "text/event-stream" in request.headers.get("accept", "")
 
     if wants_stream:
         # Read file content eagerly here — UploadFile's SpooledTemporaryFile
@@ -336,7 +353,6 @@ async def analyze_voice(request: Request, files: List[UploadFile] = File(...)):
     return results if len(results) > 1 else results[0]
 
 
-
 async def _do_analyze_stream(filename: str, content: bytes):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     task_id = uuid.uuid4().hex[:8]
@@ -348,12 +364,12 @@ async def _do_analyze_stream(filename: str, content: bytes):
     mp3_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-            tmp_path = tmp.name   # 在写入之前赋值，确保 finally 能清理
+            tmp_path = tmp.name  # 在写入之前赋值，确保 finally 能清理
             tmp.write(content)
         # ── 转码：统一为 64kbps 单声道 MP3，降低后续 I/O 开销 ──
         yield _sse_event({"type": "progress", "pct": 5, "msg": "鸭鸭正在处理音频…"})
         loop = asyncio.get_running_loop()
-        mp3_path = tmp_path + '_normalized.mp3'
+        mp3_path = tmp_path + "_normalized.mp3"
         try:
             await loop.run_in_executor(None, _transcode_to_mp3, tmp_path, mp3_path)
             analysis_path = mp3_path
@@ -371,7 +387,7 @@ async def _do_analyze_stream(filename: str, content: bytes):
             if audio_duration > MAX_AUDIO_DURATION_SEC:
                 raise HTTPException(
                     status_code=413,
-                    detail=f"音频时长 {audio_duration:.0f} 秒，超过 {MAX_AUDIO_DURATION_SEC} 秒（{MAX_AUDIO_DURATION_SEC // 60} 分钟）限制"
+                    detail=f"音频时长 {audio_duration:.0f} 秒，超过 {MAX_AUDIO_DURATION_SEC} 秒（{MAX_AUDIO_DURATION_SEC // 60} 分钟）限制",
                 )
             logger.info("音频时长 %.1f 秒 [Task: %s]", audio_duration, task_id)
         except HTTPException:
@@ -390,16 +406,18 @@ async def _do_analyze_stream(filename: str, content: bytes):
             try:
                 await asyncio.wait_for(asyncio.shield(_seg_fut), timeout=15)
             except asyncio.TimeoutError:
-                yield _sse_event({"type": "progress", "pct": 10, "msg": "鸭鸭正在聆听声纹…（此步骤较慢）"})
+                yield _sse_event(
+                    {"type": "progress", "pct": 10, "msg": "鸭鸭正在聆听声纹…（此步骤较慢）"}
+                )
         segmentation_result = await _seg_fut
         # segmentation_result: [('male'|'female'|..., start, end), ...]
 
         yield _sse_event({"type": "progress", "pct": 50, "msg": "鸭鸭听完了！正在整理笔记…"})
 
-        analysis_data    = []
+        analysis_data = []
         total_female_sec = 0.0
-        total_male_sec   = 0.0
-        voiced_acoustics = []   # [(acoustics_dict, duration_sec), ...]
+        total_male_sec = 0.0
+        voiced_acoustics = []  # [(acoustics_dict, duration_sec), ...]
 
         # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
         yield _sse_event({"type": "progress", "pct": 55, "msg": "鸭鸭正在载入音频…"})
@@ -413,10 +431,15 @@ async def _do_analyze_stream(filename: str, content: bytes):
             y_full, sr_full = None, 22050
 
         # Pre-count voiced segments for Engine B progress
-        total_voiced = sum(
-            1 for s in segmentation_result
-            if s[0] in ("female", "male") and (s[2] - s[1]) >= 0.5
-        ) if y_full is not None else 0
+        total_voiced = (
+            sum(
+                1
+                for s in segmentation_result
+                if s[0] in ("female", "male") and (s[2] - s[1]) >= 0.5
+            )
+            if y_full is not None
+            else 0
+        )
         voiced_idx = 0
 
         for seg_item in segmentation_result:
@@ -432,38 +455,48 @@ async def _do_analyze_stream(filename: str, content: bytes):
             if label in ("female", "male") and duration >= 0.5 and y_full is not None:
                 voiced_idx += 1
                 pct = 55 + (voiced_idx / max(total_voiced, 1)) * 40
-                yield _sse_event({
-                    "type": "progress",
-                    "pct": round(pct, 1),
-                    "msg": f"鸭鸭在分析第 {voiced_idx}/{total_voiced} 段…",
-                })
+                yield _sse_event(
+                    {
+                        "type": "progress",
+                        "pct": round(pct, 1),
+                        "msg": f"鸭鸭在分析第 {voiced_idx}/{total_voiced} 段…",
+                    }
+                )
                 try:
                     # 直接在内存中对 NumPy 数组进行切片，速度极快
                     start_sample = int(float(start_time) * sr_full)
-                    end_sample   = int(float(end_time) * sr_full)
+                    end_sample = int(float(end_time) * sr_full)
                     y_seg = y_full[start_sample:end_sample]
 
                     if len(y_seg) > 0:
                         acoustics = await loop.run_in_executor(
                             None, analyze_segment, y_seg, sr_full
-                        )
+                        )  # type: ignore
                     if acoustics:
                         voiced_acoustics.append((acoustics, duration))
                 except Exception as e:
-                    logger.warning("Engine B 跳过 [Task: %s] [%.1f–%.1fs]: %s", task_id, start_time, end_time, e)
+                    logger.warning(
+                        "Engine B 跳过 [Task: %s] [%.1f–%.1fs]: %s",
+                        task_id,
+                        start_time,
+                        end_time,
+                        e,
+                    )
 
             # 置信度：直接使用 Engine A (inaSpeechSegmenter) 的逐帧均值概率
             confidence = round(float(ina_confidence), 4) if ina_confidence is not None else None
 
-            analysis_data.append({
-                "label":      label,
-                "confidence": confidence,
-                "confidence_frames": confidence_frames,
-                "start_time": round(float(start_time), 2),
-                "end_time":   round(float(end_time),   2),
-                "duration":   round(float(duration),   2),
-                "acoustics":  acoustics,
-            })
+            analysis_data.append(
+                {
+                    "label": label,
+                    "confidence": confidence,
+                    "confidence_frames": confidence_frames,
+                    "start_time": round(float(start_time), 2),
+                    "end_time": round(float(end_time), 2),
+                    "duration": round(float(duration), 2),
+                    "acoustics": acoustics,
+                }
+            )
 
             if label == "female":
                 total_female_sec += duration
@@ -472,11 +505,11 @@ async def _do_analyze_stream(filename: str, content: bytes):
 
         # ── 全局汇总统计 ───────────────────────────────────────
         yield _sse_event({"type": "progress", "pct": 98, "msg": "鸭鸭快好了…"})
-        total_voice_sec  = total_female_sec + total_male_sec
-        female_ratio     = (total_female_sec / total_voice_sec) if total_voice_sec > 0 else 0.0
+        total_voice_sec = total_female_sec + total_male_sec
+        female_ratio = (total_female_sec / total_voice_sec) if total_voice_sec > 0 else 0.0
 
-        overall_f0             = None
-        overall_gender_score   = None
+        overall_f0 = None
+        overall_gender_score = None
 
         if voiced_acoustics:
             # F0: 按时长加权均值
@@ -513,20 +546,26 @@ async def _do_analyze_stream(filename: str, content: bytes):
 
         logger.info(
             "分析完成 [Task: %s] — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.1f%%",
-            task_id, len(analysis_data), overall_f0, overall_gender_score, female_ratio * 100,
+            task_id,
+            len(analysis_data),
+            overall_f0,
+            overall_gender_score,
+            female_ratio * 100,
         )
 
         result = {
-            "status":   "success",
+            "status": "success",
             "filename": filename,
             "summary": {
-                "total_female_time_sec":  round(total_female_sec, 2),
-                "total_male_time_sec":    round(total_male_sec,   2),
-                "female_ratio":           round(female_ratio, 4),
-                "overall_f0_median_hz":   overall_f0,
-                "overall_gender_score":   overall_gender_score,
-                "overall_confidence":     overall_confidence,
-                "dominant_label":         ("female" if female_ratio >= 0.5 else "male") if total_voice_sec > 0 else None,
+                "total_female_time_sec": round(total_female_sec, 2),
+                "total_male_time_sec": round(total_male_sec, 2),
+                "female_ratio": round(female_ratio, 4),
+                "overall_f0_median_hz": overall_f0,
+                "overall_gender_score": overall_gender_score,
+                "overall_confidence": overall_confidence,
+                "dominant_label": ("female" if female_ratio >= 0.5 else "male")
+                if total_voice_sec > 0
+                else None,
             },
             "analysis": analysis_data,
         }

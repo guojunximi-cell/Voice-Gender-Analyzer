@@ -10,23 +10,23 @@ Usage:
     result = analyze_segment(y, sr)
 """
 
-import numpy as np
 import librosa
-from scipy.signal import butter, sosfilt
+import numpy as np
 from scipy.linalg import solve_toeplitz
+from scipy.signal import butter, sosfilt
 
 
 def _lpc(frame: np.ndarray, order: int) -> np.ndarray:
     """Autocorrelation-method LPC (replaces scipy.signal.lpc removed in 1.16+)."""
     n = len(frame)
-    r = np.correlate(frame, frame, mode='full')[n - 1 : n + order]
+    r = np.correlate(frame, frame, mode="full")[n - 1 : n + order]
     a = solve_toeplitz(r[:order], -r[1 : order + 1])
     return np.concatenate([[1.0], a])
 
 
 # ─── Constants ────────────────────────────────────────────────
-SPEED_OF_SOUND_CM_S = 35000.0   # cm/s at ~37°C (vocal tract temperature)
-MIN_SEGMENT_SAMPLES = 2048      # ~0.09s at 22050 Hz — absolute minimum for pyin
+SPEED_OF_SOUND_CM_S = 35000.0  # cm/s at ~37°C (vocal tract temperature)
+MIN_SEGMENT_SAMPLES = 2048  # ~0.09s at 22050 Hz — absolute minimum for pyin
 
 
 # ─── Utility ─────────────────────────────────────────────────
@@ -44,13 +44,13 @@ def _extract_f0(y: np.ndarray, sr: int) -> tuple[float | None, float | None, int
         return None, None, 0
 
     frame_length = min(2048, len(y))
-    hop_length   = frame_length // 4
+    hop_length = frame_length // 4
 
     try:
         f0, voiced_flag, _ = librosa.pyin(
             y,
-            fmin=librosa.note_to_hz('C2'),   # 65 Hz — well below male floor
-            fmax=librosa.note_to_hz('C6'),   # 1047 Hz — well above female ceiling
+            fmin=librosa.note_to_hz("C2"),  # 65 Hz — well below male floor # type: ignore
+            fmax=librosa.note_to_hz("C6"),  # 1047 Hz — well above female ceiling # type: ignore
             sr=sr,
             frame_length=frame_length,
             hop_length=hop_length,
@@ -77,12 +77,12 @@ def _extract_formants(y: np.ndarray, sr: int) -> tuple[int | None, int | None, i
     Downsamples to 11025 Hz to limit analysis to ~5500 Hz ceiling.
     """
     TARGET_SR = 11025
-    FRAME_MS  = 25   # ms per analysis window
-    HOP_MS    = 10   # ms hop
-    LPC_ORDER = int(TARGET_SR / 1000) + 2   # 13
+    FRAME_MS = 25  # ms per analysis window
+    HOP_MS = 10  # ms hop
+    LPC_ORDER = int(TARGET_SR / 1000) + 2  # 13
 
     frame_len = int(FRAME_MS * TARGET_SR / 1000)
-    hop_len   = int(HOP_MS   * TARGET_SR / 1000)
+    hop_len = int(HOP_MS * TARGET_SR / 1000)
 
     # Resample
     try:
@@ -94,8 +94,8 @@ def _extract_formants(y: np.ndarray, sr: int) -> tuple[int | None, int | None, i
         return None, None, None
 
     # High-pass filter at 80 Hz (remove DC & low-freq rumble)
-    sos = butter(4, 80.0 / (TARGET_SR / 2.0), btype='high', output='sos')
-    y_hp = sosfilt(sos, y_down).astype(np.float32)
+    sos = butter(4, 80.0 / (TARGET_SR / 2.0), btype="high", output="sos")
+    y_hp = sosfilt(sos, y_down).astype(np.float32) # type: ignore
 
     # Pre-emphasis
     y_pe = np.append(y_hp[0], y_hp[1:] - 0.97 * y_hp[:-1])
@@ -117,21 +117,22 @@ def _extract_formants(y: np.ndarray, sr: int) -> tuple[int | None, int | None, i
 
         # Roots of the LPC polynomial → formant frequencies
         roots = np.roots(a)
-        roots = roots[np.imag(roots) >= 0]           # upper half-plane only
+        roots = roots[np.imag(roots) >= 0]  # upper half-plane only
         angles = np.angle(roots)
-        freqs  = np.sort(angles * TARGET_SR / (2.0 * np.pi))
-        freqs  = freqs[(freqs > 50)]                 # discard sub-50 Hz
+        freqs = np.sort(angles * TARGET_SR / (2.0 * np.pi))
+        freqs = freqs[(freqs > 50)]  # discard sub-50 Hz
 
         # Find F1 / F2 / F3 in their canonical ranges
         f1 = next((f for f in freqs if 200 < f < 1000), None)
-        f2 = next((f for f in freqs if 700  < f < 3000
-                   and (f1 is None or f > f1 + 150)), None)
-        f3 = next((f for f in freqs if 1500 < f < 4000
-                   and (f2 is None or f > f2 + 150)), None)
+        f2 = next((f for f in freqs if 700 < f < 3000 and (f1 is None or f > f1 + 150)), None)
+        f3 = next((f for f in freqs if 1500 < f < 4000 and (f2 is None or f > f2 + 150)), None)
 
-        if f1: frames_f1.append(f1)
-        if f2: frames_f2.append(f2)
-        if f3: frames_f3.append(f3)
+        if f1:
+            frames_f1.append(f1)
+        if f2:
+            frames_f2.append(f2)
+        if f3:
+            frames_f3.append(f3)
 
     f1 = int(round(float(np.median(frames_f1)))) if len(frames_f1) >= 3 else None
     f2 = int(round(float(np.median(frames_f2)))) if len(frames_f2) >= 3 else None
@@ -156,10 +157,10 @@ def _compute_spectral_tilt(y: np.ndarray, sr: int) -> float | None:
         return None
 
     S_mean = np.mean(S, axis=1)
-    freqs  = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
+    freqs = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
 
     mask = (freqs > 100) & (freqs < 8000)
-    log_freq  = np.log2(freqs[mask])
+    log_freq = np.log2(freqs[mask])
     log_power = 10.0 * np.log10(S_mean[mask] + 1e-12)
 
     if len(log_freq) < 5:
@@ -180,7 +181,7 @@ def _compute_h1_h2(y: np.ndarray, sr: int, f0_hz: float) -> float | None:
 
     try:
         spectrum = np.abs(np.fft.rfft(y, n=n_fft)) ** 2
-        freqs    = np.fft.rfftfreq(n_fft, 1.0 / sr)
+        freqs = np.fft.rfftfreq(n_fft, 1.0 / sr)
 
         window_hz = max(20.0, f0_hz * 0.25)  # proportional to F0; at least 20 Hz
 
@@ -276,10 +277,14 @@ def _score_spectral_tilt(h1_h2_db: float | None) -> float:
 # ─── 5-Tier Color Classification (1=masculine → 5=feminine) ──
 def _tier_pitch(f0_hz: float) -> int:
     """Map F0 (Hz) to 5-tier gender color class."""
-    if f0_hz < 120: return 1
-    if f0_hz < 155: return 2
-    if f0_hz < 185: return 3
-    if f0_hz < 225: return 4
+    if f0_hz < 120:
+        return 1
+    if f0_hz < 155:
+        return 2
+    if f0_hz < 185:
+        return 3
+    if f0_hz < 225:
+        return 4
     return 5
 
 
@@ -288,34 +293,50 @@ def _tier_formants(f1: int | None, f2: int | None, f3: int | None) -> int:
     Weighted formant tier: F2 primary (0.5), F1 and F3 secondary (0.25 each).
     Based on v2.0 ranges: F2 boundaries at 1400/1600/1900/2200 Hz.
     """
+
     def _f1t(v: int) -> int:
-        if v < 550: return 1
-        if v < 620: return 2
-        if v < 670: return 3
-        if v < 750: return 4
+        if v < 550:
+            return 1
+        if v < 620:
+            return 2
+        if v < 670:
+            return 3
+        if v < 750:
+            return 4
         return 5
 
     def _f2t(v: int) -> int:
-        if v < 1400: return 1
-        if v < 1600: return 2
-        if v < 1900: return 3
-        if v < 2200: return 4
+        if v < 1400:
+            return 1
+        if v < 1600:
+            return 2
+        if v < 1900:
+            return 3
+        if v < 2200:
+            return 4
         return 5
 
     def _f3t(v: int) -> int:
-        if v < 2500: return 1
-        if v < 2700: return 2
-        if v < 2950: return 3
-        if v < 3200: return 4
+        if v < 2500:
+            return 1
+        if v < 2700:
+            return 2
+        if v < 2950:
+            return 3
+        if v < 3200:
+            return 4
         return 5
 
     total, weight = 0.0, 0.0
     if f2 is not None:
-        total += _f2t(f2) * 0.50; weight += 0.50
+        total += _f2t(f2) * 0.50
+        weight += 0.50
     if f1 is not None:
-        total += _f1t(f1) * 0.25; weight += 0.25
+        total += _f1t(f1) * 0.25
+        weight += 0.25
     if f3 is not None:
-        total += _f3t(f3) * 0.25; weight += 0.25
+        total += _f3t(f3) * 0.25
+        weight += 0.25
     if weight == 0.0:
         return 3
     return max(1, min(5, round(total / weight)))
@@ -323,27 +344,35 @@ def _tier_formants(f1: int | None, f2: int | None, f3: int | None) -> int:
 
 def _tier_vtl(vtl_cm: float) -> int:
     """Map VTL (cm) to 5-tier gender color class."""
-    if vtl_cm > 17.5: return 1
-    if vtl_cm > 16.5: return 2
-    if vtl_cm > 15.5: return 3
-    if vtl_cm > 14.5: return 4
+    if vtl_cm > 17.5:
+        return 1
+    if vtl_cm > 16.5:
+        return 2
+    if vtl_cm > 15.5:
+        return 3
+    if vtl_cm > 14.5:
+        return 4
     return 5
 
 
 def _tier_h1_h2(h1_h2_db: float) -> int:
     """Map H1–H2 difference (dB) to 5-tier gender color class."""
-    if h1_h2_db < 1:  return 1
-    if h1_h2_db < 4:  return 2
-    if h1_h2_db < 7:  return 3
-    if h1_h2_db < 11: return 4
+    if h1_h2_db < 1:
+        return 1
+    if h1_h2_db < 4:
+        return 2
+    if h1_h2_db < 7:
+        return 3
+    if h1_h2_db < 11:
+        return 4
     return 5
 
 
 def _composite_score(
-    pitch_score:    float,
-    formant_score:  float,
+    pitch_score: float,
+    formant_score: float,
     resonance_score: float,
-    tilt_score:     float,
+    tilt_score: float,
 ) -> float:
     """
     Weighted composite with dynamic rebalancing when pitch and formant disagree.
@@ -379,13 +408,13 @@ def analyze_segment(y: np.ndarray, sr: int) -> dict | None:
     # Normalise amplitude
     peak = np.max(np.abs(y))
     if peak < 1e-6:
-        return None   # completely silent
+        return None  # completely silent
     y = y / peak
 
     # ── F0 ──────────────────────────────────────────────────
     f0_median, f0_std, voiced_frames = _extract_f0(y, sr)
     if f0_median is None:
-        return None   # no voiced frames → not speech
+        return None  # no voiced frames → not speech
 
     # ── Formants ────────────────────────────────────────────
     f1, f2, f3 = _extract_formants(y, sr)
@@ -397,43 +426,41 @@ def analyze_segment(y: np.ndarray, sr: int) -> dict | None:
     h1_h2 = _compute_h1_h2(y, sr, f0_median)
 
     # ── Resonance / VTL ──────────────────────────────────────
-    vtl_cm    = _compute_vtl_cm(f3, f2)
+    vtl_cm = _compute_vtl_cm(f3, f2)
     resonance = _compute_resonance(f3, f0_median)
 
     # ── Scores (0–100, used for composite gender_score) ──────
-    pitch_score    = _score_pitch(f0_median)
-    formant_score  = _score_formants(f2, f3)
-    tilt_score     = _score_spectral_tilt(h1_h2)   # now H1–H2 based
-    resonance_score = resonance   # already 0–100
+    pitch_score = _score_pitch(f0_median)
+    formant_score = _score_formants(f2, f3)
+    tilt_score = _score_spectral_tilt(h1_h2)  # now H1–H2 based
+    resonance_score = resonance  # already 0–100
 
-    gender_score = _composite_score(
-        pitch_score, formant_score, resonance_score, tilt_score
-    )
+    gender_score = _composite_score(pitch_score, formant_score, resonance_score, tilt_score)
 
     # ── 5-Tier Color Classes ──────────────────────────────────
-    pitch_tier   = _tier_pitch(f0_median)
+    pitch_tier = _tier_pitch(f0_median)
     formant_tier = _tier_formants(f1, f2, f3)
-    vtl_tier     = _tier_vtl(vtl_cm) if vtl_cm is not None else 3
-    tilt_tier    = _tier_h1_h2(h1_h2) if h1_h2 is not None else 3
+    vtl_tier = _tier_vtl(vtl_cm) if vtl_cm is not None else 3
+    tilt_tier = _tier_h1_h2(h1_h2) if h1_h2 is not None else 3
 
     return {
-        "f0_median_hz":         f0_median,
-        "f0_std_hz":            f0_std,
-        "f1_hz":                f1,
-        "f2_hz":                f2,
-        "f3_hz":                f3,
+        "f0_median_hz": f0_median,
+        "f0_std_hz": f0_std,
+        "f1_hz": f1,
+        "f2_hz": f2,
+        "f3_hz": f3,
         "spectral_tilt_db_oct": tilt,
-        "h1_h2_db":             h1_h2,
-        "vtl_cm":               vtl_cm,
-        "resonance_pct":        resonance,
-        "gender_score":         gender_score,
-        "pitch_score":          pitch_score,
-        "formant_score":        formant_score,
-        "resonance_score":      resonance_score,
-        "tilt_score":           tilt_score,
-        "pitch_tier":           pitch_tier,
-        "formant_tier":         formant_tier,
-        "vtl_tier":             vtl_tier,
-        "tilt_tier":            tilt_tier,
-        "voiced_frames":        voiced_frames,
+        "h1_h2_db": h1_h2,
+        "vtl_cm": vtl_cm,
+        "resonance_pct": resonance,
+        "gender_score": gender_score,
+        "pitch_score": pitch_score,
+        "formant_score": formant_score,
+        "resonance_score": resonance_score,
+        "tilt_score": tilt_score,
+        "pitch_tier": pitch_tier,
+        "formant_tier": formant_tier,
+        "vtl_tier": vtl_tier,
+        "tilt_tier": tilt_tier,
+        "voiced_frames": voiced_frames,
     }
