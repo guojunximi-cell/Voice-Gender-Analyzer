@@ -132,6 +132,30 @@ wheels = [
 ]
 
 [[package]]
+name = "av"
+version = "17.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/eb/abca886df3a091bc406feb5ff71b4c4f426beaae6b71b9697264ce8c7211/av-17.0.0.tar.gz", hash = "sha256:c53685df73775a8763c375c7b2d62a6cb149d992a26a4b098204da42ade8c3df", size = 4410769, upload-time = "2026-03-14T14:38:45.868Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/fb/55e3b5b5d1fc61466292f26fbcbabafa2642f378dc48875f8f554591e1a4/av-17.0.0-cp311-abi3-macosx_11_0_x86_64.whl", hash = "sha256:ed4013fac77c309a4a68141dcf6148f1821bb1073a36d4289379762a6372f711", size = 23238424, upload-time = "2026-03-14T14:38:05.856Z" },
+    { url = "https://files.pythonhosted.org/packages/52/03/9ace1acc08bc9ae38c14bf3a4b1360e995e4d999d1d33c2cbd7c9e77582a/av-17.0.0-cp311-abi3-macosx_14_0_arm64.whl", hash = "sha256:e44b6c83e9f3be9f79ee87d0b77a27cea9a9cd67bd630362c86b7e56a748dfbb", size = 18709043, upload-time = "2026-03-14T14:38:08.288Z" },
+    { url = "https://files.pythonhosted.org/packages/00/c0/637721f3cd5bb8bd16105a1a08efd781fc12f449931bdb3a4d0cfd63fa55/av-17.0.0-cp311-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:b440da6ac47da0629d509316f24bcd858f33158dbdd0f1b7293d71e99beb26de", size = 34018780, upload-time = "2026-03-14T14:38:10.45Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/59/d19bc3257dd985d55337d7f0414c019414b97e16cd3690ebf9941a847543/av-17.0.0-cp311-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:1060cba85f97f4a337311169d92c0b5e143452cfa5ca0e65fa499d7955e8592e", size = 36358757, upload-time = "2026-03-14T14:38:13.092Z" },
+    { url = "https://files.pythonhosted.org/packages/52/6c/a1f4f2677bae6f2ade7a8a18e90ebdcf70690c9b1c4e40e118aa30fa313f/av-17.0.0-cp311-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:deda202e6021cfc7ba3e816897760ec5431309d59a4da1f75df3c0e9413d71e7", size = 35195281, upload-time = "2026-03-14T14:38:15.789Z" },
+    { url = "https://files.pythonhosted.org/packages/90/ea/52b0fc6f69432c7bf3f5fbe6f707113650aa40a1a05b9096ffc2bba4f77d/av-17.0.0-cp311-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:ffaf266a1a9c2148072de0a4b5ae98061465178d2cfaa69ee089761149342974", size = 37444817, upload-time = "2026-03-14T14:38:18.563Z" },
+    { url = "https://files.pythonhosted.org/packages/34/ad/d2172966282cb8f146c13b6be7416efefde74186460c5e1708ddfc13dba6/av-17.0.0-cp311-abi3-win_amd64.whl", hash = "sha256:45a35a40b2875bf2f98de7c952d74d960f92f319734e6d28e03b4c62a49e6f49", size = 28888553, upload-time = "2026-03-14T14:38:21.223Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/bb/c5a4c4172c514d631fb506e6366b503576b8c7f29809cf42aca73e28ff01/av-17.0.0-cp311-abi3-win_arm64.whl", hash = "sha256:3d32e9b5c5bbcb872a0b6917b352a1db8a42142237826c9b49a36d5dbd9e9c26", size = 21916910, upload-time = "2026-03-14T14:38:23.706Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/8e/c40ac08e63f79387c59f6ecc38f47d4c942b549130eee579ec1a91f6a291/av-17.0.0-cp314-cp314t-macosx_11_0_x86_64.whl", hash = "sha256:d13250fb4b4522e9a6bec32da082556d5f257110ea223758151375748d9bbe25", size = 23483029, upload-time = "2026-03-14T14:38:25.758Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/fb/b4419494bfc249163ec393c613966d66db7e95c76da3345711cd115a79df/av-17.0.0-cp314-cp314t-macosx_14_0_arm64.whl", hash = "sha256:dbb56aa3b7ae72451d1bf6e9d37c7d83d39b97af712f73583ff419fbf08fc237", size = 18920446, upload-time = "2026-03-14T14:38:27.905Z" },
+    { url = "https://files.pythonhosted.org/packages/30/62/c2306d91602ddad2c56106f21dcb334fd51d5ea2e952f7fa025bb8aa39fc/av-17.0.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:a213ac9e83b7ab12c2e9f277a09cac8e9d85cf0883efdab7a87a60e2e4e48879", size = 37477266, upload-time = "2026-03-14T14:38:30.404Z" },
+    { url = "https://files.pythonhosted.org/packages/28/cd/c8510a9607886785c0b3ca019d503e888c3757529be42a7287fe2bfa92d5/av-17.0.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:e15c88bb0921f9435bcc5a27a0863dba571a80ad5e1389c4fcf2073833bb4a74", size = 39572988, upload-time = "2026-03-14T14:38:32.984Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/2d/207d9361e25b5abec9be335bbab4df6b6b838e2214be4b374f4cfb285427/av-17.0.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:096cfd1e9fc896506726c7c42aaf9b370e78c2f257cde4d6ddb6c889bfcc49ec", size = 38399591, upload-time = "2026-03-14T14:38:35.465Z" },
+    { url = "https://files.pythonhosted.org/packages/73/ca/307740c6aa2980966bf11383ffcb04bacc5b13f3d268ab4cfb274ad6f793/av-17.0.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:3649ab3d2c7f58049ded1a36e100c0d8fd529cf258f41dd88678ba824034d8c9", size = 40590681, upload-time = "2026-03-14T14:38:38.269Z" },
+    { url = "https://files.pythonhosted.org/packages/35/f2/6fdb26d0651adf409864cb2a0d60da107e467d3d1aabc94b234ead54324a/av-17.0.0-cp314-cp314t-win_amd64.whl", hash = "sha256:e5002271ab2135b551d980c2db8f3299d452e3b9d3633f24f6bb57fffe91cd10", size = 29216337, upload-time = "2026-03-14T14:38:40.83Z" },
+    { url = "https://files.pythonhosted.org/packages/41/0a/0896b829a39b5669a2d811e1a79598de661693685cd62b31f11d0c18e65b/av-17.0.0-cp314-cp314t-win_arm64.whl", hash = "sha256:dba98603fc4665b4f750de86fbaf6c0cfaece970671a9b529e0e3d1711e8367e", size = 22071058, upload-time = "2026-03-14T14:38:43.663Z" },
+]
+
+[[package]]
 name = "certifi"
 version = "2026.2.25"
 source = { registry = "https://pypi.org/simple" }
@@ -286,6 +310,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f7/e6/7adb4c5fa231e82c35b8f5741a9f2d055f520c29af5546fd70d3e8e1cd2e/fastapi-0.135.3.tar.gz", hash = "sha256:bd6d7caf1a2bdd8d676843cdcd2287729572a1ef524fc4d65c17ae002a1be654", size = 396524, upload-time = "2026-04-01T16:23:58.188Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/84/a4/5caa2de7f917a04ada20018eccf60d6cc6145b0199d55ca3711b0fc08312/fastapi-0.135.3-py3-none-any.whl", hash = "sha256:9b0f590c813acd13d0ab43dd8494138eb58e484bfac405db1f3187cfc5810d98", size = 117734, upload-time = "2026-04-01T16:23:59.328Z" },
+]
+
+[[package]]
+name = "fastapi-limiter"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "pyrate-limiter" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b7/32/81f64b69a79345caca0a90d1601ae7c84c39438145793514ee82daac4fc6/fastapi_limiter-0.2.0.tar.gz", hash = "sha256:b042259f6280056b5b2b3f506edd76c8e0648d7a5ce86c3485216a4a0fd0ec14", size = 7401, upload-time = "2026-02-06T07:00:09.831Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c4/9b/35278a18254f187d55bb450ded6bc9a59c7b3010d164e1796f3dfb7aa73d/fastapi_limiter-0.2.0-py3-none-any.whl", hash = "sha256:e576ebb29cc9614c2f38471c60ed0e849024e9a1b7a2aeb4c2a31a6d708b4aea", size = 5219, upload-time = "2026-02-06T07:00:07.824Z" },
 ]
 
 [[package]]
@@ -1039,12 +1076,35 @@ wheels = [
 ]
 
 [[package]]
+name = "pydantic-settings"
+version = "2.13.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "typing-inspection" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/52/6d/fffca34caecc4a3f97bda81b2098da5e8ab7efc9a66e819074a11955d87e/pydantic_settings-2.13.1.tar.gz", hash = "sha256:b4c11847b15237fb0171e1462bf540e294affb9b86db4d9aa5c01730bdbe4025", size = 223826, upload-time = "2026-02-19T13:45:08.055Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/4b/ccc026168948fec4f7555b9164c724cf4125eac006e176541483d2c959be/pydantic_settings-2.13.1-py3-none-any.whl", hash = "sha256:d56fd801823dbeae7f0975e1f8c8e25c258eb75d278ea7abb5d9cebb01b56237", size = 58929, upload-time = "2026-02-19T13:45:06.034Z" },
+]
+
+[[package]]
 name = "pygments"
 version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f", size = 4955991, upload-time = "2026-03-29T13:29:33.898Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
+]
+
+[[package]]
+name = "pyrate-limiter"
+version = "4.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/33/0c/6e78218e6ef726be35a4c0a5e2e281e36ddd940566800219e96d13de99ad/pyrate_limiter-4.1.0.tar.gz", hash = "sha256:be1ac413a263aa410b98757d1b01a880650948a1fc3a959512f15865eb58dbf3", size = 306136, upload-time = "2026-03-22T14:43:03.739Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/fd/57181fafae08385d00ea2702be246ab8035352a0a8e1f63391c2bcad74d4/pyrate_limiter-4.1.0-py3-none-any.whl", hash = "sha256:2696b4e4a6cffb3d40fc76662baccb766697893f0979e12bebbfc7d3b6b19603", size = 38197, upload-time = "2026-03-22T14:43:01.975Z" },
 ]
 
 [[package]]
@@ -1506,6 +1566,15 @@ wheels = [
 ]
 
 [[package]]
+name = "uuid6"
+version = "2025.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/b7/4c0f736ca824b3a25b15e8213d1bcfc15f8ac2ae48d1b445b310892dc4da/uuid6-2025.0.1.tar.gz", hash = "sha256:cd0af94fa428675a44e32c5319ec5a3485225ba2179eefcf4c3f205ae30a81bd", size = 13932, upload-time = "2025-07-04T18:30:35.186Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3d/b2/93faaab7962e2aa8d6e174afb6f76be2ca0ce89fde14d3af835acebcaa59/uuid6-2025.0.1-py3-none-any.whl", hash = "sha256:80530ce4d02a93cdf82e7122ca0da3ebbbc269790ec1cb902481fa3e9cc9ff99", size = 6979, upload-time = "2025-07-04T18:30:34.001Z" },
+]
+
+[[package]]
 name = "uvicorn"
 version = "0.44.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1560,10 +1629,15 @@ name = "voice-gender-analyzer"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "av" },
     { name = "fastapi" },
+    { name = "fastapi-limiter" },
     { name = "librosa" },
     { name = "numpy" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "scipy" },
+    { name = "uuid6" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1580,10 +1654,16 @@ inaspeechsegmenter = [
 
 [package.metadata]
 requires-dist = [
+    { name = "av", specifier = ">=17.0.0" },
     { name = "fastapi", specifier = ">=0.135.3" },
+    { name = "fastapi-limiter", specifier = ">=0.2.0" },
     { name = "librosa", specifier = ">=0.11.0" },
     { name = "numpy", specifier = ">=2.4.4" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "scipy", specifier = ">=1.17.1" },
+    { name = "uuid6", specifier = ">=2025.0.1" },
+    { name = "uuid6", marker = "python_full_version < '3.14'", specifier = ">=2025.0.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.44.0" },
 ]
 

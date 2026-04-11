@@ -63,4 +63,6 @@ CMD gunicorn backend:app \
         --bind $GUNICORN_BIND \
         --keep-alive 5 \
         --access-logfile=None \
-        --error-logfile -
+        --error-logfile - \
+        --proxy_headers=True \
+        --forwarded_allow_ips="*"
