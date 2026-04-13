@@ -6,15 +6,17 @@ from inaSpeechSegmenter.segmenter import Segmenter
 
 logger = logging.getLogger(__name__)
 
-SEG: Segmenter
+SEG: Segmenter = None  # type: ignore
 
 
 async def load_seg():
-    global SEG
-    logger.info("正在将 AI 模型载入内存...")
+    if SEG:
+        return
+
+    logger.info("正在载入 AI 模型…")
     try:
         loop = asyncio.get_event_loop()
-        SEG = await loop.run_in_executor(None, lambda: Segmenter(detect_gender=True, ffmpeg=None))
+        seg = await loop.run_in_executor(None, lambda: Segmenter(detect_gender=True, ffmpeg=None))
 
     except Exception as e:
         logger.fatal("Engine A 加载失败: %s", e)
@@ -22,8 +24,8 @@ async def load_seg():
 
     # ── logit 模型诊断 ──
     logger.info("Engine A (inaSpeechSegmenter) 加载完毕")
-    if SEG and hasattr(SEG, "gender"):
-        _g = SEG.gender
+    if hasattr(seg, "gender"):
+        _g = seg.gender
         logger.info(
             "[Gender诊断] 最后3层: %s",
             [(type(layer).__name__, getattr(layer, "name", "?")) for layer in _g.nn.layers[-3:]],
@@ -35,4 +37,5 @@ async def load_seg():
             _dense_W.shape if (_dense_W := getattr(_g, "_dense_W", None)) else None,
         )
 
-    return
+    global SEG
+    SEG = seg

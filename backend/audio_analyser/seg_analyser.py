@@ -3,13 +3,13 @@ import logging
 from typing import TYPE_CHECKING
 
 import librosa
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 from backend.audio_analyser.acoustic_analyzer import analyze_segment
 
 if TYPE_CHECKING:
     from io import BytesIO
-    from uuid import UUID
 
 logger = logging.getLogger(__file__)
 
@@ -25,7 +25,6 @@ class AnalyseResultItem(BaseModel):
 
 
 async def do_analyse_segments(
-    task_id: UUID,
     sample: BytesIO,
     segmentation_results: list[tuple[str, float, float]],
     results: list[AnalyseResultItem],
@@ -35,13 +34,13 @@ async def do_analyse_segments(
     # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
     yield {"type": "progress", "pct": 55, "msg": "鸭鸭正在载入音频…"}
     try:
-        logger.info("正在将音频载入内存以供 Engine B 切片 [Task: %s]...", task_id)
+        logger.info("正在让 librosa 读取音频…")
         y_full, sr_full = await loop.run_in_executor(
             None, lambda: librosa.load(sample, sr=None, mono=True)
         )
     except Exception as e:
-        logger.warning("librosa 读取音频失败 [Task: %s]: %s", task_id, e)
-        return
+        logger.error("librosa 读取音频失败: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
     total_voiced = sum(
         1 for s in segmentation_results if s[0] in ("female", "male") and (s[2] - s[1]) >= 0.5
@@ -75,8 +74,7 @@ async def do_analyse_segments(
 
         except Exception as e:
             logger.warning(
-                "Engine B 跳过 [Task: %s] [%.1f~%.1fs]: %s",
-                task_id,
+                "Engine B 跳过 [%.1f~%.1fs]: %s",
                 r.start_time,
                 r.end_time,
                 e,

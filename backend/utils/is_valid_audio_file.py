@@ -1,28 +1,8 @@
-import uuid
-
 from fastapi import HTTPException
 
-ALLOWED_EXTENSIONS = {
-    "wav",
-    "mp3",
-    "flac",
-    "ogg",
-    "opus",
-    "m4a",
-    "aac",
-    "aiff",
-    "au",
-    "caf",
-    "webm",
-}
-
-UNSUPPORTED_FILE_EXCEPTION = HTTPException(
-    status_code=415,
-    detail=f"上传的文件格式不受支持，仅接受: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-)
-
 INVALID_FILE_EXCEPTION = HTTPException(
-    status_code=415, detail="文件内容与声称的格式不符，请检查文件是否为有效音频"
+    status_code=415,
+    detail="文件不是有效的音频",
 )
 
 
@@ -61,16 +41,7 @@ def is_valid_audio_file_magic(header: bytes) -> bool:
     return False
 
 
-def is_valid_audio_file(name: str | None, header: bytes) -> str:
-    """通过 magic bytes 校验上传内容是否为真实音频文件（防止伪装扩展名攻击）"""
-    if not name:
-        return str(uuid.uuid4())
-
-    name_segs = name.split(".")
-    if name_segs[-1] not in ALLOWED_EXTENSIONS:
-        raise UNSUPPORTED_FILE_EXCEPTION
-
+def is_valid_audio_file(header: bytes):
+    """通过 magic bytes 校验上传内容是否为真实音频文件"""
     if len(header) < 12 or not is_valid_audio_file_magic(header):
         raise INVALID_FILE_EXCEPTION
-
-    return ".".join(name_segs[:-1])

@@ -1,27 +1,37 @@
-import io
+import asyncio
+import logging
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 import av
 from av import AudioStream
+from fastapi import HTTPException
+
+from backend.config import CFG
 
 if TYPE_CHECKING:
     from av.container import InputContainer
+
+logger = logging.getLogger(__file__)
 
 
 def get_duraton_sec(s: InputContainer) -> int:
     i_stm = s.streams.best("audio")
     assert isinstance(i_stm, AudioStream)
 
-    return i_stm.duration // i_stm.sample_rate  # type: ignore
+    duration = i_stm.duration // i_stm.sample_rate  # type: ignore
+    logger.info("音频时长 %i 秒", duration)
+
+    return duration
 
 
-def normalize_to_pcm(s: InputContainer) -> io.BytesIO:
+def normalize_to_pcm(s: InputContainer) -> BytesIO:
     i_stm = s.streams.best("audio")
     assert isinstance(i_stm, AudioStream)
     i_stm.codec_context.thread_type = "AUTO"
 
-    mp3 = io.BytesIO()
-    with av.open(mp3, "w") as t:
+    pcm = BytesIO()
+    with av.open(pcm, "w") as t:
         o_stm = t.add_stream("pcm_s16le", rate=22050)
         assert isinstance(o_stm, AudioStream)
         o_stm.codec_context.thread_type = "AUTO"
@@ -34,4 +44,36 @@ def normalize_to_pcm(s: InputContainer) -> io.BytesIO:
 
         t.mux(o_stm.encode())
 
-    return mp3
+    logger.info("已转码为标准化 PCM")
+
+    return pcm
+
+
+async def prepare_audio_for_analysis(source: BytesIO):
+    loop = asyncio.get_running_loop()
+
+    with av.open(source, "r") as s:
+        # ── 转码：统一为 16kbps 单声道 pcm，降低后续 I/O 开销 ──
+        yield {"type": "progress", "pct": 5, "msg": "鸭鸭正在处理音频…"}
+        try:
+            sample = await loop.run_in_executor(None, normalize_to_pcm, s)
+
+        except Exception as e:
+            logger.error("ffmpeg 转码失败: %s", e)
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # do dc
+    source.close()
+    del source
+
+    with av.open(sample, "r") as s:
+        # ── 时长限制 ───────────────────────────────────────────
+        yield {"type": "progress", "pct": 8, "msg": "鸭鸭在检查音频时长…"}
+        duration = await loop.run_in_executor(None, get_duraton_sec, s)
+        if duration > CFG.max_audio_duration_sec:
+            raise HTTPException(
+                status_code=413,
+                detail=f"音频时长 {duration} 秒，超过 {CFG.max_audio_duration_sec} 秒限制",
+            )
+
+    yield sample

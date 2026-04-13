@@ -28,6 +28,9 @@ dependencies = [
 Homepage = "https://github.com/guojunximi-cell/Voice-Gender-Analyzer"
 
 [dependency-groups]
+dev = [
+    "ruff>=0.15.10",
+]
 ina-ss = [
     "numpy>=2.4.4",
     "onnxruntime-gpu>=1.24.4",
@@ -43,11 +46,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv]
+# no-editable = true
 default-groups = ["ina-ss"]
 # no-binary-package = ["av"]
 
 [tool.hatch.build.targets.wheel]
-only-packages = true
 packages = ["backend"]
 
 [tool.hatch.build.targets.wheel.sources]

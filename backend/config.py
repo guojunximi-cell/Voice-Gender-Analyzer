@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     max_queue_depth: int = 10
 
 
-CFG: Settings
+CFG: Settings = None  # type: ignore
 
 
 def load_config():

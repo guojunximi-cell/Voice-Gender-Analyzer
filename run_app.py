@@ -55,10 +55,10 @@ def run_app():
     if not (frontend_dir / "node_modules").exists():
         print("⚠️ 警告: 找不到前端 node_modules，尝试在 web 目录下运行 'pnpm install'")
 
-    print("🚀 正在启动 VGAv2 项目...")
+    print("🚀 正在启动 VGAv2 项目…")
 
     # 4. 启动后端
-    print("📡 正在启动后端 (FastAPI)...")
+    print("📡 正在启动后端 (FastAPI)…")
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"  # 强制使用 UTF-8，解决 Windows 下的 Emoji 打印崩溃问题
 
@@ -74,7 +74,7 @@ def run_app():
     )
 
     # 5. 启动前端
-    print("🎨 正在启动前端 (Vite)...")
+    print("🎨 正在启动前端 (Vite)…")
     frontend_process = subprocess.Popen(
         (npm_cmd, "run", "dev"),
         cwd=str(frontend_dir),
@@ -94,7 +94,7 @@ def run_app():
     ).start()
 
     def cleanup(signum, frame):
-        print("\n🛑 正在关闭所有服务...")
+        print("\n🛑 正在关闭所有服务…")
         try:
             backend_process.terminate()
             frontend_process.terminate()
