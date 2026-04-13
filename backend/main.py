@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend import routers
-from backend.audio_analyser.seg import load_seg
 from backend.config import CFG
+from backend.services.audio_analyser.seg import load_seg
 
 logging.basicConfig(
     level=CFG.log_level,
