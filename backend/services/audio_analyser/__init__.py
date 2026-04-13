@@ -1,10 +1,10 @@
 import logging
 from typing import TYPE_CHECKING
 
-from backend.audio_analyser.auto_tools import prepare_audio_for_analysis
-from backend.audio_analyser.engine_a import do_segmentation
-from backend.audio_analyser.seg_analyser import do_analyse_segments
-from backend.audio_analyser.statics import do_statics
+from backend.services.audio_analyser.auto_tools import prepare_audio_for_analysis
+from backend.services.audio_analyser.engine_a import do_segmentation
+from backend.services.audio_analyser.seg_analyser import do_analyse_segments
+from backend.services.audio_analyser.statics import do_statics
 
 if TYPE_CHECKING:
     from io import BytesIO
