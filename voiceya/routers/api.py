@@ -3,7 +3,7 @@ import logging
 
 import pyrate_limiter as pl
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
 
 from voiceya.config import CFG
@@ -75,7 +75,11 @@ async def new_analyse(request: Request):
 
     task = await analyse_voice.kiq(buf.read())
 
-    return RedirectResponse(url=f"/status/{task.task_id}")
+    # 直接返回 task_id，让前端自行 GET /api/status/{id} 订阅 SSE。
+    # 之前用 303 重定向让浏览器 fetch 自动跟随，但 POST→303→GET 这条链在
+    # fetch / vite 代理 / curl 下各有坑（body 处理、Accept 是否传递、SSE
+    # 连接语义），把两步拆开反而最稳。
+    return {"task_id": task.task_id}
 
 
 NOT_ACCEPTING_SSE_EXCEPTION = HTTPException(
@@ -86,12 +90,8 @@ NOT_ACCEPTING_SSE_EXCEPTION = HTTPException(
 @router.get("/status/{task_id}")
 async def get_status(request: Request, task_id: str):
     # ── 4. SSE 流式响应（单文件 + Accept: text/event-stream）──
-    if "text/event-stream" in request.headers.get("accept", ""):
+    if "text/event-stream" not in request.headers.get("accept", ""):
         raise NOT_ACCEPTING_SSE_EXCEPTION
-
-    progress = await broker.result_backend.get_progress(task_id)
-    if not progress:
-        raise HTTPException(status_code=404, detail=f"task '{task_id}' is not found")
 
     return StreamingResponse(
         subscribe_to_task_and_generate_sse(task_id),

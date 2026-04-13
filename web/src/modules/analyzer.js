@@ -1,5 +1,5 @@
 // POST /api/analyze-voice
-// FormData field: "files" (one or more)
+// Body: raw audio bytes (single file)
 // Response: { status, filename, summary, analysis: [{label, start_time, end_time, duration}] }
 
 const _controllers = new Set();
@@ -137,46 +137,57 @@ export async function analyzeAudio(file, { onProgress } = {}) {
 	_controllers.add(controller);
 
 	const strippedFile = await _stripMetadata(file);
-	const formData = new FormData();
 	// 超时从 fetch 开始计时，不包含元数据剥离耗时
 	const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-	formData.append("files", strippedFile);
 
-	const headers = {};
-	if (onProgress) headers["Accept"] = "text/event-stream";
+	// 两步调用：
+	//   1) POST /api/analyze-voice —— 上传音频、拿到 task_id（后端把任务压进
+	//      taskiq 队列就立刻返回，不等分析完成）
+	//   2) GET  /api/status/{task_id} (Accept: text/event-stream) —— 订阅
+	//      worker 推到 Redis Stream 的进度/结果事件。
+	// 以前是一个 POST 配 303 让浏览器自动跟随，但 POST→303→GET 这条链在
+	// fetch / 代理 / curl 下各踩各的坑，拆成两步后定位问题就清爽了。
 
 	try {
-		const response = await fetch("/api/analyze-voice", {
+		const submitResp = await fetch("/api/analyze-voice", {
 			method: "POST",
-			body: formData,
+			body: strippedFile,
 			signal: controller.signal,
-			headers,
+			headers: {
+				"Content-Type": strippedFile.type || "application/octet-stream",
+			},
 		});
 
-		clearTimeout(timeoutId);
-
-		if (!response.ok) {
-			let msg = `请求失败 (${response.status})`;
+		if (!submitResp.ok) {
+			let msg = `请求失败 (${submitResp.status})`;
 			try {
-				const err = await response.json();
+				const err = await submitResp.json();
 				msg = err.detail || err.message || msg;
 			} catch (_) {}
 			throw new Error(msg);
 		}
 
-		// SSE streaming mode
-		if (onProgress && response.headers.get("content-type")?.includes("text/event-stream")) {
-			return await _readSSEStream(response, onProgress);
+		const { task_id } = await submitResp.json();
+		if (!task_id) throw new Error("后端未返回 task_id");
+
+		// 有 onProgress 才走 SSE；否则降级轮询不在当前场景要求之内，抛错更明确
+		if (!onProgress) {
+			throw new Error("analyzeAudio 需要 onProgress 回调才能订阅进度流");
 		}
 
-		// Classic JSON mode (batch / fallback)
-		const data = await response.json();
+		const streamResp = await fetch(`/api/status/${encodeURIComponent(task_id)}`, {
+			method: "GET",
+			signal: controller.signal,
+			headers: { Accept: "text/event-stream" },
+		});
 
-		if (data.status === "error") {
-			throw new Error(data.message || "后端分析出错");
+		clearTimeout(timeoutId);
+
+		if (!streamResp.ok) {
+			throw new Error(`订阅进度失败 (${streamResp.status})`);
 		}
 
-		return data;
+		return await _readSSEStream(streamResp, onProgress);
 	} catch (err) {
 		clearTimeout(timeoutId);
 		throw err;

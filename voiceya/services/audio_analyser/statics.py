@@ -17,31 +17,37 @@ def do_statics(analyse_results: list[AnalyseResultItem]):
     tms = sum(r.duration for r in analyse_results if r.label == "male")
 
     total_voice_sec = tms + tfs
-    female_ratio = (tms / total_voice_sec) if total_voice_sec > 0 else 0.0
+    female_ratio = (tfs / total_voice_sec) if total_voice_sec > 0 else 0.0
 
-    ps, durs = zip(
+    conf_pairs = [
         (r.confidence, r.duration)
         for r in analyse_results
         if r.confidence and r.label in ("female", "male")
-    )
-    overall_confidence = float(np.average(ps, weights=durs))
+    ]
+    if conf_pairs:
+        ps, confs_durs = zip(*conf_pairs)
+        overall_confidence = float(np.average(ps, weights=confs_durs))
+    else:
+        overall_confidence = 0.0
 
-    # F0: 按时长加权均值
-    freqs, durs, gss, vfss = zip(
-        *(
-            (
-                r.acoustics["f0_median_hz"],
-                r.duration,
-                r.acoustics["gender_score"],
-                r.acoustics["voiced_frames"],
-            )
-            for r in analyse_results
-            if r.acoustics
+    # F0 / gender_score: 按时长 / voiced_frames 加权
+    acoustic_rows = [
+        (
+            r.acoustics["f0_median_hz"],
+            r.duration,
+            r.acoustics["gender_score"],
+            r.acoustics["voiced_frames"],
         )
-    )
-    overall_f0 = float(np.average(freqs, weights=durs))
-
-    overall_gender_score = float(np.average(gss, weights=vfss))
+        for r in analyse_results
+        if r.acoustics
+    ]
+    if acoustic_rows:
+        freqs, durs_f0, gss, vfss = zip(*acoustic_rows)
+        overall_f0 = float(np.average(freqs, weights=durs_f0))
+        overall_gender_score = float(np.average(gss, weights=vfss)) if sum(vfss) else 0.0
+    else:
+        overall_f0 = 0.0
+        overall_gender_score = 0.0
 
     return {
         "status": "success",
@@ -56,5 +62,5 @@ def do_statics(analyse_results: list[AnalyseResultItem]):
             if total_voice_sec > 0
             else None,
         },
-        "analysis": analyse_results,
+        "analysis": [r.model_dump() for r in analyse_results],
     }
