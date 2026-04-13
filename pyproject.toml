@@ -51,7 +51,4 @@ default-groups = ["ina-ss"]
 # no-binary-package = ["av"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend"]
-
-[tool.hatch.build.targets.wheel.sources]
-"backend" = "voiceya"
+packages = ["voiceya"]

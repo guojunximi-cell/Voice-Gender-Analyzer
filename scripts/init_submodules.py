@@ -10,7 +10,11 @@ def apply_sparse_checkout_cfgs(proj_root: Path):
             return
 
         module = cfg_path.name.replace("%", "/")
+
         shutil.copyfile(cfg_path, proj_root / f".git/modules/{module}/info/sparse-checkout")
+
+        os.chdir(proj_root / module)
+        run(("git", "sparse-checkout", "init", "--no-cone"), stdout=PIPE)
 
 
 def init_submodules(proj_root: Path):
@@ -18,7 +22,6 @@ def init_submodules(proj_root: Path):
 
     run(("git", "submodule", "init"), stdout=PIPE)
     apply_sparse_checkout_cfgs(proj_root)
-    run(("git", "sparse-checkout", "clean", "--force"), stdout=PIPE)
 
 
 if __name__ == "__main__":

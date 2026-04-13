@@ -1,8 +1,9 @@
 {
   "python.analysis.extraPaths": [
-    "backend/inaSpeechSegmenter"
+    "voiceya/inaSpeechSegmenter"
   ],
   "cSpell.words": [
-    "kbps"
+    "kbps",
+    "voiceya"
   ]
 }

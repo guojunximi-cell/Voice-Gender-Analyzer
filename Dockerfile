@@ -20,7 +20,7 @@ FROM ghcr.io/astral-sh/uv:alpine AS py-base
 ENV UV_VENV_RELOCATABLE=1
 ENV UV_NO_DEV=1
 
-FROM py-base as backend-deps
+FROM py-base as py-deps
 RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
@@ -33,7 +33,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --no-editable \
     && pnpm run build:web
 
-FROM py-base AS backend-build
+FROM py-base AS py-build
 COPY . /build
 RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
     uv sync --locked --no-editable
@@ -54,9 +54,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=web-build /build/web/dist /web
 
 ENV PY_HOME="/.venv/bin"
-COPY --from=backend-build /build/.venv ${PY_HOME}
-COPY --from=backend-build /build/backend /backend
-COPY --from=backend-build /build/*.hdf5 /
+COPY --from=py-build /build/.venv ${PY_HOME}
+COPY --from=py-build /build/*.hdf5 /
 
 
 # ── Run Project ───────────────────────────────────────────────
