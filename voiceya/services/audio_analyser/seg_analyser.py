@@ -6,7 +6,7 @@ import librosa
 from fastapi import HTTPException
 from pydantic import BaseModel
 
-from backend.services.audio_analyser.acoustic_analyzer import analyze_segment
+from voiceya.services.audio_analyser.acoustic_analyzer import analyze_segment
 
 if TYPE_CHECKING:
     from io import BytesIO

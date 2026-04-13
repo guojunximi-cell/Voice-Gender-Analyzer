@@ -4,9 +4,9 @@ import json
 
 from fastapi import HTTPException
 
-from backend.config import CFG
-from backend.queue import Queue
-from backend.services.audio_analyser import do_analyse
+from voiceya.config import CFG
+from voiceya.queue import Queue
+from voiceya.services.audio_analyser import do_analyse
 
 
 async def __run_analyser_inner(buf: io.BytesIO):

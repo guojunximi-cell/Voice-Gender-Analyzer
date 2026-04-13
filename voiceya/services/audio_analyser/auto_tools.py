@@ -7,7 +7,7 @@ import av
 from av import AudioStream
 from fastapi import HTTPException
 
-from backend.config import CFG
+from voiceya.config import CFG
 
 if TYPE_CHECKING:
     from av.container import InputContainer

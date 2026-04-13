@@ -2,7 +2,7 @@ import asyncio
 
 from fastapi import HTTPException
 
-from backend.config import CFG
+from voiceya.config import CFG
 
 QUEUE_IS_FULL_EXCEPTION = HTTPException(
     status_code=503,

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 
-from backend.services.audio_analyser.seg import SEG
+from voiceya.services.audio_analyser.seg import SEG
 
 if TYPE_CHECKING:
     from io import BytesIO

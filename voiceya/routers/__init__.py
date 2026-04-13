@@ -2,8 +2,8 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.config import CFG
-from backend.routers import api
+from voiceya.config import CFG
+from voiceya.routers import api
 
 router = APIRouter()
 
