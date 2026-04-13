@@ -5,9 +5,9 @@ from fastapi import HTTPException
 from taskiq import TaskiqDepends
 from taskiq.depends.progress_tracker import ProgressTracker
 
-from voiceya.fastiq import broker
 from voiceya.services.audio_analyser import do_analyse
 from voiceya.services.sse import ErrorSSE, ResultSSE
+from voiceya.taskiq import broker
 
 
 @broker.task(timeout=15 * 60)

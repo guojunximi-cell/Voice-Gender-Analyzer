@@ -1,7 +1,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from voiceya.services.audio_analyser.auto_tools import prepare_audio_for_analysis
+from voiceya.services.audio_analyser.audio_tools import prepare_audio_for_analysis
 from voiceya.services.audio_analyser.engine_a import do_segmentation
 from voiceya.services.audio_analyser.seg_analyser import do_analyse_segments
 from voiceya.services.audio_analyser.statics import do_statics
