@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from voiceya import routers
 from voiceya.config import CFG
+from voiceya.fastiq import broker
 from voiceya.services.audio_analyser.seg import load_seg
 
 logging.basicConfig(
@@ -22,9 +23,15 @@ logger = logging.getLogger("voiceya")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    if not broker.is_worker_process:
+        await broker.startup()
+
     await load_seg()
 
     yield
+
+    if not broker.is_worker_process:
+        await broker.shutdown()
 
 
 app = FastAPI(title=CFG.app_name, version="2.0", lifespan=lifespan)

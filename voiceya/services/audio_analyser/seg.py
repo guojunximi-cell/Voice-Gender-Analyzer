@@ -17,7 +17,7 @@ async def load_seg():
     loop = asyncio.get_event_loop()
 
     try:
-        seg = await loop.run_in_executor(None, lambda: Segmenter(detect_gender=True, ffmpeg=None))
+        seg = await asyncio.to_thread(None, lambda: Segmenter(detect_gender=True, ffmpeg=None))
 
     except Exception as e:
         logger.fatal("Engine A 加载失败: %s", e)

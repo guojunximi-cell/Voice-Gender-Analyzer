@@ -8,9 +8,11 @@ from av import AudioStream
 from fastapi import HTTPException
 
 from voiceya.config import CFG
+from voiceya.services.sse import ProgressSSE
 
 if TYPE_CHECKING:
     from av.container import InputContainer
+    from taskiq.depends.progress_tracker import ProgressTracker
 
 logger = logging.getLogger(__file__)
 
@@ -49,31 +51,29 @@ def normalize_to_pcm(s: InputContainer) -> BytesIO:
     return pcm
 
 
-async def prepare_audio_for_analysis(source: BytesIO):
-    loop = asyncio.get_running_loop()
-
+async def prepare_audio_for_analysis(source: BytesIO, progress: ProgressTracker):
     with av.open(source, "r") as s:
         # ── 转码：统一为 16kbps 单声道 pcm，降低后续 I/O 开销 ──
-        yield {"type": "progress", "pct": 5, "msg": "鸭鸭正在处理音频…"}
+        await progress.set_progress(str(ProgressSSE(pct=5, msg="鸭鸭正在处理音频…")))
         try:
-            sample = await loop.run_in_executor(None, normalize_to_pcm, s)
+            sample = await asyncio.to_thread(normalize_to_pcm, s)
 
         except Exception as e:
             logger.error("ffmpeg 转码失败: %s", e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    # do dc
+    # do gc
     source.close()
     del source
 
     with av.open(sample, "r") as s:
         # ── 时长限制 ───────────────────────────────────────────
-        yield {"type": "progress", "pct": 8, "msg": "鸭鸭在检查音频时长…"}
-        duration = await loop.run_in_executor(None, get_duraton_sec, s)
+        await progress.set_progress(str(ProgressSSE(pct=8, msg="鸭鸭在检查音频时长…")))
+        duration = await asyncio.to_thread(get_duraton_sec, s)
         if duration > CFG.max_audio_duration_sec:
             raise HTTPException(
                 status_code=413,
                 detail=f"音频时长 {duration} 秒，超过 {CFG.max_audio_duration_sec} 秒限制",
             )
 
-    yield sample
+    return sample

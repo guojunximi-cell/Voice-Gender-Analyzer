@@ -20,6 +20,9 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
     "scipy>=1.17.1",
+    "taskiq>=0.12.1",
+    "taskiq-fastapi>=0.4.0",
+    "taskiq-redis>=1.2.2",
     "uuid6>=2025.0.1 ; python_full_version < '3.14'",
     "uvicorn[standard]>=0.44.0",
 ]

@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field, NonNegativeInt, PositiveInt
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).parent
@@ -11,17 +12,19 @@ class Settings(BaseSettings):
     admin_email: str = "fanhenna@outlook.com"
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = "WARNING"
+
+    redis_uri: str
     web_dir: Path = BASE_DIR.parent / "web"
 
     # ─── 安全配置 ──────────────────────────────────────────────────
-    max_file_size_mb: int = 10
-    max_audio_duration_sec: int = 3 * 60
-    rate_limit_ct: int = 10
-    rate_limit_duration_sec: int = 60
+    max_file_size_mb: PositiveInt = Field(10, le=512)
+    max_audio_duration_sec: PositiveInt = 3 * 60
+    rate_limit_ct: PositiveInt = 10
+    rate_limit_duration_sec: PositiveInt = 60
 
     # ─── 并发控制 ──────────────────────────────────────────────────
-    max_concurrent: int = 2
-    max_queue_depth: int = 10
+    max_concurrent: PositiveInt = 2
+    max_queue_depth: NonNegativeInt = 30
 
 
 CFG: Settings = None  # type: ignore
@@ -29,4 +32,4 @@ CFG: Settings = None  # type: ignore
 
 def load_config():
     global CFG
-    CFG = Settings()
+    CFG = Settings()  # type: ignore
