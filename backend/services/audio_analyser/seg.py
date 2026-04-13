@@ -14,8 +14,9 @@ async def load_seg():
         return
 
     logger.info("正在载入 AI 模型…")
+    loop = asyncio.get_event_loop()
+
     try:
-        loop = asyncio.get_event_loop()
         seg = await loop.run_in_executor(None, lambda: Segmenter(detect_gender=True, ffmpeg=None))
 
     except Exception as e:

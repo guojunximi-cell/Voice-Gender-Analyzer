@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__file__)
 
 
-async def do_analyse_stream(sample: BytesIO):
+async def do_analyse(sample: BytesIO):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     async for event in prepare_audio_for_analysis(sample):
         if not isinstance(event, dict):
@@ -53,9 +53,9 @@ async def do_analyse_stream(sample: BytesIO):
     yield {"type": "result", "pct": 100, "data": result}
 
 
-async def do_analyse(sample: BytesIO):
+async def do_analyse_legacy(sample: BytesIO):
     """Non-streaming wrapper: consumes the stream generator, returns the final result."""
-    async for event in do_analyse_stream(sample):
+    async for event in do_analyse(sample):
         if event.get("type") == "result":
             return event["data"]
 
