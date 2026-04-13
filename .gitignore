@@ -5,6 +5,12 @@ __pycache__/
 venv/
 .venv/
 
+# Environment
+.env
+
+# Leftover compiled-only directory (source was moved to voiceya/)
+backend/
+
 # Node.js
 **/node_modules/
 web/dist/

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from typing import TYPE_CHECKING
@@ -69,7 +71,7 @@ async def do_analyse_segments(
         try:
             y_seg = y_full[start:end]
             if y_seg:
-                r.acoustics = await asyncio.to_thread(None, analyze_segment, y_seg, sr_full)  # type: ignore
+                r.acoustics = await asyncio.to_thread(analyze_segment, y_seg, sr_full)
 
         except Exception as e:
             logger.warning(

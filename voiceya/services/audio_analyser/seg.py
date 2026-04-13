@@ -10,14 +10,15 @@ SEG: Segmenter = None  # type: ignore
 
 
 async def load_seg():
+    global SEG
+
     if SEG:
         return
 
     logger.info("正在载入 AI 模型…")
-    loop = asyncio.get_event_loop()
 
     try:
-        seg = await asyncio.to_thread(None, lambda: Segmenter(detect_gender=True, ffmpeg=None))
+        seg = await asyncio.to_thread(lambda: Segmenter(detect_gender=True, ffmpeg=None))
 
     except Exception as e:
         logger.fatal("Engine A 加载失败: %s", e)
@@ -38,5 +39,4 @@ async def load_seg():
             _dense_W.shape if (_dense_W := getattr(_g, "_dense_W", None)) else None,
         )
 
-    global SEG
     SEG = seg

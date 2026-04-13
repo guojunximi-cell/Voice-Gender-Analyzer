@@ -1,13 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+from io import BytesIO
 
 from fastapi import HTTPException
 
 from voiceya.services.audio_analyser.seg import SEG
-
-if TYPE_CHECKING:
-    from io import BytesIO
 
 
 logger = logging.getLogger(__file__)

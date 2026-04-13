@@ -2,12 +2,13 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, NonNegativeInt, PositiveInt
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).parent
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=BASE_DIR.parent / ".env", env_file_encoding="utf-8")
     app_name: str = "Voice Gender Analyzer"
     admin_email: str = "fanhenna@outlook.com"
 

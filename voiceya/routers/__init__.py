@@ -9,7 +9,7 @@ router = APIRouter()
 
 router.include_router(api.router, prefix="/api")
 
-if CFG.web_dir.is_dir:
+if (CFG.web_dir / "assets").is_dir():
     router.mount("/assets", StaticFiles(directory=CFG.web_dir / "assets"), name="assets")
 
     @router.get("/", include_in_schema=False)

@@ -45,7 +45,16 @@ def run_app():
             subprocess.run(("uv", "sync"))
             venv_path = base_dir / ".venv"
 
-        runpy.run_path(str(venv_path / "scripts/activate_this.py"))
+        # Windows uses "Scripts", Linux/macOS use "bin"
+        activate_candidates = [
+            venv_path / "Scripts" / "activate_this.py",
+            venv_path / "scripts" / "activate_this.py",
+            venv_path / "bin" / "activate_this.py",
+        ]
+        for candidate in activate_candidates:
+            if candidate.exists():
+                runpy.run_path(str(candidate))
+                break
         python_executable = sys.executable
 
     print(f"🐍 使用 Python: {python_executable}")
@@ -63,7 +72,7 @@ def run_app():
     env["PYTHONIOENCODING"] = "utf-8"  # 强制使用 UTF-8，解决 Windows 下的 Emoji 打印崩溃问题
 
     backend_process = subprocess.Popen(
-        (python_executable, "-m", "backend"),
+        (python_executable, "-m", "voiceya"),
         cwd=str(base_dir),
         env=env,
         stdout=subprocess.PIPE,

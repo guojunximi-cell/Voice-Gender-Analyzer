@@ -8,6 +8,6 @@ load_config()
 patch_numpy()
 
 # --- entry point ---
-from main import app  # noqa: E402
+from voiceya.main import app  # noqa: E402
 
 __all__ = ["app"]
