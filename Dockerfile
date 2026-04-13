@@ -24,7 +24,7 @@ FROM py-base as backend-deps
 RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project
+    uv sync --locked --no-dev --no-install-project
 
 # ── Stage 3: Build ────────────────────────────────────────────
 FROM node-base AS web-build

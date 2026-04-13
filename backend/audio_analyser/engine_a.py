@@ -3,16 +3,17 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
+from fastapi import HTTPException
+
 from backend.audio_analyser.seg import SEG
 
 if TYPE_CHECKING:
     from io import BytesIO
-    from uuid import UUID
 
 logger = logging.getLogger(__file__)
 
 
-async def do_segmentation(task_id: UUID, sample: BytesIO, results: list):
+async def do_segmentation(sample: BytesIO, results: list):
     loop = asyncio.get_running_loop()
 
     _seg_promise = loop.run_in_executor(None, SEG, sample)
@@ -29,9 +30,8 @@ async def do_segmentation(task_id: UUID, sample: BytesIO, results: list):
             }
 
         except Exception as e:
-            logger.error("分析失败 [Task: %s]: %s", task_id, e)
-            yield {"type": "error", "msg": str(e)}
-            return
+            logger.error("Engine A 分析失败: %s", e)
+            raise HTTPException(status_code=500, detail=str(e))
 
     results.clear()
     results.extend(await _seg_promise)

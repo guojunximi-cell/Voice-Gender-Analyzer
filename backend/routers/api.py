@@ -1,15 +1,19 @@
 import asyncio
+import io
 import json
+import logging
 
 import pyrate_limiter as pl
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
 
-from backend.audio_analyser import do_analyse_stream, do_analyse
+from backend.audio_analyser import do_analyse, do_analyse_stream
 from backend.config import CFG
 from backend.queue import Queue
 from backend.utils.is_valid_audio_file import is_valid_audio_file
+
+logger = logging.getLogger(__file__)
 
 router = APIRouter(tags=["api"])
 
@@ -35,7 +39,24 @@ FILE_EXCEED_SIZE_LIMIT_EXCEPTION = HTTPException(
     detail=f"上传的音频文件超过 {CFG.max_file_size_mb} MB 大小限制",
 )
 
-RATE_LIMITER = pl.Limiter(
+
+async def __guarded_sse_stream(buf: io.BytesIO):
+    """Hold semaphore & queue slot for the full streaming lifetime."""
+    try:
+        async with Queue.sem:
+            try:
+                async for chunk in do_analyse_stream(buf):
+                    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            except HTTPException as e:
+                yield f'data: {{"type":"error","code":{e.status_code},"msg":{str(e)}}}\n\n'
+            except Exception as e:
+                yield f'data: {{"type":"error","msg":{str(e)}}}\n\n'
+
+    finally:
+        await Queue.dequeue()
+
+
+__RATE_LIMITER = pl.Limiter(
     pl.Rate(CFG.rate_limit_ct, pl.Duration.SECOND * CFG.rate_limit_duration_sec)
 )
 
@@ -43,52 +64,53 @@ RATE_LIMITER = pl.Limiter(
 @router.post(
     "/analyze-voice",
     dependencies=[
-        Depends(RateLimiter(limiter=RATE_LIMITER)),
+        Depends(RateLimiter(limiter=__RATE_LIMITER)),
     ],
 )
-async def analyze_voice(request: Request, files: list[UploadFile]):
-    # ── 4. SSE 流式响应（单文件 + Accept: text/event-stream）──
-    wants_stream = len(files) == 1 and "text/event-stream" in request.headers.get("accept", "")
-
+async def analyze_voice(request: Request):
     # ── 3. 队列控制：超出最大等待数时拒绝，否则排队 ──────────
     await Queue.enqueue()
 
-    for f in files:
-        # ── 2. 文件安全校验 ────────────────────────────────────────
-        header = await f.read(12)
-        filename = is_valid_audio_file(f.filename, header)
-        rest = await f.read(CFG.max_file_size_mb * 1024 * 1024 - 12)
-        # 文件大小限制（多读 1 字节判断是否超限，避免大文件载入内存）
-        if f.read(1):
+    # ── 2. 加载文件 ──────────────────────────────────────
+    file_stream = request.stream()
+    buf = io.BytesIO()
+    # read the minimum amount of bytes that is required to check validity
+    while (pos := buf.tell()) < 12:
+        buf.write(await anext(file_stream))
+
+    # check if file is valid
+    buf.seek(0)
+    is_valid_audio_file(buf.read(12))
+    buf.seek(pos)
+
+    async for chunk in file_stream:
+        buf.write(chunk)
+
+        if buf.tell() > CFG.max_file_size_mb * 1024 * 1024:
             raise FILE_EXCEED_SIZE_LIMIT_EXCEPTION
 
-        if wants_stream:
-            # Read file content eagerly here — UploadFile's SpooledTemporaryFile
-            # may be closed after this function returns, before the lazy streaming
-            # generator gets a chance to call file.read(), causing "read of closed file".
-            async def _guarded_stream():
-                """Hold semaphore & queue slot for the full streaming lifetime."""
-                try:
-                    async with Queue.processing_sem:
-                        async for chunk in do_analyse_stream(filename, header + rest):
-                            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+    logger.info("收到文件 ({:,} B)", buf.tell())
+    buf.seek(0)
 
-                finally:
-                    await Queue.dequeue()
+    # ── 4. SSE 流式响应（单文件 + Accept: text/event-stream）──
+    wants_stream = "text/event-stream" in request.headers.get("accept", "")
+    if wants_stream:
+        return StreamingResponse(
+            __guarded_sse_stream(buf),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
-            return StreamingResponse(
-                _guarded_stream(),
-                media_type="text/event-stream",
-                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-            )
-
-        # ── 5. 经典 JSON 响应（批量 / 不支持 SSE 的客户端）────────
-        try:
-            # 获取信号量 → 同时最多 MAX_CONCURRENT 个请求在处理
-            async with Queue.processing_sem:
-                results = await asyncio.gather(do_analyse(filename, header + rest))
-
-        finally:
-            await Queue.dequeue()
+    # ── 5. 经典 JSON 响应（批量 / 不支持 SSE 的客户端）────────
+    try:
+        # 获取信号量 → 同时最多 MAX_CONCURRENT 个请求在处理
+        async with Queue.sem:
+            results = await asyncio.gather(do_analyse(buf))
 
         return results if len(results) > 1 else results[0]
+
+    finally:
+        await Queue.dequeue()
