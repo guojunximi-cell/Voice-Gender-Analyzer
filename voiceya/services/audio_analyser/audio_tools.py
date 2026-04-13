@@ -12,7 +12,8 @@ from voiceya.services.sse import ProgressSSE
 
 if TYPE_CHECKING:
     from av.container import InputContainer
-    from taskiq.depends.progress_tracker import ProgressTracker
+
+    from voiceya.services.redis import PublisherT
 
 logger = logging.getLogger(__file__)
 
@@ -51,10 +52,10 @@ def normalize_to_pcm(s: InputContainer) -> BytesIO:
     return pcm
 
 
-async def prepare_audio_for_analysis(source: BytesIO, progress: ProgressTracker):
+async def prepare_audio_for_analysis(source: BytesIO, publish: PublisherT):
     with av.open(source, "r") as s:
         # ── 转码：统一为 16kbps 单声道 pcm，降低后续 I/O 开销 ──
-        await progress.set_progress(str(ProgressSSE(pct=5, msg="鸭鸭正在处理音频…")))
+        publish(str(ProgressSSE(pct=5, msg="鸭鸭正在处理音频…")))
         try:
             sample = await asyncio.to_thread(normalize_to_pcm, s)
 
@@ -68,7 +69,7 @@ async def prepare_audio_for_analysis(source: BytesIO, progress: ProgressTracker)
 
     with av.open(sample, "r") as s:
         # ── 时长限制 ───────────────────────────────────────────
-        await progress.set_progress(str(ProgressSSE(pct=8, msg="鸭鸭在检查音频时长…")))
+        publish(str(ProgressSSE(pct=8, msg="鸭鸭在检查音频时长…")))
         duration = await asyncio.to_thread(get_duraton_sec, s)
         if duration > CFG.max_audio_duration_sec:
             raise HTTPException(

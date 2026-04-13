@@ -10,8 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from voiceya import routers
 from voiceya.config import CFG
-from voiceya.fastiq import broker
 from voiceya.services.audio_analyser.seg import load_seg
+from voiceya.services.redis import init_redis
+from voiceya.taskiq import broker
 
 logging.basicConfig(
     level=CFG.log_level,
@@ -26,6 +27,7 @@ async def lifespan(_app: FastAPI):
     if not broker.is_worker_process:
         await broker.startup()
 
+    init_redis()
     await load_seg()
 
     yield

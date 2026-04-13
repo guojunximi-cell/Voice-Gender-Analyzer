@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi_limiter.depends import RateLimiter
 
 from voiceya.config import CFG
+from voiceya.taskiq import broker
 from voiceya.tasks.analyser import analyse_voice, subscribe_to_task_and_generate_sse
 from voiceya.utils.is_valid_audio_file import is_valid_audio_file
 
@@ -87,6 +88,10 @@ async def get_status(request: Request, task_id: str):
     # ── 4. SSE 流式响应（单文件 + Accept: text/event-stream）──
     if "text/event-stream" in request.headers.get("accept", ""):
         raise NOT_ACCEPTING_SSE_EXCEPTION
+
+    progress = await broker.result_backend.get_progress(task_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail=f"task '{task_id}' is not found")
 
     return StreamingResponse(
         subscribe_to_task_and_generate_sse(task_id),

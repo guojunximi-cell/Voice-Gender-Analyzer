@@ -12,7 +12,7 @@ from voiceya.services.sse import ProgressSSE
 if TYPE_CHECKING:
     from io import BytesIO
 
-    from taskiq.depends.progress_tracker import ProgressTracker
+    from voiceya.services.redis import PublisherT
 
 logger = logging.getLogger(__file__)
 
@@ -28,10 +28,10 @@ class AnalyseResultItem(BaseModel):
 
 
 async def do_analyse_segments(
-    sample: BytesIO, segmentation_results: list[tuple[str, float, float]], progress: ProgressTracker
+    sample: BytesIO, segmentation_results: list[tuple[str, float, float]], publish: PublisherT
 ):
     # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
-    await progress.set_progress(str(ProgressSSE(pct=55, msg="鸭鸭正在载入音频…")))
+    publish(str(ProgressSSE(pct=55, msg="鸭鸭正在载入音频…")))
     try:
         logger.info("正在让 librosa 读取音频…")
         y_full, sr_full = await asyncio.to_thread(librosa.load, sample, sr=None, mono=True)
@@ -62,9 +62,7 @@ async def do_analyse_segments(
 
         i += 1
         pct = 55 + round(40 * i / max(total_voiced, 1), 1)
-        await progress.set_progress(
-            str(ProgressSSE(pct=round(pct), msg=f"鸭鸭在分析第 {i}/{total_voiced} 段…"))
-        )
+        publish(str(ProgressSSE(pct=round(pct), msg=f"鸭鸭在分析第 {i}/{total_voiced} 段…")))
 
         start = int(r.start_time * sr_full)
         end = int(r.end_time * sr_full)

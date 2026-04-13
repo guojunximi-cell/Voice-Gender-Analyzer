@@ -8,7 +8,10 @@ result_backend = RedisAsyncResultBackend(
     result_ex_time=5 * 60,
 )
 
-broker = RedisStreamBroker(url=CFG.redis_uri).with_result_backend(result_backend)
+broker = RedisStreamBroker(
+    url=CFG.redis_uri,
+    maxlen=CFG.max_queue_depth * 3,
+).with_result_backend(result_backend)
 
 
 taskiq_fastapi.init(broker, "voiceya:app")

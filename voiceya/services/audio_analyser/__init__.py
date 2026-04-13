@@ -10,28 +10,28 @@ from voiceya.services.sse import ProgressSSE
 if TYPE_CHECKING:
     from io import BytesIO
 
-    from taskiq.depends.progress_tracker import ProgressTracker
+    from voiceya.services.redis import PublisherT
 
 logger = logging.getLogger(__file__)
 
 
-async def do_analyse(content: BytesIO, progress: ProgressTracker):
+async def do_analyse(content: BytesIO, publish: PublisherT):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
-    sample = await prepare_audio_for_analysis(content, progress)
+    sample = await prepare_audio_for_analysis(content, publish)
 
     # ── Engine A: 时间分段 ─────────────────────────────────
     logger.info("Engine A 分析中…")
-    await progress.set_progress(str(ProgressSSE(pct=10, msg="鸭鸭正在聆听声纹…（此步骤较慢）")))
+    publish(str(ProgressSSE(pct=10, msg="鸭鸭正在聆听声纹…（此步骤较慢）")))
 
     segmentation_results = await do_segmentation(sample)
 
     # ── Engine B: 声学分析（仅对有声语音段）────────────
-    await progress.set_progress(str(ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…")))
+    publish(str(ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…")))
 
-    analyse_results = await do_analyse_segments(sample, segmentation_results, progress)
+    analyse_results = await do_analyse_segments(sample, segmentation_results, publish)
 
     # ── 全局汇总统计 ───────────────────────────────────────
-    await progress.set_progress(str(ProgressSSE(pct=98, msg="鸭鸭快好了…")))
+    publish(str(ProgressSSE(pct=98, msg="鸭鸭快好了…")))
 
     result = do_statics(analyse_results)
     logger.info(
