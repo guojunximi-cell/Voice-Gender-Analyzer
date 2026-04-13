@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from backend.audio_analyser.seg_analyser import AnalyseResultItem
+    from backend.services.audio_analyser.seg_analyser import AnalyseResultItem
 
 
 logger = logging.getLogger(__file__)
