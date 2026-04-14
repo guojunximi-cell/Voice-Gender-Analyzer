@@ -1,9 +1,18 @@
 from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, Any, Literal
+
+from voiceya.services.events_stream import PayloadT
+
+if TYPE_CHECKING:
+    from voiceya.services.events_stream import PayloadDictT
 
 
 @dataclass(frozen=True, kw_only=True)
-class SSE:
+class SSE(PayloadT):
     type: Literal["wait", "progress", "error", "result"]
+
+    def to_dict(self) -> PayloadDictT:
+        return asdict(self)  # type: ignore
 
 
 @dataclass(frozen=True, kw_only=True)

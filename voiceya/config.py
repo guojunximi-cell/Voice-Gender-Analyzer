@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     redis_uri: str
     web_dir: Path = BASE_DIR.parent / "web"
 
+    task_max_exec_sec: PositiveInt = 15 * 60
+    task_events_ttl_sec: PositiveInt = 10 * 60
+    task_result_ttl_sec: PositiveInt = 10 * 60
+
     # ─── 安全配置 ──────────────────────────────────────────────────
     max_file_size_mb: PositiveInt = Field(10, le=512)
     max_audio_duration_sec: PositiveInt = 3 * 60
