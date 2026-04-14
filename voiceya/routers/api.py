@@ -1,5 +1,7 @@
 import io
 import logging
+from collections import OrderedDict
+from typing import Any
 
 import pyrate_limiter as pl
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -14,6 +16,11 @@ from voiceya.utils.is_valid_audio_file import is_valid_audio_file
 logger = logging.getLogger(__file__)
 
 router = APIRouter(tags=["api"])
+
+# 进程内历史记录：不落盘、进程退出即清空，满足"不留痕"。
+# 单进程 FastAPI 下线程安全;若未来切到多 worker 需换共享存储。
+_HISTORY_CAP = 50
+_history: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
 
 
 API_CONFIGS = {
@@ -101,3 +108,34 @@ async def get_status(request: Request, task_id: str):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/history")
+def list_history():
+    return list(_history.values())
+
+
+@router.post("/history")
+async def add_history(request: Request):
+    session = await request.json()
+    sid = session.get("id")
+    if not isinstance(sid, str) or not sid:
+        raise HTTPException(status_code=400, detail="session.id 必须为非空字符串")
+
+    _history[sid] = session
+    _history.move_to_end(sid)
+    while len(_history) > _HISTORY_CAP:
+        _history.popitem(last=False)
+    return {"ok": True}
+
+
+@router.delete("/history/{session_id}")
+def delete_history(session_id: str):
+    _history.pop(session_id, None)
+    return {"ok": True}
+
+
+@router.delete("/history")
+def clear_history():
+    _history.clear()
+    return {"ok": True}

@@ -497,12 +497,12 @@ $("clear-sessions-btn")?.addEventListener("click", () => {
 });
 
 // ─── Init scatter with stored sessions ───────────────────────
-function initScatterFromStorage() {
+async function initScatterFromStorage() {
 	initScatter($("scatter-canvas"), {
 		onDotClick: onScatterDotClick,
 		onDeselect: onScatterDeselect,
 	});
-	const stored = loadSessions();
+	const stored = await loadSessions();
 	if (stored.length) loadAllSessions(stored);
 }
 
