@@ -9,6 +9,7 @@ BASE_DIR = Path(__file__).parent
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=BASE_DIR.parent / ".env", env_file_encoding="utf-8")
+
     app_name: str = "Voice Gender Analyzer"
     admin_email: str = "fanhenna@outlook.com"
 
@@ -33,4 +34,5 @@ CFG: Settings = None  # type: ignore
 
 def load_config():
     global CFG
+
     CFG = Settings()  # type: ignore

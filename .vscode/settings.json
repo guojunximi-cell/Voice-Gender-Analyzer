@@ -3,7 +3,9 @@
     "voiceya/inaSpeechSegmenter"
   ],
   "cSpell.words": [
+    "Jsonable",
     "kbps",
+    "taskiq",
     "voiceya"
   ]
 }

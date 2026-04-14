@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from voiceya.services.audio_analyser.audio_tools import prepare_audio_for_analysis
+from voiceya.services.audio_analyser.audio_tools import normalize_audio_for_analysis
 from voiceya.services.audio_analyser.engine_a import do_segmentation
 from voiceya.services.audio_analyser.seg_analyser import do_analyse_segments
 from voiceya.services.audio_analyser.statics import do_statics
@@ -12,14 +12,14 @@ from voiceya.services.sse import ProgressSSE
 if TYPE_CHECKING:
     from io import BytesIO
 
-    from voiceya.services.redis import PublisherT
+    from voiceya.services.events_stream import PublisherT
 
 logger = logging.getLogger(__file__)
 
 
 async def do_analyse(content: BytesIO, publish: PublisherT):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
-    sample = await prepare_audio_for_analysis(content, publish)
+    sample = await normalize_audio_for_analysis(content, publish)
 
     # ── Engine A: 时间分段 ─────────────────────────────────
     logger.info("Engine A 分析中…")

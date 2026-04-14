@@ -14,7 +14,7 @@ from voiceya.services.sse import ProgressSSE
 if TYPE_CHECKING:
     from io import BytesIO
 
-    from voiceya.services.redis import PublisherT
+    from voiceya.services.events_stream import PublisherT
 
 logger = logging.getLogger(__file__)
 
@@ -73,7 +73,7 @@ async def do_analyse_segments(
             # numpy ndarray 不能直接当 bool 用（多元素会抛
             # "truth value of an array is ambiguous"），这里只关心切片非空。
             if y_seg.size:
-                r.acoustics = await asyncio.to_thread(analyze_segment, y_seg, sr_full)
+                r.acoustics = await asyncio.to_thread(analyze_segment, y_seg, int(sr_full))
 
         except Exception as e:
             logger.warning(

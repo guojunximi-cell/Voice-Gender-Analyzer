@@ -15,19 +15,19 @@ from voiceya.services.sse import ProgressSSE
 if TYPE_CHECKING:
     from av.container import InputContainer
 
-    from voiceya.services.redis import PublisherT
+    from voiceya.services.events_stream import PublisherT
 
 logger = logging.getLogger(__file__)
 
 
-def get_duraton_sec(s: InputContainer) -> int:
+def get_duraton_sec(s: InputContainer) -> float:
     i_stm = s.streams.best("audio")
     assert isinstance(i_stm, AudioStream)
 
-    duration = i_stm.duration // i_stm.sample_rate  # type: ignore
+    duration = i_stm.duration * i_stm.time_base  # type: ignore
     logger.info("音频时长 %i 秒", duration)
 
-    return duration
+    return float(duration)
 
 
 def normalize_to_pcm(s: InputContainer) -> BytesIO:
@@ -56,10 +56,11 @@ def normalize_to_pcm(s: InputContainer) -> BytesIO:
     logger.info("已转码为标准化 PCM")
 
     pcm.seek(0)
+
     return pcm
 
 
-async def prepare_audio_for_analysis(source: BytesIO, publish: PublisherT):
+async def normalize_audio_for_analysis(source: BytesIO, publish: PublisherT):
     with av.open(source, "r") as s:
         # ── 转码：统一为 16kbps 单声道 pcm，降低后续 I/O 开销 ──
         publish(ProgressSSE(pct=5, msg="鸭鸭正在处理音频…"))
@@ -85,4 +86,5 @@ async def prepare_audio_for_analysis(source: BytesIO, publish: PublisherT):
             )
 
     sample.seek(0)
+
     return sample
