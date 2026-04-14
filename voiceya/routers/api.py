@@ -1,14 +1,17 @@
+import asyncio
 import io
 import logging
 from collections import OrderedDict
 from typing import Any
 
+import av
 import pyrate_limiter as pl
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
 
 from voiceya.config import CFG
+from voiceya.services.audio_analyser.audio_tools import get_duraton_sec
 from voiceya.services.events_stream import subscribe_to_events_and_generate_sse
 from voiceya.taskiq import broker
 from voiceya.tasks.analyser import analyse_voice
@@ -81,12 +84,22 @@ async def new_analyse(request: Request):
     logger.info("收到文件 ({:,} B)", buf.tell())
     buf.seek(0)
 
+    # ── 时长限制 ───────────────────────────────────────────
+    with av.open(buf, "r") as s:
+        duration = await asyncio.to_thread(get_duraton_sec, s)
+        if duration > CFG.max_audio_duration_sec:
+            raise HTTPException(
+                status_code=413,
+                detail=f"音频时长 {duration} 秒，超过 {CFG.max_audio_duration_sec} 秒限制",
+            )
+
+    buf.seek(0)
+
+    # ── kick task ─────────────────────────────────────────
     task = await analyse_voice.kiq(content=buf.read())  # pyright: ignore[reportCallIssue]
 
-    # 直接返回 task_id，让前端自行 GET /api/status/{id} 订阅 SSE。
-    # 之前用 303 重定向让浏览器 fetch 自动跟随，但 POST→303→GET 这条链在
-    # fetch / vite 代理 / curl 下各有坑（body 处理、Accept 是否传递、SSE
-    # 连接语义），把两步拆开反而最稳。
+    # POST→303→GET 这条链在 fetch / vite 代理 / curl 下各有坑（body 处理、Accept 是否传递、SSE
+    # 连接语义），把两步拆开最稳。
     return {"task_id": task.task_id}
 
 

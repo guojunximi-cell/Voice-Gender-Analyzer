@@ -9,7 +9,6 @@ import av
 from av import AudioStream
 from fastapi import HTTPException
 
-from voiceya.config import CFG
 from voiceya.services.sse import ProgressSSE
 
 if TYPE_CHECKING:
@@ -74,17 +73,5 @@ async def normalize_audio_for_analysis(source: BytesIO, publish: PublisherT):
     # do gc
     source.close()
     del source
-
-    with av.open(sample, "r") as s:
-        # ── 时长限制 ───────────────────────────────────────────
-        publish(ProgressSSE(pct=8, msg="鸭鸭在检查音频时长…"))
-        duration = await asyncio.to_thread(get_duraton_sec, s)
-        if duration > CFG.max_audio_duration_sec:
-            raise HTTPException(
-                status_code=413,
-                detail=f"音频时长 {duration} 秒，超过 {CFG.max_audio_duration_sec} 秒限制",
-            )
-
-    sample.seek(0)
 
     return sample
