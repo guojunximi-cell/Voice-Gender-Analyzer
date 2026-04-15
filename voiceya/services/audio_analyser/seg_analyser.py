@@ -24,13 +24,13 @@ class AnalyseResultItem(BaseModel):
     start_time: float
     end_time: float
     duration: float  # = end_time - start_time
-    confidence: float | None  # = seg_item[3] if len(seg_item) > 3 else None
-    confidence_frames: int | None  # = seg_item[4] if len(seg_item) > 4 else None
-    acoustics: dict | None
+    confidence: float | None = None  # = seg_item[3] if len(seg_item) > 3 else None
+    confidence_frames: list[float] | None = None  # = seg_item[4] if len(seg_item) > 4 else None
+    acoustics: dict | None = None
 
 
 async def do_analyse_segments(
-    sample: BytesIO, segmentation_results: list[tuple[str, float, float]], publish: PublisherT
+    sample: BytesIO, segmentation_results: list[tuple], publish: PublisherT
 ):
     # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
     publish(ProgressSSE(pct=55, msg="鸭鸭正在载入音频…"))
