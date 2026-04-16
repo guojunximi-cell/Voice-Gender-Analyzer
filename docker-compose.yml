@@ -1,0 +1,24 @@
+# 一键起 app + Redis，匹配 Railway 部署的 2 服务结构。
+# 用法：cp .env.example .env && docker compose up -d --build
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # compose 网络里 app 用服务名 redis 访问
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+volumes:
+  redis-data:
