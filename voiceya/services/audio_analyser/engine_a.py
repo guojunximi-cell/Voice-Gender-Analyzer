@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 from voiceya.services.audio_analyser import seg as _seg
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 async def do_segmentation(sample: BytesIO):

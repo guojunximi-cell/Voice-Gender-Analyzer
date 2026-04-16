@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from voiceya.services.events_stream import PublisherT
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 def get_duraton_sec(s: InputContainer) -> float:

@@ -25,16 +25,16 @@ logger = logging.getLogger("voiceya")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    if not broker.is_worker_process:
-        await broker.startup()
-
     init_redis()
-    await load_seg()
+
+    # worker 进程：需要 Segmenter 跑分析（taskiq WORKER_STARTUP 会走这里）
+    # api 进程：只做请求分发 + SSE，不加载 TF 模型（省 ~500 MB），
+    #          也不调 broker.startup —— 不参与 consumer group 管理，kick 由
+    #          BlockingConnectionPool 的 lazy connection 承担即可。
+    if broker.is_worker_process:
+        await load_seg()
 
     yield
-
-    if not broker.is_worker_process:
-        await broker.shutdown()
 
 
 app = FastAPI(title=CFG.app_name, version="2.0", lifespan=lifespan)

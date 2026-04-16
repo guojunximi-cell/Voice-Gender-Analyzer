@@ -17,7 +17,7 @@ from voiceya.taskiq import broker
 from voiceya.tasks.analyser import analyse_voice
 from voiceya.utils.is_valid_audio_file import is_valid_audio_file
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["api"])
 
@@ -81,7 +81,7 @@ async def new_analyse(request: Request):
         if buf.tell() > CFG.max_file_size_mb * 1024 * 1024:
             raise FILE_EXCEED_SIZE_LIMIT_EXCEPTION
 
-    logger.info("收到文件 ({:,} B)", buf.tell())
+    logger.info("收到文件 (%d B)", buf.tell())
     buf.seek(0)
 
     # ── 时长限制 ───────────────────────────────────────────

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from voiceya.services.audio_analyser.seg_analyser import AnalyseResultItem
 
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 def do_statics(analyse_results: list[AnalyseResultItem]):
