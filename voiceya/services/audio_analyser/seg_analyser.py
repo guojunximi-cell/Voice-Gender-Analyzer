@@ -33,7 +33,7 @@ async def do_analyse_segments(
     sample: BytesIO, segmentation_results: list[tuple], publish: PublisherT
 ):
     # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
-    publish(ProgressSSE(pct=55, msg="鸭鸭正在载入音频…"))
+    await publish(ProgressSSE(pct=55, msg="鸭鸭正在载入音频…"))
     try:
         logger.info("正在让 librosa 读取音频…")
         y_full, sr_full = await asyncio.to_thread(librosa.load, sample, sr=None, mono=True)
@@ -64,7 +64,7 @@ async def do_analyse_segments(
 
         i += 1
         pct = 55 + round(40 * i / max(total_voiced, 1), 1)
-        publish(ProgressSSE(pct=round(pct), msg=f"鸭鸭在分析第 {i}/{total_voiced} 段…"))
+        await publish(ProgressSSE(pct=round(pct), msg=f"鸭鸭在分析第 {i}/{total_voiced} 段…"))
 
         start = int(r.start_time * sr_full)
         end = int(r.end_time * sr_full)

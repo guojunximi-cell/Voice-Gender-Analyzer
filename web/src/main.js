@@ -85,7 +85,7 @@ function _setDuckProgress(pct, msg) {
 
 	bar.hidden = false;
 	fill.style.width = pct + "%";
-	emoji.style.left = Math.max(3, Math.min(97, pct)) + "%";
+	emoji.style.left = Math.max(0, Math.min(100, pct)) + "%";
 	if (msg && label) label.textContent = msg;
 }
 
@@ -124,12 +124,12 @@ function _finishDuck() {
 	if (!fill) return;
 
 	fill.style.width = "100%";
-	emoji.style.left = "97%";
+	emoji.style.left = "100%";
 	if (label) label.textContent = "分析完成 🎉";
 	setTimeout(() => {
 		if (bar) bar.hidden = true;
 		fill.style.width = "0%";
-		emoji.style.left = "3%";
+		emoji.style.left = "0%";
 	}, 800);
 }
 
@@ -146,7 +146,7 @@ function _hideDuck() {
 	if (!fill) return;
 	if (bar) bar.hidden = true;
 	fill.style.width = "0%";
-	emoji.style.left = "3%";
+	emoji.style.left = "0%";
 }
 
 // ── Fake animation (initial wait + batch mode) ──────────────
@@ -164,7 +164,7 @@ function _startDuckFake() {
 
 	bar.hidden = false;
 	fill.style.width = "0%";
-	emoji.style.left = "3%";
+	emoji.style.left = "0%";
 
 	const start = Date.now();
 	const MAX_PCT = 88;
@@ -174,7 +174,7 @@ function _startDuckFake() {
 		const elapsed = Date.now() - start;
 		const pct = Math.min(MAX_PCT, Math.sqrt(elapsed / DURATION_MS) * MAX_PCT);
 		fill.style.width = pct + "%";
-		emoji.style.left = Math.max(3, Math.min(97, pct)) + "%";
+		emoji.style.left = Math.max(0, Math.min(100, pct)) + "%";
 		_duckRaf = requestAnimationFrame(tick);
 	}
 	_duckRaf = requestAnimationFrame(tick);

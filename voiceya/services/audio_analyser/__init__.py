@@ -23,17 +23,18 @@ async def do_analyse(content: BytesIO, publish: PublisherT):
 
     # ── Engine A: 时间分段 ─────────────────────────────────
     logger.info("Engine A 分析中…")
-    publish(ProgressSSE(pct=10, msg="鸭鸭正在聆听声纹…（此步骤较慢）"))
+    await publish(ProgressSSE(pct=10, msg="鸭鸭正在聆听声纹…（此步骤较慢）"))
 
     segmentation_results = await do_segmentation(sample)
 
     # ── Engine B: 声学分析（仅对有声语音段）────────────
-    publish(ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…"))
+    await publish(ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…"))
 
+    sample.seek(0)
     analyse_results = await do_analyse_segments(sample, segmentation_results, publish)
 
     # ── 全局汇总统计 ───────────────────────────────────────
-    publish(ProgressSSE(pct=98, msg="鸭鸭快好了…"))
+    await publish(ProgressSSE(pct=98, msg="鸭鸭快好了…"))
 
     result = do_statics(analyse_results)
     summary = result["summary"]

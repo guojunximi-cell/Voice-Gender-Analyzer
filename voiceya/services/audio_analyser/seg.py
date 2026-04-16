@@ -26,6 +26,9 @@ def _patch_segmenter_for_frame_confidence():
     if _PATCHED:
         return
 
+    import keras
+
+    from inaSpeechSegmenter import segmenter as _iss_seg
     from inaSpeechSegmenter.segmenter import (
         DnnSegmenter,
         _binidx2seglist,
@@ -34,6 +37,30 @@ def _patch_segmenter_for_frame_confidence():
         diag_trans_exp,
         viterbi_decoding,
     )
+
+    # iSS 用 `from tensorflow.python import keras`（TF2.21 下该路径仍是遗留 TF1 Keras，
+    # 无法反序列化含 BatchNormalization 的老 H5）。换成顶层 Keras 3 即可加载。
+    _iss_seg.keras = keras
+
+    # iSS 的 media2sig16kmono 在 ffmpeg=None 分支会对 medianame 做 startswith("http://")
+    # 检查，阻止我们直接喂 BytesIO。这里直接替换为"file-like / 路径都接受"的版本。
+    from inaSpeechSegmenter import io as _iss_io
+    import soundfile as _sf
+
+    def _media2sig16kmono(medianame, start_sec=None, stop_sec=None, ffmpeg="ffmpeg", dtype="float64"):
+        if ffmpeg is None:
+            if start_sec is not None or stop_sec is not None:
+                raise NotImplementedError("start_sec/stop_sec require ffmpeg")
+            if isinstance(medianame, str) and medianame.startswith(("http://", "https://")):
+                raise NotImplementedError("http(s) media requires ffmpeg")
+            sig, sr = _sf.read(medianame, dtype=dtype)
+            assert sr == 16_000, f"需要 16 kHz，收到 {sr} Hz"
+            return sig
+        return _orig_media2sig16kmono(medianame, start_sec, stop_sec, ffmpeg, dtype)
+
+    _orig_media2sig16kmono = _iss_io.media2sig16kmono
+    _iss_io.media2sig16kmono = _media2sig16kmono
+    _iss_seg.media2sig16kmono = _media2sig16kmono
 
     def dnn_call(self, mspec, lseg, difflen=0):
         if self.nmel < 24:
@@ -106,6 +133,7 @@ def _patch_segmenter_for_frame_confidence():
 
 
 async def load_seg():
+    global SEG
     if SEG:
         return
 
@@ -133,7 +161,5 @@ async def load_seg():
             getattr(_g, "_pen_model", "MISSING"),
             _dense_W.shape if (_dense_W := getattr(_g, "_dense_W", None)) else None,
         )
-
-    global SEG
 
     SEG = seg

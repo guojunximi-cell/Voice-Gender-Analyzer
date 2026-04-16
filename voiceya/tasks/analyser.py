@@ -1,8 +1,9 @@
 import io
 import logging
-from typing import TYPE_CHECKING
+from typing import Annotated
 
 from taskiq import TaskiqDepends
+from taskiq.depends.progress_tracker import Context, ProgressTracker
 
 from voiceya.config import CFG
 from voiceya.services.audio_analyser import do_analyse
@@ -11,10 +12,6 @@ from voiceya.services.events_stream import (
 )
 from voiceya.taskiq import TaskStage, broker
 
-if TYPE_CHECKING:
-    from typing import Annotated
-
-    from taskiq.depends.progress_tracker import Context, ProgressTracker
 logger = logging.getLogger(__name__)
 
 

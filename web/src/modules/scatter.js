@@ -198,7 +198,7 @@ function _draw() {
 		ctx.textAlign = "center";
 		ctx.fillStyle = textColor;
 		ctx.font = "10px Inter, sans-serif";
-		ctx.fillText("综合性别表达 (%)", 0, 0);
+		ctx.fillText("综合性别表达", 0, 0);
 		ctx.restore();
 	}
 
@@ -210,7 +210,6 @@ function _draw() {
 		const isSelected = s.id === selectedId;
 		const isHovered = s.id === hoveredId;
 		const color = _scoreToColor(score);
-		const isFemale = score >= 50;
 		const scoreY = _scoreToY(score, plotTop, plotBottom);
 		const sy = scoreY - STRIP_H / 2;
 
@@ -255,14 +254,6 @@ function _draw() {
 			}
 		}
 
-		// Score label to the right of plot
-		const dev = Math.round(Math.abs(score - 50) * 2);
-		const sign = isFemale ? "+" : "-";
-		const tipLabel = dev === 0 ? "0%" : `${sign}${dev}%`;
-		ctx.fillStyle = isSelected ? resolveCSSVar("--text-primary") || "#eee" : _withAlpha(color, 0.9);
-		ctx.font = `${isSelected ? "bold " : ""}${isSmall ? 9 : 10}px Inter, sans-serif`;
-		ctx.textAlign = "left";
-		ctx.fillText(tipLabel, plotRight + 4, scoreY + 3.5);
 	}
 }
 

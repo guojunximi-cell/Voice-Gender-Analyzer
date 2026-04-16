@@ -688,7 +688,8 @@ body {
 }
 
 .segment-item {
-	display: flex;
+	display: grid;
+	grid-template-columns: 10px 44px 96px 1fr 6px 28px;
 	align-items: center;
 	gap: 10px;
 	padding: 8px 8px;
@@ -729,10 +730,10 @@ body {
 }
 
 .segment-duration {
-	margin-left: auto;
 	color: var(--text-muted);
 	font-size: 0.75rem;
 	font-variant-numeric: tabular-nums;
+	text-align: right;
 }
 
 /* ============================================================
@@ -1260,7 +1261,7 @@ body {
 	height: 6px;
 	border-radius: 50%;
 	background: var(--accent);
-	margin-left: auto;
+	justify-self: center;
 	flex-shrink: 0;
 }
 
@@ -1277,7 +1278,7 @@ body {
 	position: relative;
 	overflow: hidden;
 	flex-shrink: 0;
-	margin-left: 2px;
+	justify-self: end;
 }
 .segment-conf-bar::after {
 	content: "";
@@ -1634,13 +1635,16 @@ body {
    DUCK PROGRESS BAR
    ============================================================ */
 .duck-progress {
-	padding: 12px 2px 4px;
+	padding: 12px 14px 4px;
+	--duck-orange-1: #ffd28a;
+	--duck-orange-2: #ff9a3c;
+	--duck-orange-3: #f26b1f;
 }
 
 .duck-track {
 	position: relative;
 	height: 6px;
-	background: var(--bg-secondary);
+	background: rgba(255, 154, 60, 0.15);
 	border-radius: 99px;
 	overflow: visible;
 }
@@ -1648,10 +1652,11 @@ body {
 .duck-fill {
 	height: 100%;
 	width: 0%;
-	background: linear-gradient(90deg, var(--accent-subtle), var(--accent));
+	max-width: 100%;
+	background: linear-gradient(90deg, var(--duck-orange-1), var(--duck-orange-2), var(--duck-orange-3));
 	border-radius: 99px;
 	pointer-events: none;
-	transition: width 0.5s ease-out;
+	transition: width 0.12s linear;
 }
 
 .duck-emoji {
@@ -1662,9 +1667,10 @@ body {
 	line-height: 1;
 	transform: translate(-50%, -65%);
 	pointer-events: none;
-	filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+	z-index: 2;
+	filter: drop-shadow(0 1px 3px rgba(242, 107, 31, 0.35));
 	animation: duck-bob 0.55s ease-in-out infinite alternate;
-	transition: left 0.5s ease-out;
+	transition: left 0.12s linear;
 }
 
 @keyframes duck-bob {

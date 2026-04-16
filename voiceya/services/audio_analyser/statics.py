@@ -72,5 +72,5 @@ def do_statics(analyse_results: list[AnalyseResultItem]):
             if total_voice_sec > 0
             else None,
         },
-        "details": [r.model_dump() for r in analyse_results],
+        "analysis": [r.model_dump() for r in analyse_results],
     }

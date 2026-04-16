@@ -23,10 +23,18 @@ def get_duraton_sec(s: InputContainer) -> float:
     i_stm = s.streams.best("audio")
     assert isinstance(i_stm, AudioStream)
 
-    duration = i_stm.duration * i_stm.time_base  # type: ignore
-    logger.info("音频时长 %i 秒", duration)
+    # 某些容器（webm/mka 等）流级 duration 为 None，退回容器级 duration
+    # （单位为 AV_TIME_BASE = 1e6 微秒）。
+    if i_stm.duration is not None:
+        duration = float(i_stm.duration * i_stm.time_base)  # type: ignore
+    elif s.duration is not None:
+        duration = s.duration / 1_000_000
+    else:
+        raise HTTPException(status_code=400, detail="无法读取音频时长")
 
-    return float(duration)
+    logger.info("音频时长 %.2f 秒", duration)
+
+    return duration
 
 
 def normalize_to_pcm(s: InputContainer) -> BytesIO:
@@ -62,7 +70,7 @@ def normalize_to_pcm(s: InputContainer) -> BytesIO:
 async def normalize_audio_for_analysis(source: BytesIO, publish: PublisherT):
     with av.open(source, "r") as s:
         # ── 转码：统一为 16kbps 单声道 pcm，降低后续 I/O 开销 ──
-        publish(ProgressSSE(pct=5, msg="鸭鸭正在处理音频…"))
+        await publish(ProgressSSE(pct=5, msg="鸭鸭正在处理音频…"))
         try:
             sample = await asyncio.to_thread(normalize_to_pcm, s)
 

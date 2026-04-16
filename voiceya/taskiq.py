@@ -1,19 +1,14 @@
 import enum
 from contextlib import AsyncExitStack
-from typing import TYPE_CHECKING
 
-from taskiq import TaskiqEvents, TaskiqMiddleware
+from taskiq import TaskiqEvents, TaskiqMiddleware, TaskiqState
 from taskiq.abc.formatter import TaskiqFormatter
-from taskiq.message import TaskiqMessage
+from taskiq.depends.progress_tracker import TaskProgress
+from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.serializers import PickleSerializer
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
 from voiceya.config import CFG
-
-if TYPE_CHECKING:
-    from taskiq import TaskiqState
-    from taskiq.depends.progress_tracker import TaskProgress
-    from taskiq.message import BrokerMessage
 
 
 class TaskStage(enum.StrEnum):
@@ -27,9 +22,7 @@ class TaskStage(enum.StrEnum):
 
 class ProgressMiddleware(TaskiqMiddleware):
     async def pre_send(self, message: TaskiqMessage) -> TaskiqMessage:
-        progress = TaskProgress()
-        progress.state = TaskStage.PENDING
-        progress.meta = None
+        progress = TaskProgress(state=TaskStage.PENDING, meta=None)
 
         await self.broker.result_backend.set_progress(message.task_id, progress)
 
@@ -69,6 +62,7 @@ broker = (
     )
     .with_serializer(PickleSerializer())
     .with_result_backend(result_backend)
+    .with_middlewares(ProgressMiddleware())
 )
 
 broker.formatter = PythonModeFormatter(broker)
@@ -82,12 +76,12 @@ _LIFESPAN_STACK: AsyncExitStack | None = None
 
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)
 async def _worker_startup(_state: TaskiqState) -> None:
+    global _LIFESPAN_STACK
+
     if _LIFESPAN_STACK:
         return
 
     from voiceya.main import app
-
-    global _LIFESPAN_STACK
 
     _LIFESPAN_STACK = AsyncExitStack()
 
@@ -96,11 +90,11 @@ async def _worker_startup(_state: TaskiqState) -> None:
 
 @broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
 async def _worker_shutdown(_state: TaskiqState) -> None:
+    global _LIFESPAN_STACK
+
     if not _LIFESPAN_STACK:
         return
 
     await _LIFESPAN_STACK.aclose()
-
-    global _LIFESPAN_STACK
 
     _LIFESPAN_STACK = None

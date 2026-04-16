@@ -69,17 +69,6 @@ const SUB_SCORE_DEFS = [
 		ticks: [17.5, 16.5, 15.5, 14.5],
 		fmt: (v) => `${v.toFixed(1)} cm`,
 	},
-	{
-		label: "倾斜",
-		rawKey: "h1_h2_db",
-		tierKey: "tilt_tier",
-		unit: "dB",
-		range: [-2, 15],
-		logScale: false,
-		reversed: false,
-		ticks: [1, 4, 7, 11],
-		fmt: (v) => `${v.toFixed(1)} dB`,
-	},
 ];
 
 function _physicalToPercent(def, rawVal) {
@@ -107,6 +96,7 @@ function renderSubScores(a) {
 		const tier = a[def.tierKey] ?? null;
 		const color = tierToColor(tier);
 		const pct = _physicalToPercent(def, rawVal);
+		const showVal = def.rawKey !== "vtl_cm";
 		const valStr = rawVal != null ? def.fmt(rawVal) : `— ${def.unit}`;
 
 		// Build tick mark HTML at tier boundary positions
@@ -122,7 +112,7 @@ function renderSubScores(a) {
 		row.innerHTML = `
       <div class="src-header">
         <span class="src-label">${def.label}</span>
-        <span class="src-val">${valStr}</span>
+        ${showVal ? `<span class="src-val">${valStr}</span>` : ""}
       </div>
       <div class="src-track-wrap">
         <div class="src-track">
@@ -154,8 +144,7 @@ function renderSubScores(a) {
 // confidence: 0–1 from Engine A; label: 'female'|'male'
 function renderGenderBar(confidence, label) {
 	const thumb = document.getElementById("mc-gender-thumb");
-	const scoreEl = document.getElementById("mc-gender-score");
-	if (!thumb || !scoreEl) return;
+	if (!thumb) return;
 
 	const scaledConf = Math.min(confidence, 1);
 	const pct = label === "female" ? 50 + scaledConf * 50 : 50 - scaledConf * 50;
@@ -164,10 +153,6 @@ function renderGenderBar(confidence, label) {
 		thumb.style.left = `${pct}%`;
 	});
 	thumb.dataset.gender = label;
-
-	const pctDisplay = Math.min(Math.round(confidence * 100), 100);
-	const symbol = label === "female" ? "♀" : "♂";
-	scoreEl.textContent = `${pctDisplay}% ${symbol}`;
 }
 
 // ─── Public: render metrics for a segment ────────────────────
@@ -209,12 +194,6 @@ export function renderMetricsPanel(segment) {
 	setFormant("mc-f1", a.f1_hz);
 	setFormant("mc-f2", a.f2_hz);
 	setFormant("mc-f3", a.f3_hz);
-
-	// ── Spectral Tilt (H1–H2) ───────────────────────────────
-	const tiltEl = document.getElementById("mc-tilt-val");
-	if (tiltEl) {
-		tiltEl.textContent = a.h1_h2_db != null ? `${a.h1_h2_db.toFixed(1)} dB` : "—";
-	}
 
 	// ── Pitch range reference bar ────────────────────────────
 	const pitchIndicator = document.getElementById("mc-pitch-indicator");
