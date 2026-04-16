@@ -10,12 +10,10 @@ WORKDIR /build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json web/package.json
 
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 COPY web/ web/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm run build:web
+RUN pnpm run build:web
 
 # ── Stage 2: Python 依赖 + 模型下载 ──────────────────────────────
 FROM python:3.13-slim-bookworm AS py-build
@@ -45,16 +43,14 @@ RUN test -f voiceya/inaSpeechSegmenter/inaSpeechSegmenter/__init__.py \
     || (echo "ERROR: git submodule voiceya/inaSpeechSegmenter not initialized. Clone with --recurse-submodules." && exit 1)
 
 # 安装依赖到 /build/.venv（--no-editable 让项目以 wheel 形式装进 site-packages）
-RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-editable
+RUN uv sync --locked --no-dev --no-editable
 
 # 防御性补齐：保证子模块整棵树落到装好的 voiceya 包下（hatch wheel 若漏文件就靠这步兜底）
 RUN SITE_PKG="$(/build/.venv/bin/python -c 'import voiceya, pathlib; print(pathlib.Path(voiceya.__file__).parent)')" \
     && cp -r /build/voiceya/inaSpeechSegmenter "${SITE_PKG}/"
 
 # 下载 inaSpeechSegmenter 模型到 /root/.keras/inaSpeechSegmenter/（remote_utils 运行时会优先查这里）
-RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
-    /build/.venv/bin/python scripts/init_iss_model.py
+RUN /build/.venv/bin/python scripts/init_iss_model.py
 
 
 # ── Stage 3: 运行时镜像 ─────────────────────────────────────────
