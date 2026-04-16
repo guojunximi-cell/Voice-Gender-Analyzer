@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from voiceya import routers
 from voiceya.config import CFG
@@ -45,3 +46,7 @@ app.add_middleware(
 )
 
 app.include_router(routers.router)
+
+# /assets 必须挂在 app 上——APIRouter.include_router 会丢 Mount 实例，见 routers/__init__.py 注释
+if (CFG.web_dir / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=CFG.web_dir / "assets"), name="assets")
