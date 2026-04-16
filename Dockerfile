@@ -42,8 +42,7 @@ COPY . .
 RUN uv sync --locked --no-dev --no-editable
 
 # 防御性补齐：保证子模块整棵树落到装好的 voiceya 包下（hatch wheel 若漏文件就靠这步兜底）
-RUN SITE_PKG="$(/build/.venv/bin/python -c 'import importlib.util, pathlib; print(pathlib.Path(importlib.util.find_spec(\"voiceya\").origin).parent)')" \
-    && cp -r /build/voiceya/inaSpeechSegmenter "${SITE_PKG}/"
+RUN cp -r /build/voiceya/inaSpeechSegmenter /build/.venv/lib/python3.13/site-packages/voiceya/
 
 # 下载 inaSpeechSegmenter 模型到 /root/.keras/inaSpeechSegmenter/（remote_utils 运行时会优先查这里）
 RUN /build/.venv/bin/python scripts/init_iss_model.py
