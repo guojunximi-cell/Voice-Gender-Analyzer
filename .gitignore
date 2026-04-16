@@ -5,9 +5,15 @@ __pycache__/
 venv/
 .venv/
 
+# Environment
+.env
+
+# Leftover compiled-only directory (source was moved to voiceya/)
+backend/
+
 # Node.js
-frontend/node_modules/
-frontend/dist/
+**/node_modules/
+web/dist/
 
 # Output files
 output/*
@@ -23,8 +29,10 @@ output/*
 # OS / IDE
 .DS_Store
 Thumbs.db
-.vscode/
 .idea/
 
 # Logs
 *.log
+
+# Models
+*.hdf5

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run:*)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8080/api/config)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://127.0.0.1:8080/api/analyze-voice)"
+    ]
+  }
+}

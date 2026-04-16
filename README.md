@@ -31,31 +31,39 @@
 
 ## 运行
 
-建议使用 \*\*Python 3.11\*\* 或 \*\*3.12\*\*。
+需要 **Python 3.13**、[Node.js ≥ 20](https://nodejs.org/)（装 pnpm 用）、[uv](https://docs.astral.sh/uv/)、本地 Redis。
 
-需要安装 \[Node.js](https://nodejs.org/) (用于前端环境)。
+### 本地开发
 
-
-
-``` powershell
-
-
-
-pip install -r requirements.txt
-
-cd frontend
-
-npm install
-
-python run\_app.py
-
-
-
+```bash
+uv sync                 # 按 uv.lock 装 Python 依赖到 .venv
+pnpm install            # 前端依赖
+python run_app.py       # 一键起 Redis + uvicorn + taskiq worker + vite
 ```
 
+`run_app.py` 会同时拉起后端、worker 与 vite dev server，默认访问 http://localhost:5173。
 
+### Docker 自建（VPS / 自托管）
 
+需要 Docker 与 Docker Compose v2。
 
+```bash
+cp .env.example .env    # 按需改动，REDIS_URL 留空用 compose 内置 redis
+docker compose up -d --build
+```
+
+服务默认监听 `http://localhost:8080`。首次构建约 10~15 分钟（TensorFlow + inaSpeechSegmenter 模型较大）。可配置的环境变量清单见 `.env.example`。
+
+### Railway 部署
+
+Railway 按 `railway.toml` 构建。按以下步骤手动配置：
+
+1. Railway → **New Project** → **Deploy from GitHub repo** → 选本仓库
+2. **+ Add Service** → **Database** → **Redis**
+3. 在 app 服务的 **Variables** 面板加 `REDIS_URL = ${{Redis.REDIS_URL}}`
+4. 等构建完成，访问 Public URL
+
+> 推荐 Hobby Plan（内存 ≥ 512 MB）。TensorFlow + API + worker 双进程在更低档可能 OOM。
 
 ## 声明
 
