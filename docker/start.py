@@ -68,7 +68,7 @@ def main() -> int:
     _spawn(
         "api",
         (
-            "uvicorn", "voiceya:app",
+            sys.executable, "-m", "uvicorn", "voiceya:app",
             "--host", "0.0.0.0",
             "--port", PORT,
             "--proxy-headers",
@@ -79,7 +79,7 @@ def main() -> int:
     _spawn(
         "worker",
         (
-            "taskiq", "worker",
+            sys.executable, "-m", "taskiq", "worker",
             "voiceya.taskiq:broker",
             "voiceya.tasks.analyser",
             "--workers", "1",
