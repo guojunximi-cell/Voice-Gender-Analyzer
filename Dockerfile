@@ -1,72 +1,85 @@
-FROM alpine:latest as base
+# syntax=docker/dockerfile:1.7
+
+# ── Stage 1: 前端构建 ────────────────────────────────────────────
+FROM node:20-bookworm-slim AS web-build
+ENV PNPM_HOME="/pnpm"
+ENV PATH="${PNPM_HOME}:${PATH}"
+RUN corepack enable
 WORKDIR /build
 
-# ── Stage 1: Node runtime ─────────────────────────────────────
-FROM node:alpine AS node-base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="${PNPM_HOME}:$PATH"
-RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY web/package.json web/package.json
 
-FROM node-base AS web-deps
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    --mount=type=bind,source=pnpm-lock.yaml,target=pnpm-lock.yaml \
-    --mount=type=bind,source=pnpm-workspace.yaml,target=pnpm-workspace.yaml \
-    --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=web/package.json,target=web/package.json \
-    pnpm install --prod --frozen-lockfile
+    pnpm install --frozen-lockfile
 
-# ── Stage 2: Python runtime ───────────────────────────────────
-FROM ghcr.io/astral-sh/uv:alpine AS py-base
-ENV UV_VENV_RELOCATABLE=1
-ENV UV_NO_DEV=1
-
-FROM py-base as py-deps
-RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-dev --no-install-project
-
-# ── Stage 3: Build ────────────────────────────────────────────
-FROM node-base AS web-build
-COPY . /build
+COPY web/ web/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --no-editable \
-    && pnpm run build:web
+    pnpm run build:web
 
-FROM py-base AS py-build
-COPY . /build
-RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
-    uv sync --locked --no-editable
+# ── Stage 2: Python 依赖 + 模型下载 ──────────────────────────────
+FROM python:3.13-slim-bookworm AS py-build
 
-RUN uv run ./scripts/init_iss_model.py
-RUN uv run ./scripts/optimize_venv.py
+# uv: 官方镜像只发布 uv 二进制，这里拷过来用
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-
-# ── Prepare Image ─────────────────────────────────────────────
-FROM base
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ffmpeg \
+# 构建时依赖：git 给子模块检查留后路，libsndfile1 / ffmpeg 给 init_iss_model.py 用
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git \
+        build-essential \
         libsndfile1 \
+        ffmpeg \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# COPY --from=web-build /build/web/node_modules /web/node_modules
-COPY --from=web-build /build/web/dist /web
+ENV UV_NO_DEV=1 \
+    UV_LINK_MODE=copy \
+    UV_VENV_RELOCATABLE=1
 
-ENV PY_HOME="/.venv/bin"
-COPY --from=py-build /build/.venv ${PY_HOME}
-COPY --from=py-build /build/*.hdf5 /
+WORKDIR /build
+COPY . .
+
+# 子模块完整性检查：Railway 默认 clone 会 --recurse-submodules，这里是快速失败兜底
+RUN test -f voiceya/inaSpeechSegmenter/inaSpeechSegmenter/__init__.py \
+    || (echo "ERROR: git submodule voiceya/inaSpeechSegmenter not initialized. Clone with --recurse-submodules." && exit 1)
+
+# 安装依赖到 /build/.venv（--no-editable 让项目以 wheel 形式装进 site-packages）
+RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable
+
+# 防御性补齐：保证子模块整棵树落到装好的 voiceya 包下（hatch wheel 若漏文件就靠这步兜底）
+RUN SITE_PKG="$(/build/.venv/bin/python -c 'import voiceya, pathlib; print(pathlib.Path(voiceya.__file__).parent)')" \
+    && cp -r /build/voiceya/inaSpeechSegmenter "${SITE_PKG}/"
+
+# 下载 inaSpeechSegmenter 模型到 /root/.keras/inaSpeechSegmenter/（remote_utils 运行时会优先查这里）
+RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
+    /build/.venv/bin/python scripts/init_iss_model.py
 
 
-# ── Run Project ───────────────────────────────────────────────
-WORKDIR /
-ENV GUNICORN_BIND=0.0.0.0:8000
+# ── Stage 3: 运行时镜像 ─────────────────────────────────────────
+FROM python:3.13-slim-bookworm
 
-ENV PATH="${PY_HOME}:$PATH"
-CMD gunicorn voiceya:app \
-    --bind ${GUNICORN_BIND} \
-    --keep-alive 5 \
-    --access-logfile=None \
-    --error-logfile - \
-    --proxy_headers=True \
-    --forwarded_allow_ips="*"
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libsndfile1 \
+        libgomp1 \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=py-build /build/.venv /opt/venv
+COPY --from=py-build /root/.keras /root/.keras
+COPY --from=web-build /build/web/dist /app/web
+COPY docker/start.py /app/start.py
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    WEB_DIR=/app/web \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8080
+
+WORKDIR /app
+EXPOSE 8080
+
+CMD ["python", "/app/start.py"]

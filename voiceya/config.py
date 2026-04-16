@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, NonNegativeInt, PositiveInt
+from pydantic import AliasChoices, Field, NonNegativeInt, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).parent
@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"] = "WARNING"
 
-    redis_uri: str
+    redis_uri: str = Field(..., validation_alias=AliasChoices("REDIS_URI", "REDIS_URL"))
     web_dir: Path = BASE_DIR.parent / "web"
 
     task_max_exec_sec: PositiveInt = 15 * 60

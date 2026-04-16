@@ -1,0 +1,55 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+**/node_modules/
+web/dist/
+
+# Deprecated source copy (per .gitignore)
+backend/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Version control
+.git/
+.github/
+.gitattributes
+
+# Claude Code / dev tooling
+.claude/
+CLAUDE.md
+
+# Logs, scratch
+*.log
+output/
+temp/
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.m4a
+
+# Submodule: keep Python package, drop noise
+voiceya/inaSpeechSegmenter/.git
+voiceya/inaSpeechSegmenter/.github/
+voiceya/inaSpeechSegmenter/tutorials/
+voiceya/inaSpeechSegmenter/Dockerfile
+voiceya/inaSpeechSegmenter/.dockerignore
+voiceya/inaSpeechSegmenter/tests/

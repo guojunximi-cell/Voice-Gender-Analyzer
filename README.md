@@ -57,6 +57,26 @@ python run\_app.py
 
 
 
+## Railway 一键部署
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/<TEMPLATE_ID>)
+
+点击上方按钮，Railway 会按 `railway.json` 蓝图自动创建两个服务：应用本体（从本仓库 Dockerfile 构建）和 Redis 插件，并把 `REDIS_URL` 注入到应用。首次构建约 10–15 分钟（TensorFlow + inaSpeechSegmenter 模型较大），完成后点击 Railway 分配的 Public URL 即可使用。
+
+> 首次部署完成后，作者需要在 Railway 控制台 "Save as Template" 生成 Template ID，替换按钮 URL 里的 `<TEMPLATE_ID>` 占位符，之后社区访客就能真正一键复用。
+
+### 手动部署（若按钮不可用）
+
+1. Railway → New Project → Deploy from GitHub repo → 选本仓库
+2. + Add Service → Database → Redis
+3. 在 app 服务的 Variables 面板加 `REDIS_URL = ${{Redis.REDIS_URL}}`
+4. 等构建完成，访问 Public URL
+
+### 运行建议
+
+- **推荐 Plan**：Hobby ($5/月)，内存 ≥ 512 MB。TensorFlow + 双进程（API + worker）在更低档可能 OOM
+- **可选环境变量**：`LOG_LEVEL` (默认 WARNING)、`MAX_FILE_SIZE_MB` (默认 10)、`MAX_AUDIO_DURATION_SEC` (默认 180)、`MAX_CONCURRENT` (默认 2)、`MAX_QUEUE_DEPTH` (默认 30)
+
 ## 声明
 
 本工具仅用于学术研究与语音技术学习目的。性别分析结果基于统计声学模型，不代表对个体性别的判断。

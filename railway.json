@@ -1,0 +1,33 @@
+{
+	"$schema": "https://railway.com/railway.schema.json",
+	"services": [
+		{
+			"name": "app",
+			"source": {
+				"repo": "guojunximi-cell/Voice-Gender-Analyzer"
+			},
+			"build": {
+				"builder": "DOCKERFILE",
+				"dockerfilePath": "Dockerfile"
+			},
+			"deploy": {
+				"healthcheckPath": "/api/config",
+				"healthcheckTimeout": 300,
+				"restartPolicyType": "ON_FAILURE",
+				"restartPolicyMaxRetries": 3
+			},
+			"variables": {
+				"REDIS_URL": "${{Redis.REDIS_URL}}"
+			}
+		},
+		{
+			"name": "Redis",
+			"source": {
+				"image": "redis:7-alpine"
+			},
+			"deploy": {
+				"restartPolicyType": "ON_FAILURE"
+			}
+		}
+	]
+}
