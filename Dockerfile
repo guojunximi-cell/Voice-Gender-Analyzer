@@ -38,10 +38,6 @@ ENV UV_NO_DEV=1 \
 WORKDIR /build
 COPY . .
 
-# 子模块完整性检查：Railway 默认 clone 会 --recurse-submodules，这里是快速失败兜底
-RUN test -f voiceya/inaSpeechSegmenter/inaSpeechSegmenter/__init__.py \
-    || (echo "ERROR: git submodule voiceya/inaSpeechSegmenter not initialized. Clone with --recurse-submodules." && exit 1)
-
 # 安装依赖到 /build/.venv（--no-editable 让项目以 wheel 形式装进 site-packages）
 RUN uv sync --locked --no-dev --no-editable
 

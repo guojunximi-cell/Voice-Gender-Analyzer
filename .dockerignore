@@ -46,8 +46,7 @@ temp/
 *.flac
 *.m4a
 
-# Submodule: keep Python package, drop noise
-voiceya/inaSpeechSegmenter/.git
+# Vendored inaSpeechSegmenter: keep Python package, drop noise
 voiceya/inaSpeechSegmenter/.github/
 voiceya/inaSpeechSegmenter/tutorials/
 voiceya/inaSpeechSegmenter/Dockerfile
