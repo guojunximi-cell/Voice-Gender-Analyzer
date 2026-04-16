@@ -33,7 +33,7 @@ import warnings
 
 import numpy as np
 from skimage.util import view_as_windows as vaw
-from tensorflow.python import keras
+import keras
 
 from .export_funcs import seg2csv, seg2textgrid
 from .io import media2sig16kmono
@@ -143,7 +143,11 @@ class DnnSegmenter:
 
         model_path = get_remote(self.model_fname)
 
-        self.nn = keras.models.load_model(model_path, compile=False)
+        self.nn = keras.models.load_model(
+            model_path,
+            compile=False,
+            custom_objects={"BatchNormalization": keras.layers.BatchNormalization},
+        )
         self.nn.run_eagerly = False
         self.batch_size = batch_size
 
