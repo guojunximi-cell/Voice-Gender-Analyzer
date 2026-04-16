@@ -21,19 +21,16 @@ FROM python:3.13-slim-bookworm AS py-build
 # uv: 官方镜像只发布 uv 二进制，这里拷过来用
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# 构建时依赖：git 给子模块检查留后路，libsndfile1 / ffmpeg 给 init_iss_model.py 用
+# 构建时依赖：libsndfile1 / ffmpeg 给 init_iss_model.py 预热模型用
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        git \
-        build-essential \
         libsndfile1 \
         ffmpeg \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 ENV UV_NO_DEV=1 \
-    UV_LINK_MODE=copy \
-    UV_VENV_RELOCATABLE=1
+    UV_LINK_MODE=copy
 
 WORKDIR /build
 COPY . .
@@ -41,7 +38,7 @@ COPY . .
 # 安装依赖到 /build/.venv（--no-editable 让项目以 wheel 形式装进 site-packages）
 RUN uv sync --locked --no-dev --no-editable
 
-# 防御性补齐：保证子模块整棵树落到装好的 voiceya 包下（hatch wheel 若漏文件就靠这步兜底）
+# TODO: 兜底补齐 voiceya 子模块树——实测 hatch wheel 确认带齐后可删
 RUN cp -r /build/voiceya/inaSpeechSegmenter /build/.venv/lib/python3.13/site-packages/voiceya/
 
 # 下载 inaSpeechSegmenter 模型到 /root/.keras/inaSpeechSegmenter/（remote_utils 运行时会优先查这里）
