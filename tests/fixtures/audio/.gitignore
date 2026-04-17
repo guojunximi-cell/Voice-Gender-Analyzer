@@ -1,0 +1,7 @@
+# Keep the README but ignore all audio files (speaker privacy).
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.opus

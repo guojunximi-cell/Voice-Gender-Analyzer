@@ -43,6 +43,13 @@ ina-ss = [
     "scikit-image>=0.26.0",
     "tensorflow-cpu>=2.21.0",
 ]
+# Engine C 进阶分析：worker 端 ASR + sidecar HTTP client.
+# funasr 会拉入 torch（~700 MB），在 1–2 GB Docker 预算内；
+# 关闭 ENGINE_C_ENABLED 时运行时不会 import，不产生加载开销。
+engine-c = [
+    "funasr>=1.2.0",
+    "httpx>=0.28.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -50,7 +57,7 @@ build-backend = "hatchling.build"
 
 [tool.uv]
 # no-editable = true
-default-groups = ["ina-ss"]
+default-groups = ["ina-ss", "engine-c"]
 # no-binary-package = ["av"]
 
 [tool.hatch.build.targets.wheel]

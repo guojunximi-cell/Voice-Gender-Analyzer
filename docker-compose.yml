@@ -1,5 +1,9 @@
-# 一键起 app + Redis，匹配 Railway 部署的 2 服务结构。
+# 一键起 app + Redis（+ 可选 Engine C sidecar），匹配 Railway 部署结构。
 # 用法：cp .env.example .env && docker compose up -d --build
+#
+# Engine C (visualizer-backend) 默认不起——占盘 ~2.5 GB、冷启动慢。
+# 需要时：docker compose --profile engine-c up -d --build
+# 并在 .env 里 ENGINE_C_ENABLED=true。
 services:
   redis:
     image: redis:7-alpine
@@ -16,9 +20,28 @@ services:
     environment:
       # compose 网络里 app 用服务名 redis 访问
       REDIS_URL: redis://redis:6379/0
+      # Engine C sidecar 内部地址——若 sidecar 未起，app 端会在调用时失败降级为 null
+      ENGINE_C_SIDECAR_URL: http://visualizer-backend:8001
     depends_on:
       - redis
     restart: unless-stopped
+
+  visualizer-backend:
+    # Engine C 进阶分析 sidecar：MFA + Praat + 源项目 resonance 链。
+    # 只在 --profile engine-c 下启动。
+    profiles: ["engine-c"]
+    build:
+      context: .
+      dockerfile: voiceya/sidecars/visualizer-backend.Dockerfile
+    expose:
+      - "8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
 volumes:
   redis-data:
