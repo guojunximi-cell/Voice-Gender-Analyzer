@@ -1,0 +1,285 @@
+/* ============================================================
+   TIMELINE — Phone-level interactive timeline tokens & styles
+   ============================================================ */
+
+/* ── Timeline tokens ─────────────────────────────────────────── */
+:root {
+	/* Cividis heatmap (9 stops, monotonic luminance, CVD-safe) */
+	--cv-0: #00224e;
+	--cv-1: #13386c;
+	--cv-2: #3b496c;
+	--cv-3: #5c5d6b;
+	--cv-4: #7c7b78;
+	--cv-5: #9b957a;
+	--cv-6: #bdb176;
+	--cv-7: #dfcd5a;
+	--cv-8: #fde737;
+
+	/* Pitch accent (Okabe-Ito orange, CVD-validated) */
+	--pitch: #e69f00;
+	--pitch-halo: #0b1220;
+
+	/* Active character highlight (Okabe-Ito blue) */
+	--active: #0072b2;
+	--active-bg: #e3f2fd;
+}
+
+[data-theme="dark"] {
+	--cv-0: #13386c; /* lift low end so it doesn't blend into dark bg */
+	--pitch-halo: rgba(0, 0, 0, 0.6);
+	--active: #56b4e9;
+	--active-bg: #1e3a5f;
+}
+
+/* ── Skeleton (loading state) ────────────────────────────────── */
+.vga-timeline {
+	margin-top: 0;
+	contain: layout style;
+}
+
+.vga-timeline[data-state="skeleton"] .vga-skel {
+	background: var(--bg-secondary);
+	border-radius: var(--radius-sm);
+	animation: vga-skel-pulse 1.5s ease-in-out infinite;
+}
+
+.vga-skel--band {
+	height: 18px;
+	margin-bottom: 8px;
+}
+
+.vga-skel--row {
+	height: 60px;
+	margin-bottom: 12px;
+}
+
+.vga-skel--chart {
+	height: 200px;
+}
+
+@keyframes vga-skel-pulse {
+	0%,
+	100% {
+		opacity: 0.4;
+	}
+	50% {
+		opacity: 0.7;
+	}
+}
+
+/* ── Heatmap band ────────────────────────────────────────────── */
+.vga-heatmap {
+	display: block;
+	width: 100%;
+	height: 18px;
+	margin-bottom: 8px;
+}
+
+.vga-heatmap rect {
+	transition: filter 80ms linear;
+	cursor: pointer;
+}
+
+.vga-heatmap rect:hover,
+.vga-heatmap rect:focus-visible {
+	filter: brightness(1.15);
+	outline: none;
+}
+
+.vga-heatmap rect.active {
+	stroke: var(--active);
+	stroke-width: 0.003;
+}
+
+/* ── Transcript row ──────────────────────────────────────────── */
+.vga-transcript {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 12px 0;
+	contain: content;
+}
+
+.phone {
+	all: unset;
+	box-sizing: border-box;
+	cursor: pointer;
+	min-width: 44px;
+	min-height: 56px;
+	display: grid;
+	grid-template-rows: 24px 14px 14px;
+	align-items: center;
+	justify-items: center;
+	padding: 4px 2px;
+	border-radius: 6px;
+	font-family:
+		"PingFang SC",
+		"Hiragino Sans GB",
+		"Microsoft YaHei",
+		"Noto Sans CJK SC",
+		sans-serif;
+	transition:
+		background-color 80ms linear,
+		color 80ms linear;
+}
+
+.phone:focus-visible {
+	outline: 3px solid var(--active);
+	outline-offset: 2px;
+}
+
+.phone__char {
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 1.4;
+}
+
+.phone__pitch,
+.phone__res {
+	font-family: "SF Mono", "JetBrains Mono", "Fira Mono", monospace;
+	font-size: 11px;
+	color: var(--text-muted);
+}
+
+.phone[aria-current="true"] {
+	background: var(--active-bg);
+	color: var(--active);
+	will-change: background-color, color;
+}
+
+.phone[aria-current="true"] .phone__pitch,
+.phone[aria-current="true"] .phone__res {
+	color: var(--active);
+}
+
+/* ── Trend chart ─────────────────────────────────────────────── */
+.vga-trend-wrap {
+	margin-top: 12px;
+}
+
+/* Screen-reader-only data table (behind the chart canvas) */
+.vga-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ── Fallback / empty state ──────────────────────────────────── */
+.vga-fallback {
+	padding: 24px 20px;
+	border: 1px dashed var(--border-strong);
+	border-radius: var(--radius-md);
+	background: var(--bg-secondary);
+	color: var(--text-secondary);
+	font-size: 0.875rem;
+	line-height: 1.7;
+}
+
+.vga-fallback h3 {
+	font-size: 0.95rem;
+	font-weight: 600;
+	color: var(--text-primary);
+	margin-bottom: 8px;
+}
+
+.vga-fallback h4 {
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+	margin-top: 12px;
+	margin-bottom: 4px;
+}
+
+.vga-fallback ul,
+.vga-fallback ol {
+	padding-left: 20px;
+	margin-bottom: 8px;
+}
+
+.vga-fallback__actions {
+	margin-top: 16px;
+	display: flex;
+	gap: 8px;
+}
+
+/* ── Low phone count banner ──────────────────────────────────── */
+.vga-low-phone-banner {
+	padding: 8px 12px;
+	border-radius: var(--radius-sm);
+	background: var(--accent-subtle);
+	color: var(--text-secondary);
+	font-size: 0.82rem;
+	margin-bottom: 8px;
+}
+
+/* ── Return-to-current button ────────────────────────────────── */
+.vga-return-btn {
+	position: sticky;
+	bottom: 8px;
+	margin-left: auto;
+	margin-right: auto;
+	display: none;
+	padding: 4px 12px;
+	border-radius: 16px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text-secondary);
+	font-size: 0.75rem;
+	cursor: pointer;
+	box-shadow: var(--shadow-sm);
+	z-index: 2;
+}
+
+.vga-return-btn.show {
+	display: block;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 767px) {
+	.vga-heatmap {
+		height: 14px;
+	}
+
+	.phone {
+		min-width: 52px;
+		min-height: 60px;
+	}
+
+	.vga-skel--chart {
+		height: 160px;
+	}
+}
+
+/* ── Engine A/B panel refinements ─────────────────────────────── */
+.mc-nn-disclaimer,
+.mc-ref-disclaimer {
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	line-height: 1.6;
+	margin-bottom: 10px;
+	padding: 6px 8px;
+	background: var(--bg-secondary);
+	border-radius: var(--radius-sm);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+	.phone {
+		transition: none;
+	}
+
+	.vga-skel {
+		animation: none;
+		opacity: 0.5;
+	}
+
+	.vga-return-btn {
+		animation: none;
+	}
+}
