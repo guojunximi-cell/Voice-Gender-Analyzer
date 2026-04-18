@@ -216,6 +216,9 @@ function _setPlayState(playing) {
 }
 
 // ─── Public controls ─────────────────────────────────────────
+export function getWaveSurfer() {
+	return ws;
+}
 export function togglePlay() {
 	ws?.playPause();
 }

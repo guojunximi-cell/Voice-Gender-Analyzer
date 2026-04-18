@@ -9,11 +9,13 @@
 			})();
 		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="color-scheme" content="light dark" />
 		<title>声音分析鸭 — 声音性别分析</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 		<link rel="stylesheet" href="/src/styles/main.css" />
+		<link rel="stylesheet" href="/src/styles/timeline.css" />
 	</head>
 	<body>
 		<!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
@@ -309,6 +311,9 @@
 					</div>
 				</section>
 
+				<!-- Phone-level timeline (Engine C, feature-flagged) -->
+				<div id="phone-timeline-root" hidden></div>
+
 				<!-- Stats cards -->
 				<section id="stats-section" class="stats-section" hidden>
 					<div class="stats-grid">
@@ -432,11 +437,11 @@
 						</div>
 					</details>
 
-					<!-- Collapsible: Gender expression (Engine A as primary) -->
+					<!-- Engine A: Neural network estimate (reference only) -->
 					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header">综合性别表达</summary>
+						<summary class="mc-collapsible-header">神经网络估计 (供参考)</summary>
 						<div class="mc-collapsible-body">
-							<div class="gender-primary-label">分类置信度 (Engine A · inaSpeechSegmenter)</div>
+							<p class="mc-nn-disclaimer">此估计来自一个在大规模语音数据上训练的分类器。它反映的是「典型听者可能如何感知你的声音」，不代表你的身份。</p>
 							<div class="gender-spectrum">
 								<div class="gender-track">
 									<div class="gender-thumb" id="mc-gender-thumb" style="left: 50%"></div>
@@ -448,6 +453,14 @@
 								</div>
 							</div>
 							<div id="mc-certainty-tag" class="certainty-tag" hidden></div>
+						</div>
+					</details>
+
+					<!-- Engine B: Reference averages (collapsed by default) -->
+					<details class="mc-collapsible" id="mc-reference-panel">
+						<summary class="mc-collapsible-header">参考平均值</summary>
+						<div class="mc-collapsible-body">
+							<p class="mc-ref-disclaimer">这些是整段录音的宏观平均值，仅供参考。个体音素的数据请参考上方的时间轴。</p>
 							<div id="mc-subscores" class="mc-subscores"></div>
 						</div>
 					</details>

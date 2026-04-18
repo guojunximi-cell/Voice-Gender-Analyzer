@@ -1,5 +1,7 @@
 import { analyzeAudio, cancelAnalysis } from "./modules/analyzer.js";
+import { isTimelineEnabled } from "./modules/feature-flag.js";
 import { clearMetricsPanel, renderConfidenceDistribution, renderMetricsPanel } from "./modules/metrics-panel.js";
+import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
 import { highlightActiveSegment, renderSegments, renderStats, resetResults } from "./modules/results.js";
 import {
@@ -18,7 +20,14 @@ import {
 	removeSession as storeRemoveSession,
 } from "./modules/session-store.js";
 import { RESTRICTED_MAX_BYTES, setupUploader, validateFile } from "./modules/uploader.js";
-import { destroyWaveform, drawTimeline, initWaveform, togglePlay, updateWaveformTheme } from "./modules/waveform.js";
+import {
+	destroyWaveform,
+	drawTimeline,
+	getWaveSurfer,
+	initWaveform,
+	togglePlay,
+	updateWaveformTheme,
+} from "./modules/waveform.js";
 import { nextSessionColor } from "./utils.js";
 
 // ─── State ────────────────────────────────────────────────────
@@ -27,6 +36,10 @@ let phase = "idle";
 let currentFile = null;
 let analysisData = null; // current API response
 let _batchInProgress = false; // true while batch multi-file analysis is running
+
+// ─── Phone timeline (Engine C) ───────────────────────────────
+const _timelineEnabled = isTimelineEnabled();
+let _phoneTimeline = null;
 
 // ─── DOM shortcuts ────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -222,9 +235,22 @@ function setPhase(next) {
 		if (icon) icon.style.display = analyzing ? "none" : "";
 	}
 
-	if (next === "analyzing") _startDuckFake();
-	else if (next === "results") _finishDuck();
-	else if (!_batchInProgress) _hideDuck();
+	if (next === "analyzing") {
+		_startDuckFake();
+		// Show timeline skeleton while analysis is in progress
+		if (_timelineEnabled) {
+			const root = $("phone-timeline-root");
+			if (root) {
+				root.hidden = false;
+				_phoneTimeline = new PhoneTimeline({ container: root, wavesurfer: getWaveSurfer() });
+				_phoneTimeline.setLoading();
+			}
+		}
+	} else if (next === "results") {
+		_finishDuck();
+	} else if (!_batchInProgress) {
+		_hideDuck();
+	}
 }
 
 // ─── File loaded ──────────────────────────────────────────────
@@ -234,6 +260,12 @@ function onFileSelected(file) {
 	analysisData = null;
 	resetResults();
 	clearMetricsPanel();
+	if (_phoneTimeline) {
+		_phoneTimeline.destroy();
+		_phoneTimeline = null;
+	}
+	const tlRoot = $("phone-timeline-root");
+	if (tlRoot) tlRoot.hidden = true;
 
 	$("file-name").textContent = file.name;
 
@@ -367,6 +399,12 @@ $("change-file-btn")?.addEventListener("click", () => {
 	destroyWaveform();
 	resetResults();
 	clearMetricsPanel();
+	if (_phoneTimeline) {
+		_phoneTimeline.destroy();
+		_phoneTimeline = null;
+	}
+	const tlRoot = $("phone-timeline-root");
+	if (tlRoot) tlRoot.hidden = true;
 	currentFile = null;
 	analysisData = null;
 	setPhase("idle");
@@ -411,6 +449,13 @@ $("analyze-btn")?.addEventListener("click", async () => {
 		// Render stats + segment list
 		renderStats(data.analysis);
 		renderSegments(data.analysis);
+
+		// Feed Engine C data to phone timeline
+		if (_phoneTimeline && data.summary?.engine_c) {
+			_phoneTimeline.setData(data.summary.engine_c);
+		} else if (_phoneTimeline) {
+			_phoneTimeline.setData(null);
+		}
 
 		setPhase("results");
 
