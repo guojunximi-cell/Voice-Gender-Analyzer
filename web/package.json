@@ -11,6 +11,7 @@
 		"lint:fix": "oxlint --fix"
 	},
 	"dependencies": {
+		"uplot": "^1.6.32",
 		"wavesurfer.js": "^7.12.6"
 	},
 	"devDependencies": {
