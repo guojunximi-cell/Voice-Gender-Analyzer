@@ -91,6 +91,9 @@ async def run_engine_c(
         return None
 
     # 源 resonance.py 可能因样本不足而不填某些字段；全部按 None-safe 取。
+    raw_phones = data.get("phones") or []
+    phones = _build_phone_array(raw_phones, data.get("words") or [])
+
     summary = {
         "mean_pitch_hz": _safe_float(data.get("meanPitch")),
         "median_pitch_hz": _safe_float(data.get("medianPitch")),
@@ -98,9 +101,10 @@ async def run_engine_c(
         "mean_resonance": _safe_float(data.get("meanResonance")),
         "median_resonance": _safe_float(data.get("medianResonance")),
         "stdev_resonance": _safe_float(data.get("stdevResonance")),
-        "phone_count": len(data.get("phones") or []),
+        "phone_count": len(phones),
         "word_count": len(data.get("words") or []),
         "transcript": transcript,
+        "phones": phones,
     }
 
     logger.info(
@@ -110,6 +114,55 @@ async def run_engine_c(
         summary["mean_resonance"],
     )
     return summary
+
+
+def _build_phone_array(
+    raw_phones: list[dict[str, Any]],
+    words: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Transform sidecar phone dicts into the frontend-facing format.
+
+    Each raw phone has ``time`` (start) but no explicit end — the end is
+    the next phone's start time.  We also map each phone back to its hanzi
+    character via the ``word_index`` cross-reference.
+    """
+    if not raw_phones:
+        return []
+
+    phones: list[dict[str, Any]] = []
+    for i, p in enumerate(raw_phones):
+        start = _safe_float(p.get("time"))
+        if start is None:
+            continue
+
+        # End time = next phone's start, or for the last phone, start + 0.1 s
+        if i + 1 < len(raw_phones):
+            end = _safe_float(raw_phones[i + 1].get("time"))
+            if end is None or end <= start:
+                end = start + 0.1
+        else:
+            end = start + 0.1
+
+        # Map to hanzi via word_index → words[idx]["word"]
+        word_idx = p.get("word_index")
+        char = ""
+        if word_idx is not None and 0 <= word_idx < len(words):
+            char = words[word_idx].get("word", "") or ""
+
+        formants = p.get("F") or []
+        phones.append({
+            "start": round(start, 3),
+            "end": round(end, 3),
+            "char": char,
+            "phone": p.get("phoneme", ""),
+            "pitch": _safe_float(formants[0]) if len(formants) > 0 else None,
+            "resonance": _safe_float(p.get("resonance")),
+            "F1": _safe_float(formants[1]) if len(formants) > 1 else None,
+            "F2": _safe_float(formants[2]) if len(formants) > 2 else None,
+            "F3": _safe_float(formants[3]) if len(formants) > 3 else None,
+        })
+
+    return phones
 
 
 def _safe_float(x: Any) -> float | None:
