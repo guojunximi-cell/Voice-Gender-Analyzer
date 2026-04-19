@@ -71,12 +71,17 @@ async def run_engine_c(
         logger.info("Engine C skipped: empty transcript (noise / non-speech)")
         return None
 
+    headers: dict[str, str] = {}
+    if CFG.engine_c_sidecar_token:
+        headers["X-Engine-C-Token"] = CFG.engine_c_sidecar_token
+
     try:
         async with httpx.AsyncClient(timeout=CFG.engine_c_sidecar_timeout_sec) as client:
             resp = await client.post(
                 f"{CFG.engine_c_sidecar_url}/engine_c/analyze",
                 files={"audio": ("audio.wav", audio_bytes, "audio/wav")},
                 data={"transcript": transcript},
+                headers=headers,
             )
         if resp.status_code != 200:
             logger.warning(

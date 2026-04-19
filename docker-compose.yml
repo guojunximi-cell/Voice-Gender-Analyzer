@@ -22,6 +22,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       # Engine C sidecar 内部地址——若 sidecar 未起，app 端会在调用时失败降级为 null
       ENGINE_C_SIDECAR_URL: http://visualizer-backend:8001
+      # H2 共享密钥：worker 端字段名是 ENGINE_C_SIDECAR_TOKEN（在 .env 里设一次）。
+      # 留空则 sidecar 端不强制鉴权（仅 dev / 隔离内网场景）。
     depends_on:
       - redis
     restart: unless-stopped
@@ -35,6 +37,12 @@ services:
       dockerfile: voiceya/sidecars/visualizer-backend.Dockerfile
     expose:
       - "8001"
+    environment:
+      # H2: sidecar 读 ENGINE_C_TOKEN，与 worker 的 ENGINE_C_SIDECAR_TOKEN
+      # 共享同一份秘密；compose 把单一 .env 值映射到两边的命名。
+      ENGINE_C_TOKEN: ${ENGINE_C_SIDECAR_TOKEN:-}
+      # H2: 单请求 audio 体积上限（MiB），防止 sidecar 端内部 DoS。
+      ENGINE_C_MAX_AUDIO_MB: ${ENGINE_C_MAX_AUDIO_MB:-50}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8001/healthz"]

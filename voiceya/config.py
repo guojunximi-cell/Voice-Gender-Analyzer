@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     engine_c_sidecar_url: str = "http://visualizer-backend:8001"
     engine_c_sidecar_timeout_sec: PositiveInt = 60
     engine_c_min_duration_sec: PositiveInt = 3
+    # Shared secret with the sidecar.  Empty string = unauthenticated (dev /
+    # isolated docker network only).  When set, the worker sends the token
+    # via X-Engine-C-Token; the sidecar (env ENGINE_C_TOKEN) requires a match.
+    engine_c_sidecar_token: str = ""
 
 
 CFG: Settings = None  # type: ignore
