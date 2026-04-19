@@ -211,8 +211,18 @@ function _updateSeekUI(t) {
 function _setPlayState(playing) {
 	const btn = $("play-btn");
 	if (!btn) return;
-	btn.querySelector(".icon-play").hidden = playing;
-	btn.querySelector(".icon-pause").hidden = !playing;
+	// Strip the no-JS-fallback `hidden` attribute from both icons once on first
+	// invocation — `[hidden] { display: none }` from the UA stylesheet would
+	// otherwise outrank the .play-btn.is-playing .icon-pause rule in some
+	// browsers, leaving the pause icon stuck hidden during playback.  After
+	// removal, the class-based CSS toggle in main.css is fully authoritative.
+	const playSvg = btn.querySelector(".icon-play");
+	const pauseSvg = btn.querySelector(".icon-pause");
+	playSvg?.removeAttribute("hidden");
+	pauseSvg?.removeAttribute("hidden");
+	btn.classList.toggle("is-playing", !!playing);
+	btn.setAttribute("aria-label", playing ? "暂停" : "播放");
+	btn.setAttribute("aria-pressed", playing ? "true" : "false");
 }
 
 // ─── Public controls ─────────────────────────────────────────

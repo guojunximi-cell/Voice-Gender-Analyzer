@@ -5,22 +5,24 @@
  * and translates them into bus events consumed by HeatmapBand, TranscriptRow,
  * and TrendChart.
  *
- * Owns the active-index computation (via findActiveIdx) so that all consumers
- * share a single binary-search-per-tick, not one each.
+ * Owns both the active-char and active-sentence computations so that all
+ * consumers share a single pass per tick.
  */
 
-import { findActiveIdx } from "./phone-utils.js";
+import { findActiveIdx, findSentenceIdx } from "./phone-utils.js";
 
 export class PlaybackSync {
 	/**
 	 * @param {{ wavesurfer: object, state: object, bus: object }} opts
-	 *   state must have: { chars, currentTime, activeCharIdx, isPlaying, autoScroll }
+	 *   state must have: { chars, sentences, currentTime, activeCharIdx,
+	 *                      activeSentenceIdx, isPlaying, autoScroll }
 	 */
 	constructor({ wavesurfer, state, bus }) {
 		this.ws = wavesurfer;
 		this.state = state;
 		this.bus = bus;
-		this._lastIdx = -1;
+		this._lastCharIdx = -1;
+		this._lastSentenceIdx = -1;
 		this._unsubs = [];
 	}
 
@@ -28,7 +30,6 @@ export class PlaybackSync {
 		const ws = this.ws;
 		const bus = this.bus;
 
-		// WaveSurfer event subscriptions
 		const onProcess = (t) => this._onTime(t);
 		const onSeeking = (t) => this._onTime(t);
 		const onPlay = () => {
@@ -70,12 +71,26 @@ export class PlaybackSync {
 
 	_onTime(t) {
 		this.state.currentTime = t;
-		const idx = findActiveIdx(t, this.state.chars, this._lastIdx);
-		if (idx !== this._lastIdx) {
-			const prev = this._lastIdx;
-			this._lastIdx = idx;
-			this.state.activeCharIdx = idx;
-			this.bus.emit("activeCharChanged", { prevIdx: prev, nextIdx: idx });
+		const charIdx = findActiveIdx(t, this.state.chars, this._lastCharIdx);
+		if (charIdx !== this._lastCharIdx) {
+			const prev = this._lastCharIdx;
+			this._lastCharIdx = charIdx;
+			this.state.activeCharIdx = charIdx;
+			this.bus.emit("activeCharChanged", { prevIdx: prev, nextIdx: charIdx });
+
+			// Did the sentence change too?
+			const sentences = this.state.sentences || [];
+			const sentenceIdx = findSentenceIdx(charIdx, sentences);
+			if (sentenceIdx !== this._lastSentenceIdx && sentenceIdx >= 0) {
+				const prevS = this._lastSentenceIdx;
+				this._lastSentenceIdx = sentenceIdx;
+				this.state.activeSentenceIdx = sentenceIdx;
+				this.bus.emit("activeSentenceChanged", {
+					prevIdx: prevS,
+					nextIdx: sentenceIdx,
+					sentence: sentences[sentenceIdx],
+				});
+			}
 		}
 		this.bus.emit("currentTimeChanged", t);
 	}

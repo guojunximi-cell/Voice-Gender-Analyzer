@@ -311,11 +311,22 @@
 					</div>
 				</section>
 
-				<!-- Phone-level timeline (Engine C, feature-flagged) -->
+				<!-- Phone-level timeline (Engine C, feature-flagged) — drill-down detail -->
 				<div id="phone-timeline-root" hidden></div>
 
-				<!-- Stats cards -->
-				<section id="stats-section" class="stats-section" hidden>
+				<!-- Mobile tabs (visible only on narrow screens) -->
+				<div class="mobile-tabs" id="mobile-tabs" hidden>
+					<button class="mobile-tab active" data-tab="segments">分段详情</button>
+					<button class="mobile-tab" data-tab="metrics">声学特征</button>
+				</div>
+
+				<!-- Stats cards — macro conclusion, sits directly above segment list so
+				     the two summary panels (overall composition + per-segment detail)
+				     are visually grouped at the bottom of the center column. -->
+				<section id="stats-section" class="card stats-section" hidden>
+					<div class="section-header">
+						<h2 class="section-title">声音占比</h2>
+					</div>
 					<div class="stats-grid">
 						<div class="stat-card stat-male">
 							<div class="stat-dot"></div>
@@ -340,12 +351,6 @@
 						</div>
 					</div>
 				</section>
-
-				<!-- Mobile tabs (visible only on narrow screens) -->
-				<div class="mobile-tabs" id="mobile-tabs" hidden>
-					<button class="mobile-tab active" data-tab="segments">分段详情</button>
-					<button class="mobile-tab" data-tab="metrics">声学特征</button>
-				</div>
 
 				<!-- Segment list -->
 				<section id="segments-section" class="card" hidden>

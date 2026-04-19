@@ -345,6 +345,26 @@ body {
 		background var(--transition),
 		transform 80ms ease;
 }
+
+/* Play / pause icon swap.  Default: show play, hide pause.  When the button
+   gains `.is-playing` (set by waveform.js on wavesurfer's `play` event), swap.
+   The `[hidden]` attribute on the inline SVGs in index.html is a no-JS
+   fallback; these rules deterministically override it once JS runs and avoid
+   the inline-SVG-inside-flex hidden-attr quirk seen in some Chromium builds. */
+.play-btn .icon-play,
+.play-btn .icon-pause {
+	display: block;
+}
+.play-btn .icon-pause {
+	display: none;
+}
+.play-btn.is-playing .icon-play {
+	display: none;
+}
+.play-btn.is-playing .icon-pause {
+	display: block;
+}
+
 .play-btn:hover:not(:disabled) {
 	background: var(--accent-hover);
 	transform: scale(1.05);
@@ -535,35 +555,30 @@ body {
 .stats-section {
 }
 
+/* Stats list mirrors .segments-list visual language: a column of transparent
+   grid rows inside a single .card wrapper (no per-row borders / shadows / left
+   accent stripes).  Per-type dominance is conveyed by a subtle tinted
+   background — kept here because it carries information that the segment list's
+   uniform .active state doesn't need. */
 .stats-grid {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 12px;
+	padding: 0 12px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
 }
 
 .stat-card {
-	background: var(--surface);
-	border: 1px solid var(--border);
-	border-left: 3px solid transparent;
-	border-radius: var(--radius-md);
-	padding: 18px 16px 14px;
-	box-shadow: var(--shadow-sm);
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+	display: grid;
+	grid-template-columns: 10px 44px 56px 1fr 36px;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 8px;
+	border-radius: var(--radius-sm);
+	border: 1px solid transparent;
+	font-size: 0.85rem;
 	transition:
 		background var(--transition),
 		border-color var(--transition);
-}
-
-.stat-male {
-	border-left-color: var(--male);
-}
-.stat-female {
-	border-left-color: var(--female);
-}
-.stat-other {
-	border-left-color: var(--noise);
 }
 
 .stat-male.dominant {
@@ -580,7 +595,6 @@ body {
 	width: 10px;
 	height: 10px;
 	border-radius: 3px;
-	margin-bottom: 2px;
 }
 
 .stat-male .stat-dot {
@@ -594,23 +608,19 @@ body {
 }
 
 .stat-label {
-	font-size: 0.78rem;
-	color: var(--text-secondary);
+	color: var(--text-primary);
 	font-weight: 500;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
 }
 
 .stat-pct {
-	font-size: 1.6rem;
 	font-weight: 600;
-	letter-spacing: -0.03em;
+	letter-spacing: -0.01em;
 	color: var(--text-primary);
-	line-height: 1.1;
+	font-variant-numeric: tabular-nums;
 }
 
 .stat-bar-wrap {
-	height: 5px;
+	height: 4px;
 	background: var(--border-strong);
 	border-radius: 99px;
 	overflow: hidden;
@@ -634,9 +644,10 @@ body {
 }
 
 .stat-duration {
-	font-size: 0.8rem;
+	font-size: 0.78rem;
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
+	text-align: right;
 }
 
 /* ============================================================
@@ -1489,16 +1500,8 @@ body {
 	.upload-zone {
 		padding: 36px 20px;
 	}
-	.stats-grid {
-		grid-template-columns: repeat(3, 1fr);
-		gap: 8px;
-	}
-	.stat-pct {
-		font-size: 1.3rem;
-	}
-	.stat-card {
-		padding: 14px 12px 10px;
-	}
+	/* .stats-grid / .stat-card use the same single-line row layout at all
+	   widths now (see base rules above) — no per-breakpoint overrides needed. */
 	.mc-cards-row {
 		grid-template-columns: 1fr 1fr;
 	}
@@ -1815,16 +1818,8 @@ body {
 	.upload-hint {
 		font-size: 0.72rem;
 	}
-	.stats-grid {
-		grid-template-columns: 1fr;
-		gap: 8px;
-	}
-	.stat-pct {
-		font-size: 1.1rem;
-	}
-	.stat-card {
-		padding: 12px 10px 10px;
-	}
+	/* Stats already use a compact single-line row layout — no narrow-screen
+	   override needed. */
 	.controls {
 		flex-wrap: wrap;
 		gap: 8px;

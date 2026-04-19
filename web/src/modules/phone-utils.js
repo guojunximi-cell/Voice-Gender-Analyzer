@@ -91,3 +91,69 @@ export function findActiveIdx(t, chars, lastIdx) {
 function _mean(arr) {
 	return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
+
+/**
+ * Group consecutive characters into sentences by time-gap heuristic.
+ *
+ * Rules (matches user spec):
+ *   (a) gap > 0.5 s between adjacent real chars → split
+ *   (b) sentence length ≥ 15 real chars → forced split (fallback cap)
+ *   (c) empty/spacer chars are skipped (they are silence gaps, not content)
+ *
+ * Each sentence: { start, end, startIdx, endIdx, chars: [...] }
+ * where startIdx / endIdx point into the ORIGINAL chars array (inclusive,
+ * both pointing at real chars), so PlaybackSync can map activeCharIdx →
+ * sentenceIdx without a second filter.
+ */
+export function groupCharsIntoSentences(chars) {
+	if (!chars?.length) return [];
+
+	const sentences = [];
+	let cur = { chars: [], startIdx: -1, endIdx: -1 };
+	let lastRealEnd = -Infinity;
+	const MAX_CHARS = 15;
+	const GAP_SEC = 0.5;
+
+	const closeSentence = () => {
+		if (!cur.chars.length) return;
+		cur.start = cur.chars[0].start;
+		cur.end = cur.chars[cur.chars.length - 1].end;
+		sentences.push(cur);
+		cur = { chars: [], startIdx: -1, endIdx: -1 };
+	};
+
+	for (let i = 0; i < chars.length; i++) {
+		const c = chars[i];
+		if (!c.char) continue; // skip spacer cells
+
+		if (cur.chars.length > 0) {
+			const gap = c.start - lastRealEnd;
+			if (gap > GAP_SEC || cur.chars.length >= MAX_CHARS) {
+				closeSentence();
+			}
+		}
+
+		if (cur.startIdx === -1) cur.startIdx = i;
+		cur.endIdx = i;
+		cur.chars.push(c);
+		lastRealEnd = c.end;
+	}
+	closeSentence();
+
+	return sentences;
+}
+
+/**
+ * Find the sentence containing a given char index.
+ * Returns -1 if charIdx is -1 (no active char) or points at a spacer
+ * between sentences.  Linear scan — sentences are typically < 50.
+ */
+export function findSentenceIdx(charIdx, sentences) {
+	if (charIdx < 0 || !sentences?.length) return -1;
+	for (let i = 0; i < sentences.length; i++) {
+		if (charIdx >= sentences[i].startIdx && charIdx <= sentences[i].endIdx) {
+			return i;
+		}
+	}
+	return -1;
+}

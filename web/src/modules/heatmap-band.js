@@ -1,35 +1,44 @@
 /**
- * heatmap-band.js — SVG resonance heatmap rendered beneath the waveform.
+ * heatmap-band.js — SVG resonance heatmap, rendered per current sentence.
  *
- * One <rect> per phone, colored by Cividis interpolation of the resonance
- * value (0–1).  Null resonance → diagonal-stripe hatch pattern.
+ * Each visible <rect> is one phone, colored by the blue→pink diverging
+ * palette of its resonance value.  Null resonance → hatch pattern.
  *
- * Click any rect → bus.emit('seek', startTime).
- * Active phone is highlighted with an accent stroke.
+ * The heatmap follows the currently-active sentence: viewBox = the
+ * sentence's duration, so each row always fills the full width.  A faint
+ * reference line at the empirical 0.587 threshold marks "female-direction
+ * boundary".
  */
 
-import { cividis } from "./cividis.js";
+import { divergingResonance, THRESHOLDS } from "./diverging.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
 export class HeatmapBand {
 	/**
-	 * @param {{ container: HTMLElement, phones: Array, duration: number, bus: object }} opts
+	 * @param {{
+	 *   container: HTMLElement,
+	 *   phones: Array,
+	 *   sentences: Array,
+	 *   bus: object,
+	 * }} opts
 	 */
-	mount({ container, phones, duration, bus }) {
+	mount({ container, phones, sentences, bus }) {
 		this.bus = bus;
-		this.duration = duration;
 		this.phones = phones;
-		this.rects = [];
+		this.sentences = sentences;
+		this.currentSentenceIdx = 0;
 
-		const svg = document.createElementNS(NS, "svg");
-		svg.setAttribute("class", "vga-heatmap");
-		svg.setAttribute("viewBox", `0 0 ${duration} 1`);
-		svg.setAttribute("preserveAspectRatio", "none");
-		svg.setAttribute("role", "group");
-		svg.setAttribute("aria-label", "共鸣热力带，每格代表一个音素的共鸣值 0\u20131");
+		this.svg = document.createElementNS(NS, "svg");
+		this.svg.setAttribute("class", "vga-heatmap");
+		this.svg.setAttribute("preserveAspectRatio", "none");
+		this.svg.setAttribute("role", "group");
+		this.svg.setAttribute(
+			"aria-label",
+			"\u5171\u9e23\u70ed\u529b\u5e26\uff0c\u6bcf\u683c\u4ee3\u8868\u4e00\u4e2a\u97f3\u7d20\u7684\u5171\u9e23\u503c 0\u20131",
+		);
 
-		// Hatch pattern for null-resonance phones
+		// Hatch pattern (null resonance)
 		const defs = document.createElementNS(NS, "defs");
 		const pattern = document.createElementNS(NS, "pattern");
 		pattern.setAttribute("id", "vga-hatch");
@@ -51,20 +60,81 @@ export class HeatmapBand {
 		pattern.appendChild(bg);
 		pattern.appendChild(line);
 		defs.appendChild(pattern);
-		svg.appendChild(defs);
+		this.svg.appendChild(defs);
 
-		phones.forEach((p, i) => {
+		container.appendChild(this.svg);
+
+		this._renderSentence(0);
+
+		this._onActiveSentence = ({ nextIdx }) => {
+			if (nextIdx !== this.currentSentenceIdx) this._renderSentence(nextIdx);
+		};
+		bus.on("activeSentenceChanged", this._onActiveSentence);
+
+		// Highlight active phone via currentTime (sentence-scoped)
+		this._activeRect = null;
+		this._onTime = (t) => this._highlightAt(t);
+		bus.on("currentTimeChanged", this._onTime);
+	}
+
+	_highlightAt(t) {
+		if (!this.rects?.length) return;
+		const s = this.sentences[this.currentSentenceIdx];
+		if (!s || t < s.start || t > s.end) {
+			if (this._activeRect) {
+				this._activeRect.classList.remove("active");
+				this._activeRect = null;
+			}
+			return;
+		}
+		// Linear find — phones per sentence are small (<40 typically)
+		let hit = null;
+		for (let j = 0; j < this.rects.length; j++) {
+			const pIdx = this.phoneIdxByRect[j];
+			const p = this.phones[pIdx];
+			if (t >= p.start && t < p.end) {
+				hit = this.rects[j];
+				break;
+			}
+		}
+		if (hit !== this._activeRect) {
+			this._activeRect?.classList.remove("active");
+			hit?.classList.add("active");
+			this._activeRect = hit;
+		}
+	}
+
+	_renderSentence(idx) {
+		if (!this.sentences.length) return;
+		const clamped = Math.max(0, Math.min(this.sentences.length - 1, idx));
+		this.currentSentenceIdx = clamped;
+		const s = this.sentences[clamped];
+		const sDur = Math.max(0.01, s.end - s.start);
+
+		// Clear previous rects/refline (keep <defs>)
+		while (this.svg.children.length > 1) {
+			this.svg.removeChild(this.svg.lastChild);
+		}
+		this.svg.setAttribute("viewBox", `0 0 ${sDur} 1`);
+
+		this.rects = [];
+		this.phoneIdxByRect = [];
+
+		// Filter phones within the sentence's time window
+		for (let i = 0; i < this.phones.length; i++) {
+			const p = this.phones[i];
+			if (p.start >= s.end || p.end <= s.start) continue;
+			const x = Math.max(0, p.start - s.start);
+			const w = Math.max(0.001, Math.min(sDur, p.end - s.start) - x);
+
 			const rect = document.createElementNS(NS, "rect");
-			const x = p.start;
-			const w = Math.max(0.001, p.end - p.start);
 			rect.setAttribute("x", x);
 			rect.setAttribute("width", w);
 			rect.setAttribute("y", "0");
 			rect.setAttribute("height", "1");
 
-			const color = cividis(p.resonance);
+			const color = divergingResonance(p.resonance);
 			rect.setAttribute("fill", color ?? "url(#vga-hatch)");
-
 			rect.dataset.phoneIdx = i;
 			rect.setAttribute("tabindex", "0");
 			rect.setAttribute("role", "img");
@@ -75,38 +145,33 @@ export class HeatmapBand {
 			title.textContent = `${charLabel} ${p.phone} \xb7 \u5171\u9e23 ${resLabel}`;
 			rect.appendChild(title);
 
-			rect.addEventListener("click", () => bus.emit("seek", p.start));
+			rect.addEventListener("click", () => this.bus.emit("seek", p.start));
 			rect.addEventListener("keydown", (e) => {
 				if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();
-					bus.emit("seek", p.start);
+					this.bus.emit("seek", p.start);
 				}
 			});
 
-			svg.appendChild(rect);
+			this.svg.appendChild(rect);
 			this.rects.push(rect);
-		});
+			this.phoneIdxByRect.push(i);
+		}
 
-		container.appendChild(svg);
-		this.svg = svg;
-		this._activeIdx = -1;
-
-		// Listen for active phone changes to highlight the rect
-		this._onActive = ({ nextIdx }) => {
-			if (this._activeIdx >= 0 && this.rects[this._activeIdx]) {
-				this.rects[this._activeIdx].classList.remove("active");
-			}
-			if (nextIdx >= 0 && this.rects[nextIdx]) {
-				this.rects[nextIdx].classList.add("active");
-			}
-			this._activeIdx = nextIdx;
-		};
-		bus.on("activeCharChanged", this._onActive);
+		// Threshold reference line (0.587) — currently the resonance axis is
+		// the color channel, not the Y axis, so the "line" is conceptual:
+		// we annotate it on the SVG title so SR users hear about it, and
+		// rely on the palette + legend for sighted users.
+		this.svg.setAttribute(
+			"aria-description",
+			`\u5f53\u524d\u53e5\u7684\u5171\u9e23\u70ed\u529b\u5e26\uff1b\u5973\u58f0\u9608\u503c = ${THRESHOLDS.resonance}`,
+		);
 	}
 
 	destroy() {
-		if (this.bus && this._onActive) {
-			this.bus.off("activeCharChanged", this._onActive);
+		if (this.bus) {
+			if (this._onActiveSentence) this.bus.off("activeSentenceChanged", this._onActiveSentence);
+			if (this._onTime) this.bus.off("currentTimeChanged", this._onTime);
 		}
 		this.svg?.remove();
 		this.svg = null;
