@@ -166,10 +166,15 @@ export function highlightActiveSegment(currentSec, analysis) {
 		item.classList.toggle("active", isActive);
 
 		if (isActive && !item.dataset.scrolled) {
+			// Mark that we've already fired the once-per-activation effects
+			// (dataset.scrolled is a misnomer kept for compatibility — we no
+			// longer scroll, but still need a once-flag for segment-select).
 			item.dataset.scrolled = "1";
-			item.scrollIntoView({ block: "nearest", behavior: "smooth" });
 
-			// Also update metrics panel while audio plays through segments
+			// Update metrics panel when audio enters a new segment.  The
+			// previous version also called scrollIntoView here, but it
+			// cascaded to .panel-center and visibly jumped the page — see
+			// docs note on auto-scroll policy.
 			document.dispatchEvent(
 				new CustomEvent("segment-select", {
 					detail: { segment: seg, index: i },

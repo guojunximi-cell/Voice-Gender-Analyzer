@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from voiceya.config import CFG
 from voiceya.services.audio_analyser.audio_tools import normalize_audio_for_analysis
 from voiceya.services.audio_analyser.engine_a import do_segmentation
+from voiceya.services.audio_analyser.engine_c import run_engine_c
 from voiceya.services.audio_analyser.seg_analyser import do_analyse_segments
 from voiceya.services.audio_analyser.statics import do_statics
 from voiceya.services.sse import ProgressSSE
@@ -33,17 +35,27 @@ async def do_analyse(content: BytesIO, publish: PublisherT):
     sample.seek(0)
     analyse_results = await do_analyse_segments(sample, segmentation_results, publish)
 
+    # ── Engine C: 进阶分析（feature-flagged，默认关）────────
+    engine_c_summary = None
+    if CFG.engine_c_enabled:
+        await publish(ProgressSSE(pct=85, msg="鸭鸭开小灶做进阶分析…"))
+        sample.seek(0)
+        audio_bytes = sample.read()
+        engine_c_summary = await run_engine_c(audio_bytes, analyse_results)
+
     # ── 全局汇总统计 ───────────────────────────────────────
     await publish(ProgressSSE(pct=98, msg="鸭鸭快好了…"))
 
     result = do_statics(analyse_results)
     summary = result["summary"]
+    summary["engine_c"] = engine_c_summary
     logger.info(
-        "分析完成 — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.3f",
+        "分析完成 — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.3f，Engine C=%s",
         len(analyse_results),
         summary["overall_f0_median_hz"],
         summary["overall_gender_score"],
         summary["female_ratio"],
+        "on" if engine_c_summary else "off/skip",
     )
 
     result["filename"] = "upload"

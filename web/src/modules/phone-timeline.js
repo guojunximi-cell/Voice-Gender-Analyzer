@@ -1,0 +1,277 @@
+/**
+ * phone-timeline.js — Orchestrator for the phone-level interactive timeline.
+ *
+ * Renders beneath the waveform when Engine C data is available:
+ *   - SVG resonance heatmap band (HeatmapBand)
+ *   - Clickable hanzi transcript row with karaoke sync (TranscriptRow)
+ *   - Dual-axis pitch+resonance trend chart (TrendChart)
+ *   - Playback synchronization hub (PlaybackSync)
+ *
+ * Feature-flagged via vga.timeline (see feature-flag.js).
+ */
+
+import { createBus } from "./bus.js";
+import { renderFallback, renderLowPhoneBanner, renderNoSpeech } from "./engine-c-fallback.js";
+import { GenderLegend } from "./gender-legend.js";
+import { HeatmapBand } from "./heatmap-band.js";
+import { groupCharsIntoSentences, groupPhonesByChar } from "./phone-utils.js";
+import { PlaybackSync } from "./playback-sync.js";
+import { TranscriptRow } from "./transcript-row.js";
+import { TrendChart } from "./trend-chart.js";
+
+const LOW_PHONE_THRESHOLD = 8;
+
+export class PhoneTimeline {
+	/**
+	 * @param {{ container: HTMLElement, wavesurfer: object|null }} opts
+	 */
+	constructor({ container, wavesurfer }) {
+		this.root = container;
+		this.ws = wavesurfer;
+		this._rendered = false;
+		this._chars = [];
+		this._sentences = [];
+		this._bus = null;
+		this._sync = null;
+		this._heatmap = null;
+		this._transcript = null;
+		this._trendChart = null;
+		this._legend = null;
+	}
+
+	/** Show the loading skeleton. */
+	setLoading() {
+		this._destroyChildren();
+		this.root.innerHTML = `
+			<div class="vga-timeline" data-state="skeleton">
+				<div class="vga-skel vga-skel--band"></div>
+				<div class="vga-skel vga-skel--row"></div>
+				<div class="vga-skel vga-skel--chart"></div>
+			</div>`;
+		this._rendered = true;
+	}
+
+	/**
+	 * Receive Engine C data and render the full timeline.
+	 * @param {object|null} engineC — summary.engine_c from the API response
+	 */
+	setData(engineC) {
+		if (!this._rendered) return;
+		this._destroyChildren();
+
+		const timeline = this.root.querySelector(".vga-timeline");
+		if (!timeline) return;
+
+		// No data at all → failure fallback
+		if (!engineC) {
+			timeline.dataset.state = "error";
+			renderFallback(timeline);
+			return;
+		}
+
+		// Empty transcript → no-speech fallback
+		if (!engineC.transcript?.trim()) {
+			timeline.dataset.state = "empty";
+			renderNoSpeech(timeline);
+			return;
+		}
+
+		// No phones → failure (MFA likely failed)
+		if (!engineC.phones?.length) {
+			timeline.dataset.state = "error";
+			renderFallback(timeline);
+			return;
+		}
+
+		// Group phones into character cells, then characters into sentences
+		this._chars = groupPhonesByChar(engineC.phones);
+		this._sentences = groupCharsIntoSentences(this._chars);
+
+		// Dev-mode scroll monitor: verify no unexpected scroll occurs during
+		// playback.  The app uses a fixed-height .app-layout with the actual
+		// scrolling happening inside .panel-center (window.scrollY stays 0
+		// regardless), so we must monitor the panel's scrollTop — not the
+		// window's.  Console check: `window._scrollMonitor` — if min === max
+		// === scrollAtLoad, nothing scrolled the panel.
+		if (import.meta.env.DEV && typeof window !== "undefined") {
+			const panel = document.querySelector(".panel-center");
+			const y = panel ? panel.scrollTop : 0;
+			window._scrollMonitor = {
+				target: panel ? ".panel-center" : "window",
+				scrollAtLoad: y,
+				min: y,
+				max: y,
+			};
+			if (panel && !window._scrollMonitorInstalled) {
+				window._scrollMonitorInstalled = true;
+				panel.addEventListener(
+					"scroll",
+					() => {
+						const m = window._scrollMonitor;
+						if (!m) return;
+						const cy = panel.scrollTop;
+						if (cy < m.min) m.min = cy;
+						if (cy > m.max) m.max = cy;
+					},
+					{ passive: true },
+				);
+			}
+		}
+
+		// Determine duration from the last phone's end time
+		const lastPhone = engineC.phones[engineC.phones.length - 1];
+		const duration = lastPhone ? lastPhone.end : 0;
+
+		// Build layout containers.  Order top-down:
+		//   band (heatmap) → transcript → chart → footer (mode toggle + shared
+		//   color legend + line-style key).  The legend used to live above the
+		//   band as a per-sentence gauge; it's now a static key shared by both
+		//   the heatmap fills and the chart line gradients, parked under the
+		//   chart so the mode toggle and line-style indicators sit alongside.
+		timeline.dataset.state = "ready";
+		timeline.innerHTML = `
+			<div class="vga-timeline__band"></div>
+			<div class="vga-timeline__transcript"></div>
+			<div class="vga-timeline__chart"></div>
+			<div class="vga-timeline__footer">
+				<div class="vga-timeline__footer-controls"></div>
+				<div class="vga-timeline__footer-legend"></div>
+				<div class="vga-timeline__footer-keys">
+					<span class="vga-line-key">
+						<span class="vga-line-key__swatch vga-line-key__swatch--solid"></span>
+						<span class="vga-line-key__label">音高</span>
+					</span>
+					<span class="vga-line-key">
+						<span class="vga-line-key__swatch vga-line-key__swatch--dashed"></span>
+						<span class="vga-line-key__label">共鸣</span>
+					</span>
+				</div>
+			</div>`;
+
+		// Low phone count warning
+		if (engineC.phone_count < LOW_PHONE_THRESHOLD) {
+			renderLowPhoneBanner(timeline, engineC.phone_count);
+		}
+
+		// Create shared state + bus
+		const reducedMotion =
+			matchMedia("(prefers-reduced-motion: reduce)").matches ||
+			localStorage.getItem("vga.reducedMotion") === "1";
+
+		const state = {
+			chars: this._chars,
+			sentences: this._sentences,
+			currentTime: 0,
+			activeCharIdx: -1,
+			activeSentenceIdx: 0,
+			isPlaying: false,
+			autoScroll: true,
+			reducedMotion,
+		};
+
+		this._bus = createBus();
+
+		// Mount children
+		const bandEl = timeline.querySelector(".vga-timeline__band");
+		const transcriptEl = timeline.querySelector(".vga-timeline__transcript");
+		const chartEl = timeline.querySelector(".vga-timeline__chart");
+		const footerControlsEl = timeline.querySelector(".vga-timeline__footer-controls");
+		const footerLegendEl = timeline.querySelector(".vga-timeline__footer-legend");
+
+		// Heatmap band (scoped to current sentence)
+		this._heatmap = new HeatmapBand();
+		this._heatmap.mount({
+			container: bandEl,
+			phones: engineC.phones,
+			sentences: this._sentences,
+			bus: this._bus,
+		});
+
+		// Transcript row (paginated by sentence)
+		this._transcript = new TranscriptRow();
+		this._transcript.mount({
+			container: transcriptEl,
+			chars: this._chars,
+			sentences: this._sentences,
+			bus: this._bus,
+			state,
+		});
+
+		// Trend chart (global view + current-sentence highlight band).  The
+		// chart builds its own mode-toggle but doesn't append it; we pull it
+		// out and place it in the footer alongside the shared legend.
+		this._trendChart = new TrendChart();
+		this._trendChart.mount({
+			container: chartEl,
+			chars: this._chars,
+			duration,
+			sentences: this._sentences,
+			bus: this._bus,
+		});
+
+		// Footer: mode toggle (left) + gender legend (center) + line key (right).
+		const modeToggle = this._trendChart.getModeToggle();
+		if (modeToggle) footerControlsEl.appendChild(modeToggle);
+
+		this._legend = new GenderLegend();
+		this._legend.mount({ container: footerLegendEl });
+
+		// Playback sync (connects WaveSurfer ↔ bus)
+		if (this.ws) {
+			this._sync = new PlaybackSync({ wavesurfer: this.ws, state, bus: this._bus });
+			this._sync.init();
+		}
+
+		// Announce completion to screen readers
+		this._announceReady(this._chars.filter((c) => c.char).length);
+	}
+
+	/** Set error/failure state. */
+	setError(_err) {
+		if (!this._rendered) return;
+		this._destroyChildren();
+		const timeline = this.root.querySelector(".vga-timeline");
+		if (timeline) {
+			timeline.dataset.state = "error";
+			renderFallback(timeline);
+		}
+	}
+
+	/** Clean up everything. */
+	destroy() {
+		this._destroyChildren();
+		this.root.innerHTML = "";
+		this._rendered = false;
+		this._chars = [];
+	}
+
+	/** Tear down child components without clearing the root container. */
+	_destroyChildren() {
+		this._sync?.destroy();
+		this._heatmap?.destroy();
+		this._transcript?.destroy();
+		this._trendChart?.destroy();
+		this._legend?.destroy();
+		this._bus?.destroy();
+		this._sync = null;
+		this._heatmap = null;
+		this._transcript = null;
+		this._trendChart = null;
+		this._legend = null;
+		this._bus = null;
+	}
+
+	/** Polite SR announcement on analysis complete. */
+	_announceReady(charCount) {
+		let announcer = document.getElementById("vga-timeline-announcer");
+		if (!announcer) {
+			announcer = document.createElement("div");
+			announcer.id = "vga-timeline-announcer";
+			announcer.setAttribute("role", "status");
+			announcer.setAttribute("aria-live", "polite");
+			announcer.className = "vga-sr-only";
+			document.body.appendChild(announcer);
+		}
+		announcer.textContent = `分析完成，共 ${charCount} 个字`;
+	}
+}
