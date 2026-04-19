@@ -19,7 +19,10 @@ services:
       - .env
     environment:
       # compose 网络里 app 用服务名 redis 访问
+      # config.py 的 AliasChoices 优先取 REDIS_URI，必须两个都覆盖，
+      # 否则 .env 里的 localhost 值会通过 REDIS_URI 抢先生效。
       REDIS_URL: redis://redis:6379/0
+      REDIS_URI: redis://redis:6379/0
       # Engine C sidecar 内部地址——若 sidecar 未起，app 端会在调用时失败降级为 null
       ENGINE_C_SIDECAR_URL: http://visualizer-backend:8001
       # H2 共享密钥：worker 端字段名是 ENGINE_C_SIDECAR_TOKEN（在 .env 里设一次）。
