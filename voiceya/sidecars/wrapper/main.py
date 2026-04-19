@@ -124,6 +124,21 @@ async def analyze(
     # process() raises before reaching its own rmtree.
     tmp_dir = settings["recordings"] + str(random.randint(0, 2**32))
 
+    # Snapshot cwd so we can restore it in the finally block.  The vendored
+    # preprocessing.process() does `os.chdir(tmp_dir)` before MFA but only
+    # restores on the success path — if MFA raises, cwd stays inside tmp_dir,
+    # then our finally rmtree's tmp_dir, leaving the process with a cwd
+    # pointing at a deleted directory.  Subsequent requests then crash at
+    # `os.getcwd()` inside preprocessing.process with a bare Errno-2 (no
+    # path), which is opaque and looks unrelated to the original failure.
+    try:
+        saved_cwd = os.getcwd()
+    except OSError:
+        # Already poisoned by a prior request — bail to /app (set by the
+        # sidecar Dockerfile WORKDIR) so we have a known-good cwd.
+        saved_cwd = "/app"
+        os.chdir(saved_cwd)
+
     try:
         praat_output = preprocessing.process(audio_bytes, transcript, tmp_dir, LANG)
         data = phones.parse(praat_output, LANG)
@@ -147,3 +162,10 @@ async def analyze(
         # ignore_errors=True handles the case where process() already ran its
         # own rmtree on the happy path.
         shutil.rmtree(tmp_dir, ignore_errors=True)
+        # Restore cwd in case the vendored preprocessing.process chdir'd
+        # into tmp_dir and raised before restoring (see saved_cwd note above).
+        try:
+            if os.getcwd() != saved_cwd:
+                os.chdir(saved_cwd)
+        except OSError:
+            os.chdir(saved_cwd)
