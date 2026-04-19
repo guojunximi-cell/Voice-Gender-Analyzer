@@ -1,0 +1,25 @@
+# Railway service config for the Engine C sidecar (visualizer-backend).
+#
+# 用法：在 Railway 的 sidecar service → Settings → Config-as-Code →
+#       Config Path 改成 `railway.sidecar.toml`，重新部署。
+#
+# 不放在根 railway.toml 的原因：根 toml 的 dockerfilePath = "Dockerfile"
+# 是 worker 用的，整个 repo 默认共用那一份；sidecar 必须用单独的 toml
+# 走另一份 Dockerfile。
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "voiceya/sidecars/visualizer-backend.Dockerfile"
+# 只有 sidecar 自己的源码 / 这份 toml 改了才重新部署，避免 worker 端
+# 的前端 / Dockerfile / 依赖改动每次都触发 sidecar 重建（2.5 GB、10+ 分钟）。
+watchPatterns = [
+  "voiceya/sidecars/**",
+  "railway.sidecar.toml",
+]
+
+[deploy]
+# Sidecar 自带的 FastAPI healthcheck 端点。
+healthcheckPath = "/healthz"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

@@ -1,6 +1,14 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+# 排除 sidecar 相关路径——sidecar 是另一个 service（用 railway.sidecar.toml）。
+# 不排掉的话，每次改 sidecar 代码会同时触发 worker 重新部署，没必要。
+# Gitignore-style：先全包，再用 ! 排除特定路径（later rules win）。
+watchPatterns = [
+  "**",
+  "!voiceya/sidecars/**",
+  "!railway.sidecar.toml",
+]
 
 [deploy]
 healthcheckPath = "/api/config"
