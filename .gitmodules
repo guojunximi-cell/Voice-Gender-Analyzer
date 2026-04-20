@@ -1,0 +1,3 @@
+[submodule "voiceya/inaSpeechSegmenter"]
+	path = voiceya/inaSpeechSegmenter
+	url = https://github.com/k3-cat/inaSpeechSegmenter

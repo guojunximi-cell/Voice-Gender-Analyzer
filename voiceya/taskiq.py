@@ -1,14 +1,19 @@
 import enum
 from contextlib import AsyncExitStack
+from typing import TYPE_CHECKING
 
-from taskiq import TaskiqEvents, TaskiqMiddleware, TaskiqState
+from taskiq import TaskiqEvents, TaskiqMiddleware
 from taskiq.abc.formatter import TaskiqFormatter
-from taskiq.depends.progress_tracker import TaskProgress
-from taskiq.message import BrokerMessage, TaskiqMessage
+from taskiq.message import TaskiqMessage
 from taskiq.serializers import PickleSerializer
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
 from voiceya.config import CFG
+
+if TYPE_CHECKING:
+    from taskiq import TaskiqState
+    from taskiq.depends.progress_tracker import TaskProgress
+    from taskiq.message import BrokerMessage
 
 
 class TaskStage(enum.StrEnum):
@@ -22,7 +27,10 @@ class TaskStage(enum.StrEnum):
 
 class ProgressMiddleware(TaskiqMiddleware):
     async def pre_send(self, message: TaskiqMessage) -> TaskiqMessage:
-        progress = TaskProgress(state=TaskStage.PENDING, meta=None)
+        progress = TaskProgress(
+            state=TaskStage.PENDING,
+            meta=None,
+        )
 
         await self.broker.result_backend.set_progress(message.task_id, progress)
 
