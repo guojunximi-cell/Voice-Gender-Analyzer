@@ -255,6 +255,7 @@
 							<path d="M9 2v4h3" />
 						</svg>
 						<span id="file-name" class="file-name">—</span>
+						<span id="audio-unavailable-hint" class="hint-muted" hidden>原音频不可用（页面刷新后丢失）</span>
 						<button id="change-file-btn" class="link-btn small">更换文件</button>
 					</div>
 					<div id="waveform-container" class="waveform-container">
@@ -400,14 +401,6 @@
 						</div>
 					</div>
 
-					<!-- Collapsible: Confidence timeline -->
-					<details class="mc-collapsible" id="mc-dist-section" hidden>
-						<summary class="mc-collapsible-header">置信度时间线</summary>
-						<div class="mc-collapsible-body">
-							<canvas id="mc-dist-canvas" height="64" style="width: 100%; display: block; border-radius: 6px"></canvas>
-						</div>
-					</details>
-
 					<!-- Collapsible: Pitch range -->
 					<details class="mc-collapsible" open>
 						<summary class="mc-collapsible-header">音高范围 (80~320 Hz)</summary>
@@ -446,7 +439,9 @@
 					<details class="mc-collapsible" open>
 						<summary class="mc-collapsible-header">神经网络估计 (供参考)</summary>
 						<div class="mc-collapsible-body">
-							<p class="mc-nn-disclaimer">此估计来自一个在大规模语音数据上训练的分类器。它反映的是「典型听者可能如何感知你的声音」，不代表你的身份。</p>
+							<p class="mc-nn-disclaimer">
+								此估计来自一个在大规模语音数据上训练的分类器。它反映的是「典型听者可能如何感知你的声音」，不代表你的身份。
+							</p>
 							<div class="gender-spectrum">
 								<div class="gender-track">
 									<div class="gender-thumb" id="mc-gender-thumb" style="left: 50%"></div>
@@ -458,15 +453,6 @@
 								</div>
 							</div>
 							<div id="mc-certainty-tag" class="certainty-tag" hidden></div>
-						</div>
-					</details>
-
-					<!-- Engine B: Reference averages (collapsed by default) -->
-					<details class="mc-collapsible" id="mc-reference-panel">
-						<summary class="mc-collapsible-header">参考平均值</summary>
-						<div class="mc-collapsible-body">
-							<p class="mc-ref-disclaimer">这些是整段录音的宏观平均值，仅供参考。个体音素的数据请参考上方的时间轴。</p>
-							<div id="mc-subscores" class="mc-subscores"></div>
 						</div>
 					</details>
 

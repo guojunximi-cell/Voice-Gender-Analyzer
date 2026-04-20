@@ -2,7 +2,7 @@
  * bus.js — Tiny pub/sub for cross-component communication.
  *
  * Used by PhoneTimeline and its children (HeatmapBand, TranscriptRow,
- * TrendChart, PlaybackSync) to share state without tight coupling.
+ * PlaybackSync) to share state without tight coupling.
  */
 
 export function createBus() {

@@ -298,6 +298,12 @@ body {
 	font-size: 0.78rem;
 }
 
+.hint-muted {
+	color: var(--text-muted);
+	font-size: 0.78rem;
+	font-weight: normal;
+}
+
 .btn-primary {
 	display: inline-flex;
 	align-items: center;
@@ -1164,106 +1170,6 @@ body {
 	color: var(--text-muted);
 	text-align: center;
 	margin-top: 4px;
-}
-
-/* Sub-scores: spectrum range chart */
-.mc-subscores {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-	margin-top: 10px;
-}
-
-.src-row {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-
-.src-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: baseline;
-	font-size: 0.8rem;
-}
-
-.src-label {
-	color: var(--text-secondary);
-	white-space: nowrap;
-}
-
-.src-weight {
-	font-size: 0.68rem;
-	color: var(--text-muted);
-}
-
-.src-val {
-	color: var(--text-primary);
-	font-weight: 500;
-	font-variant-numeric: tabular-nums;
-	min-width: 32px;
-	text-align: right;
-}
-
-.src-track-wrap {
-	padding: 5px 0;
-}
-
-.src-track {
-	position: relative;
-	height: 6px;
-	border-radius: 99px;
-	background: linear-gradient(to right, var(--male-subtle) 0%, var(--border-strong) 50%, var(--female-subtle) 100%);
-}
-
-.src-tick {
-	position: absolute;
-	top: -3px;
-	bottom: -3px;
-	width: 1px;
-	background: var(--border-strong);
-	transform: translateX(-50%);
-	border-radius: 1px;
-	pointer-events: none;
-}
-
-.src-marker {
-	position: absolute;
-	top: 50%;
-	width: 10px;
-	height: 10px;
-	transform: translate(-50%, -50%) rotate(45deg);
-	border-radius: 2px;
-	background: var(--text-muted);
-	border: 1.5px solid var(--surface);
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-	transition: left 600ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.src-marker[data-zone="male"] {
-	background: var(--male);
-}
-.src-marker[data-zone="female"] {
-	background: var(--female);
-}
-.src-marker[data-zone="neutral"] {
-	background: var(--text-muted);
-}
-
-.src-zone-legend {
-	display: flex;
-	justify-content: space-between;
-	font-size: 0.66rem;
-	color: var(--text-muted);
-	margin-top: 2px;
-	padding: 0 2px;
-}
-
-.src-legend-male {
-	color: var(--male);
-}
-.src-legend-female {
-	color: var(--female);
 }
 
 /* Segment acoustic dot indicator */

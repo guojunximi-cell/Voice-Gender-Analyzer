@@ -1,18 +1,26 @@
 /**
- * heatmap-band.js — SVG resonance heatmap, rendered per current sentence.
+ * heatmap-band.js — SVG heatmap band, rendered per current sentence.
  *
- * Each visible <rect> is one phone, colored by the blue→pink diverging
- * palette of its resonance value.  Null resonance → hatch pattern.
+ * Each visible <rect> is one phone, colored through a caller-supplied
+ * `colorFn(phone)`.  Two bands live in the timeline: one keyed on pitch,
+ * one on resonance.  Null / non-finite color → hatch pattern fallback.
  *
  * The heatmap follows the currently-active sentence: viewBox = the
- * sentence's duration, so each row always fills the full width.  A faint
- * reference line at the empirical 0.587 threshold marks "female-direction
- * boundary".
+ * sentence's duration, so each row always fills the full width.
  */
 
-import { divergingResonance, THRESHOLDS } from "./diverging.js";
+import { divergingResonance } from "./diverging.js";
 
 const NS = "http://www.w3.org/2000/svg";
+// Each band's hatch pattern needs a unique id so two bands on the same page
+// don't share (and thus steal) a single <pattern> from the first <defs>.
+let _hatchSeq = 0;
+
+const DEFAULT_TITLE_FN = (p) => {
+	const charLabel = p.char || "\u2205";
+	const resLabel = p.resonance != null ? p.resonance.toFixed(2) : "\u2014";
+	return `${charLabel} ${p.phone} \xb7 \u5171\u9e23 ${resLabel}`;
+};
 
 export class HeatmapBand {
 	/**
@@ -21,27 +29,42 @@ export class HeatmapBand {
 	 *   phones: Array,
 	 *   sentences: Array,
 	 *   bus: object,
+	 *   colorFn?: (phone) => string|null,
+	 *   titleFn?: (phone) => string,
+	 *   ariaLabel?: string,
+	 *   ariaDescription?: string,
 	 * }} opts
 	 */
-	mount({ container, phones, sentences, bus }) {
+	mount({
+		container,
+		phones,
+		sentences,
+		bus,
+		colorFn = (p) => divergingResonance(p.resonance),
+		titleFn = DEFAULT_TITLE_FN,
+		ariaLabel = "\u5171\u9e23\u70ed\u529b\u5e26\uff0c\u6bcf\u683c\u4ee3\u8868\u4e00\u4e2a\u97f3\u7d20\u7684\u5171\u9e23\u503c 0\u20131",
+		ariaDescription = "\u5f53\u524d\u53e5\u7684\u5171\u9e23\u70ed\u529b\u5e26",
+	}) {
 		this.bus = bus;
 		this.phones = phones;
 		this.sentences = sentences;
+		this.colorFn = colorFn;
+		this.titleFn = titleFn;
+		this.ariaDescription = ariaDescription;
 		this.currentSentenceIdx = 0;
+
+		this._hatchId = `vga-hatch-${++_hatchSeq}`;
 
 		this.svg = document.createElementNS(NS, "svg");
 		this.svg.setAttribute("class", "vga-heatmap");
 		this.svg.setAttribute("preserveAspectRatio", "none");
 		this.svg.setAttribute("role", "group");
-		this.svg.setAttribute(
-			"aria-label",
-			"\u5171\u9e23\u70ed\u529b\u5e26\uff0c\u6bcf\u683c\u4ee3\u8868\u4e00\u4e2a\u97f3\u7d20\u7684\u5171\u9e23\u503c 0\u20131",
-		);
+		this.svg.setAttribute("aria-label", ariaLabel);
 
-		// Hatch pattern (null resonance)
+		// Hatch pattern (null color fallback)
 		const defs = document.createElementNS(NS, "defs");
 		const pattern = document.createElementNS(NS, "pattern");
-		pattern.setAttribute("id", "vga-hatch");
+		pattern.setAttribute("id", this._hatchId);
 		pattern.setAttribute("width", "4");
 		pattern.setAttribute("height", "4");
 		pattern.setAttribute("patternUnits", "userSpaceOnUse");
@@ -133,16 +156,14 @@ export class HeatmapBand {
 			rect.setAttribute("y", "0");
 			rect.setAttribute("height", "1");
 
-			const color = divergingResonance(p.resonance);
-			rect.setAttribute("fill", color ?? "url(#vga-hatch)");
+			const color = this.colorFn(p);
+			rect.setAttribute("fill", color ?? `url(#${this._hatchId})`);
 			rect.dataset.phoneIdx = i;
 			rect.setAttribute("tabindex", "0");
 			rect.setAttribute("role", "img");
 
 			const title = document.createElementNS(NS, "title");
-			const charLabel = p.char || "\u2205";
-			const resLabel = p.resonance != null ? p.resonance.toFixed(2) : "\u2014";
-			title.textContent = `${charLabel} ${p.phone} \xb7 \u5171\u9e23 ${resLabel}`;
+			title.textContent = this.titleFn(p);
 			rect.appendChild(title);
 
 			rect.addEventListener("click", () => this.bus.emit("seek", p.start));
@@ -158,14 +179,7 @@ export class HeatmapBand {
 			this.phoneIdxByRect.push(i);
 		}
 
-		// Threshold reference line (0.587) — currently the resonance axis is
-		// the color channel, not the Y axis, so the "line" is conceptual:
-		// we annotate it on the SVG title so SR users hear about it, and
-		// rely on the palette + legend for sighted users.
-		this.svg.setAttribute(
-			"aria-description",
-			`\u5f53\u524d\u53e5\u7684\u5171\u9e23\u70ed\u529b\u5e26\uff1b\u5973\u58f0\u9608\u503c = ${THRESHOLDS.resonance}`,
-		);
+		this.svg.setAttribute("aria-description", this.ariaDescription);
 	}
 
 	destroy() {

@@ -51,7 +51,60 @@ export function groupPhonesByChar(phones) {
 		const f3Vals = c.phones.map((p) => p.F3).filter((v) => v != null);
 		c.F3 = f3Vals.length ? _mean(f3Vals) : null;
 	}
+
+	// Pitch is fundamentally sparse at the phone level: Praat can't extract F0
+	// from unvoiced consonants (/t/, /k/, /p/…) and outlier rejection at the
+	// sidecar drops more.  For the heatmap we want every voiced hanzi to show
+	// a color — so we (1) lift pitch to char level (all phones of a char share
+	// one color), and (2) fill char-level gaps by linear interpolation in time
+	// between the nearest voiced neighbours.  Resonance is left alone: LPC
+	// produces formants even for unvoiced phones, so per-phone resolution is
+	// honest and useful.
+	_fillCharPitch(chars);
+	for (const c of chars) {
+		const v = c.pitchInterp;
+		for (const p of c.phones) p.charPitch = v;
+	}
+
 	return chars;
+}
+
+/**
+ * Write `c.pitchInterp` on every char cell.  Voiced chars copy their measured
+ * `c.pitch`; null chars that sit between two voiced neighbours get a linear
+ * interpolation by time; null chars at the edges hold the nearest value
+ * constant.  Chars with no voiced neighbour at all stay null (e.g. a whole
+ * phrase of only unvoiced phones — rare in Mandarin).  Spacer cells (empty
+ * char) are skipped so silence doesn't anchor interpolation paths.
+ */
+function _fillCharPitch(chars) {
+	const real = chars.filter((c) => c.char);
+	if (!real.length) return;
+
+	for (let i = 0; i < real.length; i++) {
+		const c = real[i];
+		if (c.pitch != null) {
+			c.pitchInterp = c.pitch;
+			continue;
+		}
+		let lo = i - 1;
+		while (lo >= 0 && real[lo].pitch == null) lo--;
+		let hi = i + 1;
+		while (hi < real.length && real[hi].pitch == null) hi++;
+		const prev = lo >= 0 ? real[lo] : null;
+		const next = hi < real.length ? real[hi] : null;
+		if (prev && next) {
+			const span = next.start - prev.end;
+			const t = span > 0 ? (c.start - prev.end) / span : 0.5;
+			c.pitchInterp = prev.pitch + (next.pitch - prev.pitch) * Math.max(0, Math.min(1, t));
+		} else if (prev) {
+			c.pitchInterp = prev.pitch;
+		} else if (next) {
+			c.pitchInterp = next.pitch;
+		} else {
+			c.pitchInterp = null;
+		}
+	}
 }
 
 /**
@@ -93,19 +146,29 @@ function _mean(arr) {
 }
 
 /**
- * Group consecutive characters into sentences by time-gap heuristic.
+ * Group consecutive characters into sentences.
  *
- * Rules (matches user spec):
- *   (a) gap > 0.5 s between adjacent real chars → split
- *   (b) sentence length ≥ 15 real chars → forced split (fallback cap)
- *   (c) empty/spacer chars are skipped (they are silence gaps, not content)
+ * Primary signal (when `silenceRanges` is non-empty): any silence interval
+ * falling between two adjacent real chars triggers a sentence break.  These
+ * ranges come from ffmpeg `silencedetect -30dB:d=0.5` in the sidecar — an
+ * authoritative acoustic measurement, immune to MFA's habit of gluing
+ * mid-sentence silence onto the preceding hanzi's phone cell.
+ *
+ * Fallback (when `silenceRanges` is empty): phone-to-phone gap > 0.5 s.
+ * Unreliable when MFA attributes silence phones to the preceding word
+ * (gap is then ~0), which is why Level 2 was added.
+ *
+ * Cap (always on): sentence length ≥ 15 real chars → forced split, so the
+ * UI never has to fit an unreadable 30-char line in one row.
+ *
+ * Spacer cells (empty `char`) are skipped in both signal paths.
  *
  * Each sentence: { start, end, startIdx, endIdx, chars: [...] }
  * where startIdx / endIdx point into the ORIGINAL chars array (inclusive,
  * both pointing at real chars), so PlaybackSync can map activeCharIdx →
  * sentenceIdx without a second filter.
  */
-export function groupCharsIntoSentences(chars) {
+export function groupCharsIntoSentences(chars, silenceRanges = []) {
 	if (!chars?.length) return [];
 
 	const sentences = [];
@@ -113,6 +176,30 @@ export function groupCharsIntoSentences(chars) {
 	let lastRealEnd = -Infinity;
 	const MAX_CHARS = 15;
 	const GAP_SEC = 0.5;
+
+	// 10 ms slop for silence-range containment: phone timings and silence
+	// timings both round to 3 decimals but come from different subprocess
+	// runs, so allow tiny misalignment at the edges.
+	const SLOP = 0.01;
+	const hasSilenceInfo = silenceRanges && silenceRanges.length > 0;
+	// Sorted copy + advancing pointer — avoids an O(N*M) scan when both are
+	// large.  Silences are monotone in time; so is the char loop.
+	const silences = hasSilenceInfo ? [...silenceRanges].sort((a, b) => a.start - b.start) : [];
+	let silenceCursor = 0;
+
+	const hasSilenceBetween = (prevEnd, curStart) => {
+		// Advance past silences that ended before prevEnd — they belong to an
+		// earlier gap and can't split this pair.
+		while (silenceCursor < silences.length && silences[silenceCursor].end < prevEnd - SLOP) {
+			silenceCursor++;
+		}
+		for (let k = silenceCursor; k < silences.length; k++) {
+			const s = silences[k];
+			if (s.start > curStart + SLOP) break; // past the gap — none remaining can match
+			if (s.start >= prevEnd - SLOP && s.end <= curStart + SLOP) return true;
+		}
+		return false;
+	};
 
 	const closeSentence = () => {
 		if (!cur.chars.length) return;
@@ -127,8 +214,8 @@ export function groupCharsIntoSentences(chars) {
 		if (!c.char) continue; // skip spacer cells
 
 		if (cur.chars.length > 0) {
-			const gap = c.start - lastRealEnd;
-			if (gap > GAP_SEC || cur.chars.length >= MAX_CHARS) {
+			const shouldSplit = hasSilenceInfo ? hasSilenceBetween(lastRealEnd, c.start) : c.start - lastRealEnd > GAP_SEC;
+			if (shouldSplit || cur.chars.length >= MAX_CHARS) {
 				closeSentence();
 			}
 		}

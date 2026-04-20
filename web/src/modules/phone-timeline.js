@@ -2,24 +2,42 @@
  * phone-timeline.js — Orchestrator for the phone-level interactive timeline.
  *
  * Renders beneath the waveform when Engine C data is available:
- *   - SVG resonance heatmap band (HeatmapBand)
+ *   - SVG pitch heatmap band (HeatmapBand, keyed on pitch Hz)
  *   - Clickable hanzi transcript row with karaoke sync (TranscriptRow)
- *   - Dual-axis pitch+resonance trend chart (TrendChart)
+ *   - SVG resonance heatmap band (HeatmapBand, keyed on resonance 0–1)
  *   - Playback synchronization hub (PlaybackSync)
  *
  * Feature-flagged via vga.timeline (see feature-flag.js).
  */
 
 import { createBus } from "./bus.js";
+import { divergingPitch, divergingResonance } from "./diverging.js";
 import { renderFallback, renderLowPhoneBanner, renderNoSpeech } from "./engine-c-fallback.js";
 import { GenderLegend } from "./gender-legend.js";
 import { HeatmapBand } from "./heatmap-band.js";
 import { groupCharsIntoSentences, groupPhonesByChar } from "./phone-utils.js";
 import { PlaybackSync } from "./playback-sync.js";
 import { TranscriptRow } from "./transcript-row.js";
-import { TrendChart } from "./trend-chart.js";
 
 const LOW_PHONE_THRESHOLD = 8;
+
+const pitchTitleFn = (p) => {
+	const charLabel = p.char || "\u2205";
+	// Show the phone's raw measured pitch in the tooltip (honest per-phone
+	// read-out) even though the fill color comes from the char-level value.
+	const raw = p.pitch != null && p.pitch > 0 ? `${p.pitch.toFixed(0)} Hz` : "\u2014";
+	const interp =
+		p.charPitch != null && (p.pitch == null || p.pitch <= 0)
+			? ` (\u5b57\u7ea7\u63a8\u7b97 ${p.charPitch.toFixed(0)} Hz)`
+			: "";
+	return `${charLabel} ${p.phone} \xb7 \u97f3\u9ad8 ${raw}${interp}`;
+};
+
+const resonanceTitleFn = (p) => {
+	const charLabel = p.char || "\u2205";
+	const resLabel = p.resonance != null ? p.resonance.toFixed(2) : "\u2014";
+	return `${charLabel} ${p.phone} \xb7 \u5171\u9e23 ${resLabel}`;
+};
 
 export class PhoneTimeline {
 	/**
@@ -33,10 +51,13 @@ export class PhoneTimeline {
 		this._sentences = [];
 		this._bus = null;
 		this._sync = null;
-		this._heatmap = null;
+		this._pitchBand = null;
+		this._resonanceBand = null;
 		this._transcript = null;
-		this._trendChart = null;
 		this._legend = null;
+		this._onCursorMove = null;
+		this._onCursorLeave = null;
+		this._cursorRowsEl = null;
 	}
 
 	/** Show the loading skeleton. */
@@ -46,7 +67,7 @@ export class PhoneTimeline {
 			<div class="vga-timeline" data-state="skeleton">
 				<div class="vga-skel vga-skel--band"></div>
 				<div class="vga-skel vga-skel--row"></div>
-				<div class="vga-skel vga-skel--chart"></div>
+				<div class="vga-skel vga-skel--band"></div>
 			</div>`;
 		this._rendered = true;
 	}
@@ -83,9 +104,48 @@ export class PhoneTimeline {
 			return;
 		}
 
-		// Group phones into character cells, then characters into sentences
+		// Group phones into character cells, then characters into sentences.
+		// silence_ranges (Level 2) is the authoritative split signal when the
+		// sidecar returns it; groupCharsIntoSentences falls back to a phone-
+		// gap heuristic if it's empty or absent.
 		this._chars = groupPhonesByChar(engineC.phones);
-		this._sentences = groupCharsIntoSentences(this._chars);
+		this._sentences = groupCharsIntoSentences(this._chars, engineC.silence_ranges || []);
+
+		// Dev diagnostic: expose the aggregated data + silence ranges so we
+		// can verify Level 2 is doing the splitting.  In DevTools, look at:
+		//   window._vgaSilenceRanges   → authoritative pauses from ffmpeg
+		//   window._vgaSentences       → resulting sentence cuts
+		//   window._vgaChars           → full char cells with gap-to-prev
+		if (import.meta.env.DEV && typeof window !== "undefined") {
+			let lastRealEnd = -Infinity;
+			window._vgaChars = this._chars.map((c, i) => {
+				const gap = c.char ? c.start - lastRealEnd : null;
+				if (c.char) lastRealEnd = c.end;
+				return {
+					i,
+					char: c.char || "·spacer·",
+					start: +c.start.toFixed(3),
+					end: +c.end.toFixed(3),
+					dur: +(c.end - c.start).toFixed(3),
+					gapToPrev: gap == null ? "" : +gap.toFixed(3),
+					phoneLabels: c.phones.map((p) => p.phone).join(","),
+				};
+			});
+			window._vgaSentences = this._sentences.map((s, i) => ({
+				i,
+				start: +s.start.toFixed(3),
+				end: +s.end.toFixed(3),
+				text: s.chars.map((c) => c.char).join(""),
+				len: s.chars.length,
+			}));
+			window._vgaSilenceRanges = engineC.silence_ranges || [];
+			// biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+			console.log(
+				`[Engine C] ${window._vgaSentences.length} sentences, ${window._vgaSilenceRanges.length} silence ranges`,
+			);
+			// biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+			console.table(window._vgaSentences);
+		}
 
 		// Dev-mode scroll monitor: verify no unexpected scroll occurs during
 		// playback.  The app uses a fixed-height .app-layout with the actual
@@ -118,34 +178,36 @@ export class PhoneTimeline {
 			}
 		}
 
-		// Determine duration from the last phone's end time
-		const lastPhone = engineC.phones[engineC.phones.length - 1];
-		const duration = lastPhone ? lastPhone.end : 0;
-
-		// Build layout containers.  Order top-down:
-		//   band (heatmap) → transcript → chart → footer (mode toggle + shared
-		//   color legend + line-style key).  The legend used to live above the
-		//   band as a per-sentence gauge; it's now a static key shared by both
-		//   the heatmap fills and the chart line gradients, parked under the
-		//   chart so the mode toggle and line-style indicators sit alongside.
+		// Build layout containers.  Sandwich order (inside .vga-timeline__rows):
+		//   [音高] pitch band
+		//   [    ] transcript (readout + hanzi)
+		//   [共鸣] resonance band
+		// Each row is [label slot | content slot]; the label slot has a fixed
+		// width so the three content slots line up to the pixel — preserving
+		// time-alignment between the two bands and the hanzi above.  The nav
+		// (← 7/8 →) and the single shared palette legend both sit below, so
+		// nothing interrupts the sandwich.
 		timeline.dataset.state = "ready";
 		timeline.innerHTML = `
-			<div class="vga-timeline__band"></div>
-			<div class="vga-timeline__transcript"></div>
-			<div class="vga-timeline__chart"></div>
-			<div class="vga-timeline__footer">
-				<div class="vga-timeline__footer-controls"></div>
-				<div class="vga-timeline__footer-legend"></div>
-				<div class="vga-timeline__footer-keys">
-					<span class="vga-line-key">
-						<span class="vga-line-key__swatch vga-line-key__swatch--solid"></span>
-						<span class="vga-line-key__label">音高</span>
-					</span>
-					<span class="vga-line-key">
-						<span class="vga-line-key__swatch vga-line-key__swatch--dashed"></span>
-						<span class="vga-line-key__label">共鸣</span>
-					</span>
+			<div class="vga-timeline__readout-row"></div>
+			<div class="vga-timeline__rows">
+				<div class="vga-timeline__row vga-timeline__row--pitch">
+					<span class="vga-timeline__label">音高</span>
+					<div class="vga-timeline__band vga-timeline__band--pitch"></div>
 				</div>
+				<div class="vga-timeline__row vga-timeline__row--transcript">
+					<span class="vga-timeline__label" aria-hidden="true"></span>
+					<div class="vga-timeline__transcript"></div>
+				</div>
+				<div class="vga-timeline__row vga-timeline__row--resonance">
+					<span class="vga-timeline__label">共鸣</span>
+					<div class="vga-timeline__band vga-timeline__band--resonance"></div>
+				</div>
+				<div class="vga-timeline__cursor" aria-hidden="true"></div>
+			</div>
+			<div class="vga-timeline__nav-row"></div>
+			<div class="vga-timeline__footer">
+				<div class="vga-timeline__footer-legend"></div>
 			</div>`;
 
 		// Low phone count warning
@@ -155,8 +217,7 @@ export class PhoneTimeline {
 
 		// Create shared state + bus
 		const reducedMotion =
-			matchMedia("(prefers-reduced-motion: reduce)").matches ||
-			localStorage.getItem("vga.reducedMotion") === "1";
+			matchMedia("(prefers-reduced-motion: reduce)").matches || localStorage.getItem("vga.reducedMotion") === "1";
 
 		const state = {
 			chars: this._chars,
@@ -172,22 +233,34 @@ export class PhoneTimeline {
 		this._bus = createBus();
 
 		// Mount children
-		const bandEl = timeline.querySelector(".vga-timeline__band");
+		const pitchBandEl = timeline.querySelector(".vga-timeline__band--pitch");
+		const resonanceBandEl = timeline.querySelector(".vga-timeline__band--resonance");
 		const transcriptEl = timeline.querySelector(".vga-timeline__transcript");
-		const chartEl = timeline.querySelector(".vga-timeline__chart");
-		const footerControlsEl = timeline.querySelector(".vga-timeline__footer-controls");
+		const navEl = timeline.querySelector(".vga-timeline__nav-row");
+		const readoutEl = timeline.querySelector(".vga-timeline__readout-row");
 		const footerLegendEl = timeline.querySelector(".vga-timeline__footer-legend");
+		const rowsEl = timeline.querySelector(".vga-timeline__rows");
+		const cursorEl = timeline.querySelector(".vga-timeline__cursor");
 
-		// Heatmap band (scoped to current sentence)
-		this._heatmap = new HeatmapBand();
-		this._heatmap.mount({
-			container: bandEl,
+		// Pitch heatmap (top).  Color per char-level aggregate (inherited by
+		// all phones of that char) so unvoiced consonants don't leave gaps
+		// inside otherwise-voiced hanzi.  See phone-utils._fillCharPitch.
+		this._pitchBand = new HeatmapBand();
+		this._pitchBand.mount({
+			container: pitchBandEl,
 			phones: engineC.phones,
 			sentences: this._sentences,
 			bus: this._bus,
+			colorFn: (p) => divergingPitch(p.charPitch),
+			titleFn: pitchTitleFn,
+			ariaLabel: "音高热力带，每个汉字的音高（不发声辅音继承该字的元音值）",
+			ariaDescription: "当前句的音高热力带",
 		});
 
-		// Transcript row (paginated by sentence)
+		// Transcript row (paginated by sentence).  navContainer / readoutContainer
+		// lift the nav (below resonance) and the active-char readout (above
+		// pitch band) out of the transcript wrap, keeping the three time-
+		// aligned rows (pitch / hanzi / resonance) as one uninterrupted block.
 		this._transcript = new TranscriptRow();
 		this._transcript.mount({
 			container: transcriptEl,
@@ -195,26 +268,47 @@ export class PhoneTimeline {
 			sentences: this._sentences,
 			bus: this._bus,
 			state,
+			navContainer: navEl,
+			readoutContainer: readoutEl,
 		});
 
-		// Trend chart (global view + current-sentence highlight band).  The
-		// chart builds its own mode-toggle but doesn't append it; we pull it
-		// out and place it in the footer alongside the shared legend.
-		this._trendChart = new TrendChart();
-		this._trendChart.mount({
-			container: chartEl,
-			chars: this._chars,
-			duration,
+		// Resonance heatmap (bottom)
+		this._resonanceBand = new HeatmapBand();
+		this._resonanceBand.mount({
+			container: resonanceBandEl,
+			phones: engineC.phones,
 			sentences: this._sentences,
 			bus: this._bus,
+			colorFn: (p) => divergingResonance(p.resonance),
+			titleFn: resonanceTitleFn,
+			ariaLabel: "共鸣热力带，每格代表一个音素的共鸣值 0–1",
+			ariaDescription: "当前句的共鸣热力带；女声阈值 = 0.587",
 		});
-
-		// Footer: mode toggle (left) + gender legend (center) + line key (right).
-		const modeToggle = this._trendChart.getModeToggle();
-		if (modeToggle) footerControlsEl.appendChild(modeToggle);
 
 		this._legend = new GenderLegend();
 		this._legend.mount({ container: footerLegendEl });
+
+		// Hover crosshair: a 1px vertical line across the three rows makes the
+		// "same column = same moment in time" relationship explicit.  We query
+		// the content slot's left edge from the DOM (not a hardcoded offset) so
+		// the line ignores the label column and only spans the data region.
+		this._cursorRowsEl = rowsEl;
+		if (rowsEl && cursorEl) {
+			const contentRef = timeline.querySelector(".vga-timeline__row--pitch .vga-timeline__band");
+			this._onCursorMove = (e) => {
+				const rows = rowsEl.getBoundingClientRect();
+				const content = contentRef.getBoundingClientRect();
+				if (e.clientX < content.left || e.clientX > content.right) {
+					cursorEl.classList.remove("visible");
+					return;
+				}
+				cursorEl.style.left = `${e.clientX - rows.left}px`;
+				cursorEl.classList.add("visible");
+			};
+			this._onCursorLeave = () => cursorEl.classList.remove("visible");
+			rowsEl.addEventListener("mousemove", this._onCursorMove);
+			rowsEl.addEventListener("mouseleave", this._onCursorLeave);
+		}
 
 		// Playback sync (connects WaveSurfer ↔ bus)
 		if (this.ws) {
@@ -247,16 +341,23 @@ export class PhoneTimeline {
 
 	/** Tear down child components without clearing the root container. */
 	_destroyChildren() {
+		if (this._cursorRowsEl) {
+			if (this._onCursorMove) this._cursorRowsEl.removeEventListener("mousemove", this._onCursorMove);
+			if (this._onCursorLeave) this._cursorRowsEl.removeEventListener("mouseleave", this._onCursorLeave);
+		}
+		this._cursorRowsEl = null;
+		this._onCursorMove = null;
+		this._onCursorLeave = null;
 		this._sync?.destroy();
-		this._heatmap?.destroy();
+		this._pitchBand?.destroy();
+		this._resonanceBand?.destroy();
 		this._transcript?.destroy();
-		this._trendChart?.destroy();
 		this._legend?.destroy();
 		this._bus?.destroy();
 		this._sync = null;
-		this._heatmap = null;
+		this._pitchBand = null;
+		this._resonanceBand = null;
 		this._transcript = null;
-		this._trendChart = null;
 		this._legend = null;
 		this._bus = null;
 	}

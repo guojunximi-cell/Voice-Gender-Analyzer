@@ -1,6 +1,7 @@
 import { analyzeAudio, cancelAnalysis } from "./modules/analyzer.js";
+import * as audioCache from "./modules/audio-cache.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
-import { clearMetricsPanel, renderConfidenceDistribution, renderMetricsPanel } from "./modules/metrics-panel.js";
+import { clearMetricsPanel, renderMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
 import { highlightActiveSegment, renderSegments, renderStats, resetResults } from "./modules/results.js";
@@ -43,6 +44,11 @@ let _phoneTimeline = null;
 
 // ─── DOM shortcuts ────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
+
+function setAudioUnavailableHint(show) {
+	const el = $("audio-unavailable-hint");
+	if (el) el.hidden = !show;
+}
 
 // ─── Toast ────────────────────────────────────────────────────
 let toastTimer = null;
@@ -299,6 +305,7 @@ async function _silentAnalyzeAndSave(file) {
 				analysis: data.analysis,
 			};
 			saveSession(session);
+			audioCache.set(session.id, file);
 			addSession(session);
 		}
 		return data;
@@ -405,6 +412,7 @@ $("change-file-btn")?.addEventListener("click", () => {
 	}
 	const tlRoot = $("phone-timeline-root");
 	if (tlRoot) tlRoot.hidden = true;
+	setAudioUnavailableHint(false);
 	currentFile = null;
 	analysisData = null;
 	setPhase("idle");
@@ -450,6 +458,10 @@ $("analyze-btn")?.addEventListener("click", async () => {
 		renderStats(data.analysis);
 		renderSegments(data.analysis);
 
+		// Whole-file acoustic averages (Engine C + duration-weighted Engine A).
+		// Rendered once here — no per-segment updates.
+		renderMetricsPanel(data.summary, data.analysis);
+
 		// Feed Engine C data to phone timeline
 		if (_phoneTimeline && data.summary?.engine_c) {
 			_phoneTimeline.setData(data.summary.engine_c);
@@ -473,6 +485,7 @@ $("analyze-btn")?.addEventListener("click", async () => {
 				analysis: data.analysis,
 			};
 			saveSession(session);
+			audioCache.set(session.id, currentFile);
 			addSession(session);
 			selectSession(session.id);
 		}
@@ -487,31 +500,78 @@ $("analyze-btn")?.addEventListener("click", async () => {
 	}
 });
 
-// ─── Segment select → metrics panel ──────────────────────────
-document.addEventListener("segment-select", (e) => {
-	renderMetricsPanel(e.detail.segment);
-	renderConfidenceDistribution(e.detail.segment);
-});
-
 // ─── Scatter dot click → restore session ────────────────────
 let _selectedSessionId = null;
 
 function onScatterDotClick(session) {
+	// 若正在分析，先取消——避免与历史还原竞争 _phoneTimeline / 波形的构建
+	if (phase === "analyzing") cancelAnalysis();
+
 	_selectedSessionId = session.id;
 	$("delete-session-btn").hidden = false;
-	analysisData = session; // use stored data
+	analysisData = session;
+	// 历史视图只读：不允许对它再次点"开始分析"，避免 analyze-btn 状态混乱
+	currentFile = null;
 
-	// Restore segment timeline (no waveform audio — show static state)
-	drawTimeline(session.analysis);
-	renderStats(session.analysis);
-	renderSegments(session.analysis);
+	// 拆旧波形与音素时间线，再按 session 重建——这也让条目之间切换时
+	// 音素时间线会正确刷新到目标条目的 engine_c
+	destroyWaveform();
+	if (_phoneTimeline) {
+		_phoneTimeline.destroy();
+		_phoneTimeline = null;
+	}
 
-	// Show player section in "static" mode (no audio loaded)
+	// Player chrome
 	if ($("file-name")) $("file-name").textContent = session.filename;
 	if ($("player-section")) $("player-section").hidden = false;
 	if ($("upload-section")) $("upload-section").hidden = true;
 
-	clearMetricsPanel();
+	// 历史是查看态：强制锁 analyze-btn 防 setPhase 残留把它解锁
+	if ($("analyze-btn")) $("analyze-btn").disabled = true;
+	if ($("analyze-text")) $("analyze-text").textContent = "已分析";
+
+	renderStats(session.analysis);
+	renderSegments(session.analysis);
+	renderMetricsPanel(session.summary, session.analysis);
+
+	const tlRoot = $("phone-timeline-root");
+	const cachedFile = audioCache.get(session.id);
+
+	if (cachedFile) {
+		// Hot：内存里还有原文件，完整还原播放器 + 音素时间线（带卡拉 OK 同步）
+		setAudioUnavailableHint(false);
+		const loading = $("waveform-loading");
+		if (loading) loading.style.display = "flex";
+		initWaveform(cachedFile, {
+			onReady: () => {
+				// 段落 overlay 依赖 waveform 模块内部的 duration，必须在 ready 后画
+				drawTimeline(session.analysis);
+				// waveform.js 的 ready handler 会把 analyze-btn 重新启用，这里再锁回去
+				if ($("analyze-btn")) $("analyze-btn").disabled = true;
+				if (_timelineEnabled && tlRoot) {
+					tlRoot.hidden = false;
+					_phoneTimeline = new PhoneTimeline({
+						container: tlRoot,
+						wavesurfer: getWaveSurfer(),
+					});
+					_phoneTimeline.setData(session.summary?.engine_c ?? null);
+				}
+			},
+			onTimeUpdate: (t) => {
+				if (analysisData) highlightActiveSegment(t, analysisData.analysis);
+			},
+		});
+	} else {
+		// Cold：缓存里没有原文件（刷新后 / 被淘汰 / 批量旧数据），
+		// 仅还原音素时间线静态图，段落用右侧列表承担（段落 overlay 依赖
+		// waveform duration，duration===0 时 drawTimeline 会 no-op）。
+		setAudioUnavailableHint(true);
+		if (_timelineEnabled && tlRoot) {
+			tlRoot.hidden = false;
+			_phoneTimeline = new PhoneTimeline({ container: tlRoot, wavesurfer: null });
+			_phoneTimeline.setData(session.summary?.engine_c ?? null);
+		}
+	}
 }
 
 function onScatterDeselect() {
@@ -522,6 +582,7 @@ function onScatterDeselect() {
 // ─── Delete single session ────────────────────────────────────
 $("delete-session-btn")?.addEventListener("click", () => {
 	if (!_selectedSessionId) return;
+	audioCache.remove(_selectedSessionId);
 	storeRemoveSession(_selectedSessionId);
 	scatterRemoveSession(_selectedSessionId);
 	_selectedSessionId = null;
@@ -532,6 +593,7 @@ $("delete-session-btn")?.addEventListener("click", () => {
 $("clear-sessions-btn")?.addEventListener("click", () => {
 	if (!confirm("清空所有历史分析记录？")) return;
 	clearSessions();
+	audioCache.clear();
 	clearAllSessions();
 	_selectedSessionId = null;
 	analysisData = null;

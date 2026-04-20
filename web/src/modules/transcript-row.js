@@ -26,13 +26,15 @@ export class TranscriptRow {
 	 *   state: object,
 	 * }} opts
 	 */
-	mount({ container, chars, sentences, bus, state }) {
+	mount({ container, chars, sentences, bus, state, navContainer = null, readoutContainer = null }) {
 		this.bus = bus;
 		this.state = state;
 		this.chars = chars;
 		this.sentences = sentences;
 		this.currentSentenceIdx = 0;
 		this._activeBtn = null;
+		this._navContainer = navContainer;
+		this._readoutContainer = readoutContainer;
 
 		const wrap = document.createElement("div");
 		wrap.className = "vga-transcript-wrap";
@@ -49,7 +51,14 @@ export class TranscriptRow {
 			`<span class="vga-transcript-readout__char">\u2014</span>` +
 			`<span class="vga-transcript-readout__metric"><span class="vga-transcript-readout__label">\u97f3\u9ad8</span><span class="vga-transcript-readout__pitch">\u2014</span></span>` +
 			`<span class="vga-transcript-readout__metric"><span class="vga-transcript-readout__label">\u5171\u9e23</span><span class="vga-transcript-readout__res">\u2014</span></span>`;
-		wrap.appendChild(this._readout);
+		// Readout is externally placed when readoutContainer is given (so
+		// PhoneTimeline can put it above the pitch band as a header, keeping
+		// the sandwich of bands + hanzi uninterrupted below).
+		if (this._readoutContainer) {
+			this._readoutContainer.appendChild(this._readout);
+		} else {
+			wrap.appendChild(this._readout);
+		}
 		this._readoutChar = this._readout.querySelector(".vga-transcript-readout__char");
 		this._readoutPitch = this._readout.querySelector(".vga-transcript-readout__pitch");
 		this._readoutRes = this._readout.querySelector(".vga-transcript-readout__res");
@@ -60,7 +69,13 @@ export class TranscriptRow {
 		wrap.appendChild(this._group);
 
 		this._nav = this._buildNav();
-		wrap.appendChild(this._nav.root);
+		// Nav is externally placed when navContainer is given (so PhoneTimeline
+		// can put it below the resonance band, completing the sandwich).
+		if (this._navContainer) {
+			this._navContainer.appendChild(this._nav.root);
+		} else {
+			wrap.appendChild(this._nav.root);
+		}
 
 		container.appendChild(wrap);
 		this._wrap = wrap;
@@ -136,7 +151,7 @@ export class TranscriptRow {
 	 * User-nav: rebuild and scroll the wrap into view ({block: 'nearest'},
 	 * so a fully-visible wrap stays put; only scrolls if scrolled off).
 	 *
-	 * Also emits activeSentenceChanged so HeatmapBand / TrendChart band /
+	 * Also emits activeSentenceChanged so the two HeatmapBand instances and
 	 * GenderLegend follow the user's choice — without this, the transcript
 	 * row would advance but the rest of the timeline would stay on whatever
 	 * sentence playback last entered.  TranscriptRow's own subscriber is
@@ -190,10 +205,7 @@ export class TranscriptRow {
 				const expectedPx = (widthPct / 100) * groupWidth;
 				if (expectedPx < minWidthPx) minWidthPx = expectedPx;
 			}
-			const charFont = Math.max(
-				CHAR_FONT_MIN,
-				Math.min(CHAR_FONT_MAX, Math.floor(minWidthPx * 0.9)),
-			);
+			const charFont = Math.max(CHAR_FONT_MIN, Math.min(CHAR_FONT_MAX, Math.floor(minWidthPx * 0.9)));
 
 			for (let i = 0; i < s.chars.length; i++) {
 				const c = s.chars[i];
@@ -330,7 +342,13 @@ export class TranscriptRow {
 			return;
 		}
 		this._readoutChar.textContent = c.char || "\u2014";
-		this._readoutPitch.textContent = c.pitch != null ? `${Math.round(c.pitch)} Hz` : "\u2014";
+		// Prefer the interpolated char pitch when the raw measurement is null
+		// (clean hanzi where Praat dropped the F0 on short / unvoiced frames).
+		// Mark inherited values with "~" so the user knows it wasn't measured.
+		const displayPitch = c.pitch ?? c.pitchInterp;
+		const isInterp = c.pitch == null && c.pitchInterp != null;
+		this._readoutPitch.textContent =
+			displayPitch != null ? `${isInterp ? "~" : ""}${Math.round(displayPitch)} Hz` : "\u2014";
 		this._readoutRes.textContent = c.resonance != null ? c.resonance.toFixed(2) : "\u2014";
 	}
 
@@ -380,6 +398,9 @@ export class TranscriptRow {
 		}
 		if (this._group && this._onGroupClick) this._group.removeEventListener("click", this._onGroupClick);
 		this._returnBtn?.remove();
+		// Nav / readout live outside .vga-transcript-wrap when externally placed; remove explicitly.
+		this._nav?.root?.remove();
+		this._readout?.remove();
 		this._wrap?.remove();
 		this._btnByCharIdx = null;
 	}

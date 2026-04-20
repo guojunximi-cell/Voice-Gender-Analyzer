@@ -59,10 +59,6 @@
 	margin-bottom: 12px;
 }
 
-.vga-skel--chart {
-	height: 200px;
-}
-
 @keyframes vga-skel-pulse {
 	0%,
 	100% {
@@ -73,12 +69,82 @@
 	}
 }
 
+/* ── Active-char readout (header above the sandwich) ─────────── */
+.vga-timeline__readout-row {
+	margin-bottom: 8px;
+}
+
+.vga-timeline__readout-row:empty {
+	display: none;
+}
+
+/* ── Row grid: [label | content] ─────────────────────────────
+   .vga-timeline__rows hosts the sandwich (pitch / transcript / resonance)
+   with position:relative so the hover cursor can layer across all three.
+   Each row shares the same [label-slot | content-slot] structure so the
+   three content slots line up to the pixel, keeping time-alignment intact. */
+.vga-timeline__rows {
+	position: relative;
+}
+
+.vga-timeline__row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.vga-timeline__row--pitch {
+	margin-bottom: 6px;
+}
+
+.vga-timeline__row--resonance {
+	margin-top: 6px;
+}
+
+.vga-timeline__label {
+	flex: 0 0 36px;
+	text-align: right;
+	font-size: 0.72rem;
+	color: var(--text-secondary);
+	user-select: none;
+	letter-spacing: 0.02em;
+}
+
+/* Transcript row's label slot is empty — it still reserves width so the
+   hanzi row's left edge sits at the same x as the two bands'. */
+.vga-timeline__row--transcript .vga-timeline__label {
+	min-height: 1px;
+}
+
+.vga-timeline__band,
+.vga-timeline__transcript {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* Hover crosshair: a 1px vertical line across the rows.  Anchored by
+   JS (phone-timeline.js) on mousemove inside the content slot. */
+.vga-timeline__cursor {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: var(--active);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 100ms linear;
+	z-index: 2;
+}
+
+.vga-timeline__cursor.visible {
+	opacity: 0.35;
+}
+
 /* ── Heatmap band ────────────────────────────────────────────── */
 .vga-heatmap {
 	display: block;
 	width: 100%;
 	height: 18px;
-	margin-bottom: 8px;
 }
 
 .vga-heatmap rect {
@@ -155,12 +221,7 @@
 }
 
 .vga-transcript-readout__char {
-	font-family:
-		"PingFang SC",
-		"Hiragino Sans GB",
-		"Microsoft YaHei",
-		"Noto Sans CJK SC",
-		sans-serif;
+	font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
 	font-size: 1.05rem;
 	font-weight: 500;
 	color: var(--active);
@@ -251,12 +312,7 @@
 	justify-content: center;
 	padding: 0;
 	border-radius: 4px;
-	font-family:
-		"PingFang SC",
-		"Hiragino Sans GB",
-		"Microsoft YaHei",
-		"Noto Sans CJK SC",
-		sans-serif;
+	font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
 	transition:
 		background-color 80ms linear,
 		color 80ms linear;
@@ -282,143 +338,27 @@
 	will-change: background-color, color;
 }
 
-/* ── Trend chart ─────────────────────────────────────────────── */
-.vga-trend-wrap {
-	margin-top: 12px;
-	position: relative;
-}
-
-.vga-trend-axis-titles {
-	/* Horizontal title row above the canvas — replaces uPlot's rotated y-axis
-	   labels with two corner pills (left = pitch axis, right = resonance).
-	   Lives outside `.vga-trend-chart-area` so the sentence-band overlay can
-	   stay scoped to the canvas without overlapping these. */
+/* ── Sentence nav row ─────────────────────────────────────────
+   Own row between the resonance band and the footer — keeps the three
+   time-aligned rows (pitch / hanzi / resonance) as a single uninterrupted
+   block.  Centered; no label column. */
+.vga-timeline__nav-row {
 	display: flex;
-	justify-content: space-between;
-	align-items: baseline;
-	font-size: 11px;
-	font-weight: 500;
-	margin-bottom: 4px;
-	pointer-events: none;
-}
-
-.vga-trend-chart-area {
-	/* uPlot canvas + sentence-band overlay live here.  Position-relative so
-	   the absolute band's top/bottom % refer to the canvas, not the wrap. */
-	position: relative;
-}
-
-.vga-trend-mode-toggle {
-	/* Inline segmented control — placed by PhoneTimeline in the shared
-	   timeline footer next to the legend, no longer overlaid on the chart. */
-	display: inline-flex;
-	gap: 1px;
-	padding: 2px;
-	background: var(--bg-secondary);
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	font-size: 11px;
-	flex-shrink: 0;
-}
-
-.vga-trend-mode-btn {
-	all: unset;
-	box-sizing: border-box;
-	padding: 3px 9px;
-	border-radius: 4px;
-	cursor: pointer;
-	color: var(--text-secondary);
-	transition:
-		background-color 120ms linear,
-		color 120ms linear;
-}
-
-.vga-trend-mode-btn:hover {
-	color: var(--text-primary);
-}
-
-.vga-trend-mode-btn:focus-visible {
-	outline: 2px solid var(--active);
-	outline-offset: 1px;
-}
-
-.vga-trend-mode-btn.active {
-	background: var(--surface);
-	color: var(--text-primary);
-	font-weight: 500;
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-}
-
-.vga-trend-sentence-band {
-	/* Soft spotlight rather than bounding box: no border, fades to transparent
-	   at edges, peaks ~15% opacity in the middle.  Color is the soft blue
-	   anchor from the diverging palette (#5B8FB0). */
-	position: absolute;
-	top: 10%;
-	bottom: 10%;
-	background: linear-gradient(
-		90deg,
-		transparent 0%,
-		rgba(91, 143, 176, 0) 5%,
-		rgba(91, 143, 176, 0.15) 50%,
-		rgba(91, 143, 176, 0) 95%,
-		transparent 100%
-	);
-	pointer-events: none;
-	display: none;
-	transition:
-		left 300ms ease-out,
-		width 300ms ease-out;
-	z-index: 1;
-}
-
-/* ── Timeline footer (mode toggle + legend + line key) ────────── */
-.vga-timeline__footer {
-	display: flex;
-	align-items: center;
-	gap: 16px;
+	justify-content: center;
 	margin-top: 10px;
-	flex-wrap: wrap;
 }
 
-.vga-timeline__footer-controls {
-	flex-shrink: 0;
+.vga-timeline__nav-row:empty {
+	display: none;
+}
+
+/* ── Timeline footer (shared palette legend only) ─────────────── */
+.vga-timeline__footer {
+	margin-top: 10px;
 }
 
 .vga-timeline__footer-legend {
-	flex: 1;
-	min-width: 200px;
-}
-
-.vga-timeline__footer-keys {
-	display: flex;
-	gap: 12px;
-	flex-shrink: 0;
-}
-
-.vga-line-key {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	font-size: 0.78rem;
-	color: var(--text-secondary);
-}
-
-.vga-line-key__swatch {
-	display: inline-block;
-	width: 22px;
-	height: 0;
-	border-top-width: 2px;
-	border-top-style: solid;
-	border-top-color: var(--text-secondary);
-}
-
-.vga-line-key__swatch--solid {
-	border-top-style: solid;
-}
-
-.vga-line-key__swatch--dashed {
-	border-top-style: dashed;
+	width: 100%;
 }
 
 /* ── Gender legend ───────────────────────────────────────────── */
@@ -491,10 +431,13 @@
 }
 
 .vga-gender-legend__popover {
+	/* Flip upward — the legend sits at the very bottom of the center panel,
+	   so a `top: 100%` popover hits the panel edge and gets clipped / covers
+	   the scrollbar.  Anchoring to `bottom: 100%` opens over the timeline
+	   instead, where there's always room. */
 	position: absolute;
-	top: 100%;
+	bottom: calc(100% + 6px);
 	right: 0;
-	margin-top: 4px;
 	max-width: 360px;
 	padding: 10px 12px;
 	background: var(--surface);
@@ -611,6 +554,15 @@
 		height: 14px;
 	}
 
+	.vga-timeline__label {
+		flex: 0 0 28px;
+		font-size: 0.68rem;
+	}
+
+	.vga-timeline__row {
+		gap: 6px;
+	}
+
 	.vga-transcript {
 		height: 32px;
 	}
@@ -625,10 +577,6 @@
 		font-size: 0.95rem;
 	}
 
-	.vga-skel--chart {
-		height: 160px;
-	}
-
 	.vga-sentence-nav__btn {
 		min-width: 44px;
 		min-height: 44px;
@@ -637,8 +585,7 @@
 }
 
 /* ── Engine A/B panel refinements ─────────────────────────────── */
-.mc-nn-disclaimer,
-.mc-ref-disclaimer {
+.mc-nn-disclaimer {
 	font-size: 0.78rem;
 	color: var(--text-muted);
 	line-height: 1.6;
@@ -652,8 +599,8 @@
 @media (prefers-reduced-motion: reduce) {
 	.phone,
 	.vga-transcript,
-	.vga-trend-sentence-band,
-	.vga-sentence-nav__btn {
+	.vga-sentence-nav__btn,
+	.vga-timeline__cursor {
 		transition: none;
 	}
 

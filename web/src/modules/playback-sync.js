@@ -2,8 +2,8 @@
  * playback-sync.js — Central bus wiring between WaveSurfer and timeline children.
  *
  * Subscribes to WaveSurfer events (audioprocess, seeking, play, pause, finish)
- * and translates them into bus events consumed by HeatmapBand, TranscriptRow,
- * and TrendChart.
+ * and translates them into bus events consumed by the two HeatmapBand
+ * instances (pitch + resonance) and TranscriptRow.
  *
  * Owns both the active-char and active-sentence computations so that all
  * consumers share a single pass per tick.
