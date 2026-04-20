@@ -24,7 +24,10 @@ import json
 import logging
 import os
 import random
+import re
 import shutil
+import subprocess
+import tempfile
 import traceback
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
@@ -76,6 +79,90 @@ def _load_weights() -> list[float]:
 
 WEIGHTS: list[float] = _load_weights()
 LANG = "zh"
+
+# ── Silence detection ───────────────────────────────────────────────
+# The vendored preprocessing.process() already runs ffmpeg silencedetect
+# internally (for noise-profile extraction) but discards the ranges.  We
+# re-run it here so the wrapper owns the signal without having to patch the
+# vendored library.  Cost: ~100-300 ms of extra ffmpeg on the request path,
+# trivial next to MFA alignment.
+#
+# Thresholds match preprocessing.py:30 (-30 dB, min 0.5 s) so the ranges
+# returned here line up with what process() uses internally.  These also
+# match the frontend's mental model: any pause the user hears as a sentence
+# boundary will exceed 0.5 s at conversational speech levels.
+_SILENCE_RE = re.compile(r"silence_(start|end):\s*(-?[\d.]+)")
+
+
+def _detect_silence(
+    audio_bytes: bytes,
+    threshold_db: int = -30,
+    min_dur_sec: float = 0.5,
+) -> list[dict[str, float]]:
+    """Return [{start, end}] silence intervals via ffmpeg silencedetect.
+
+    Defensive: never raises — returns `[]` on any failure (ffmpeg missing,
+    decode error, timeout).  Caller treats empty list as "no info" and falls
+    back to the phone-gap heuristic.
+    """
+    if not audio_bytes:
+        return []
+    tmp_path: str | None = None
+    try:
+        # delete=False + manual unlink so ffmpeg (separate process) can open
+        # the file on OSes where NamedTemporaryFile holds an exclusive lock.
+        with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
+        proc = subprocess.run(  # noqa: S603 — args are hard-coded, no shell
+            [
+                settings["ffmpeg"],
+                "-nostats",
+                "-i",
+                tmp_path,
+                "-af",
+                f"silencedetect=n={threshold_db}dB:d={min_dur_sec}",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+        logger.warning("silencedetect failed: %s", exc)
+        return []
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    starts: list[float] = []
+    ends: list[float] = []
+    for line in (proc.stderr or "").splitlines():
+        m = _SILENCE_RE.search(line)
+        if not m:
+            continue
+        try:
+            val = float(m.group(2))
+        except ValueError:
+            continue
+        (starts if m.group(1) == "start" else ends).append(val)
+
+    # Pair each start with the first end that comes after it.  Handles the
+    # normal case (balanced pairs) plus edge cases: audio starts in silence
+    # (stray leading end → dropped) or ends in silence (trailing start with
+    # no end → dropped).  Downstream only trusts closed intervals.
+    pairs: list[dict[str, float]] = []
+    end_idx = 0
+    for s in starts:
+        while end_idx < len(ends) and ends[end_idx] <= s:
+            end_idx += 1
+        if end_idx >= len(ends):
+            break
+        pairs.append({"start": round(s, 3), "end": round(ends[end_idx], 3)})
+        end_idx += 1
+    return pairs
 
 
 @app.get("/healthz")
@@ -140,11 +227,18 @@ async def analyze(
         os.chdir(saved_cwd)
 
     try:
+        # Run silencedetect alongside the main pipeline.  Independent of MFA,
+        # so even if alignment fails we'd still have the ranges — but we
+        # only reach the return on full success anyway, so we compute it
+        # here to keep the happy path linear.
+        silence_ranges = _detect_silence(audio_bytes)
+
         praat_output = preprocessing.process(audio_bytes, transcript, tmp_dir, LANG)
         data = phones.parse(praat_output, LANG)
         if not data.get("phones"):
             raise RuntimeError("MFA produced no alignment output")
         resonance.compute_resonance(data, WEIGHTS, LANG)
+        data["silenceRanges"] = silence_ranges
         return data
     except HTTPException:
         raise
@@ -153,7 +247,7 @@ async def analyze(
         # stderr / file paths / command lines used to leak via `detail`.
         # Full traceback stays in server logs for ops.
         logger.warning("Engine C analyze failed: %s", exc)
-        logger.debug("Engine C trace:\n%s", traceback.format_exc())
+        logger.warning("Engine C trace:\n%s", traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail="engine_c pipeline failed",

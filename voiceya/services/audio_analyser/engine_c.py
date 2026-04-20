@@ -99,6 +99,22 @@ async def run_engine_c(
     raw_phones = data.get("phones") or []
     phones = _build_phone_array(raw_phones, data.get("words") or [])
 
+    # Silence ranges come from ffmpeg silencedetect (-30 dB, 0.5s min) run
+    # in the sidecar wrapper alongside MFA.  The frontend uses them as the
+    # authoritative sentence-break signal — more reliable than inferring
+    # pauses from phone-to-phone gaps (Praat writes every phone's end = next
+    # phone's start, so phone gaps are always ~0 even across real silences).
+    raw_silence = data.get("silenceRanges") or []
+    silence_ranges = [
+        {"start": s, "end": e}
+        for s, e in (
+            (_safe_float(r.get("start")), _safe_float(r.get("end")))
+            for r in raw_silence
+            if isinstance(r, dict)
+        )
+        if s is not None and e is not None and e > s
+    ]
+
     summary = {
         "mean_pitch_hz": _safe_float(data.get("meanPitch")),
         "median_pitch_hz": _safe_float(data.get("medianPitch")),
@@ -110,6 +126,7 @@ async def run_engine_c(
         "word_count": len(data.get("words") or []),
         "transcript": transcript,
         "phones": phones,
+        "silence_ranges": silence_ranges,
     }
 
     logger.info(

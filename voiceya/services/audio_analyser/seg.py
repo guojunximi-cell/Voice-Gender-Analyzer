@@ -1,6 +1,7 @@
 import asyncio
 import gc
 import logging
+import os
 import sys
 
 import numpy as np
@@ -138,17 +139,20 @@ async def load_seg():
         return
 
     logger.info("正在载入 AI 模型…")
+    energy_ratio = float(os.getenv("ENGINE_A_ENERGY_RATIO", "0.07"))
 
     try:
         _patch_segmenter_for_frame_confidence()
-        seg = await asyncio.to_thread(Segmenter, detect_gender=True, ffmpeg=None)
+        seg = await asyncio.to_thread(
+            Segmenter, detect_gender=True, ffmpeg=None, energy_ratio=energy_ratio
+        )
 
     except Exception as e:
         logger.fatal("Engine A 加载失败: %s", e)
         sys.exit(-1)
 
     # ── logit 模型诊断 ──
-    logger.info("Engine A (inaSpeechSegmenter) 加载完毕")
+    logger.info("Engine A (inaSpeechSegmenter) 加载完毕 (energy_ratio=%s)", energy_ratio)
     if hasattr(seg, "gender"):
         _g = seg.gender
         logger.info(

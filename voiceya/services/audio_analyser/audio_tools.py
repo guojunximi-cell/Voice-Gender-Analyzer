@@ -30,7 +30,14 @@ def get_duraton_sec(s: InputContainer) -> float:
     elif s.duration is not None:
         duration = s.duration / 1_000_000
     else:
-        raise HTTPException(status_code=400, detail="无法读取音频时长")
+        # 浏览器 MediaRecorder 产出的 webm/ogg 通常两级 duration 都缺失 —
+        # 只能实打实解码数样本。文件大小已被 max_file_size_mb 封顶，开销可控。
+        sample_rate = i_stm.rate
+        if sample_rate is None:
+            raise HTTPException(status_code=400, detail="无法读取音频时长")
+        n_samples = sum(frame.samples for frame in s.decode(i_stm))
+        duration = n_samples / sample_rate
+        logger.info("duration 回退到样本计数：%d 采样", n_samples)
 
     logger.info("音频时长 %.2f 秒", duration)
 
