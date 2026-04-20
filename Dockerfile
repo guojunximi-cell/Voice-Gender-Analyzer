@@ -23,12 +23,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # 构建时依赖：libsndfile1 / ffmpeg 给 init_iss_model.py 预热模型用
 # build-essential (g++ 等) 是 editdistance 0.8.1 (funasr 间接依赖) 编译 Cython 扩展所必需的。
+# git 给下方 submodule 兜底用：Railway 的 build context 不 recurse submodule，
+# 需要检测空目录再手动 clone。
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libsndfile1 \
         ffmpeg \
         ca-certificates \
         build-essential \
+        git \
     && rm -rf /var/lib/apt/lists/*
 
 ENV UV_NO_DEV=1 \
@@ -37,6 +40,15 @@ ENV UV_NO_DEV=1 \
 
 WORKDIR /build
 COPY . .
+
+# Railway 兜底：build context 不 recurse submodule 时，gitlink 目录为空。
+# 检测不到 submodule 的 setup.py 就手动 clone 到对应 commit。
+# 本地 submodule 已填充时 test -f 直接跳过，不影响本地构建。
+ARG INA_SS_COMMIT=7568394
+RUN test -f voiceya/inaSpeechSegmenter/setup.py \
+    || (rm -rf voiceya/inaSpeechSegmenter \
+        && git clone https://github.com/k3-cat/inaSpeechSegmenter.git voiceya/inaSpeechSegmenter \
+        && git -C voiceya/inaSpeechSegmenter checkout ${INA_SS_COMMIT})
 
 # 安装依赖到 /build/.venv（--no-editable 让项目以 wheel 形式装进 site-packages）
 RUN uv sync --locked --no-dev --no-editable
