@@ -146,88 +146,45 @@ function _mean(arr) {
 }
 
 /**
- * Group consecutive characters into sentences.
+ * Slice chars into fixed-size pages of `charCount` real hanzi each.
  *
- * Primary signal (when `silenceRanges` is non-empty): any silence interval
- * falling between two adjacent real chars triggers a sentence break.  These
- * ranges come from ffmpeg `silencedetect -30dB:d=0.5` in the sidecar — an
- * authoritative acoustic measurement, immune to MFA's habit of gluing
- * mid-sentence silence onto the preceding hanzi's phone cell.
+ * Pure width-driven: ignores acoustic signals (silence, phone gaps) entirely.
+ * Caller picks `charCount` from `⌊containerPx / readablePxPerChar⌋`, so the
+ * resulting pagination tracks the viewport.  Spacer cells (empty `char`) are
+ * never counted toward the page size and never kept in the page's `chars`
+ * array — they live only in the original `chars[]` for time-continuity.
  *
- * Fallback (when `silenceRanges` is empty): phone-to-phone gap > 0.5 s.
- * Unreliable when MFA attributes silence phones to the preceding word
- * (gap is then ~0), which is why Level 2 was added.
- *
- * Cap (always on): sentence length ≥ 15 real chars → forced split, so the
- * UI never has to fit an unreadable 30-char line in one row.
- *
- * Spacer cells (empty `char`) are skipped in both signal paths.
- *
- * Each sentence: { start, end, startIdx, endIdx, chars: [...] }
- * where startIdx / endIdx point into the ORIGINAL chars array (inclusive,
- * both pointing at real chars), so PlaybackSync can map activeCharIdx →
- * sentenceIdx without a second filter.
+ * Each page has the same shape as the previous acoustic-sentence output, so
+ * HeatmapBand and TranscriptRow consume it unchanged:
+ *   { start, end, startIdx, endIdx, chars: [realCharRefs] }
+ * `startIdx` / `endIdx` point into the ORIGINAL chars[] (inclusive, both
+ * pointing at real chars) — PlaybackSync uses these to map activeCharIdx → pageIdx.
  */
-export function groupCharsIntoSentences(chars, silenceRanges = []) {
+export function groupCharsByWidth(chars, { charCount } = {}) {
 	if (!chars?.length) return [];
+	const N = Math.max(1, Math.floor(charCount || 1));
 
-	const sentences = [];
+	const pages = [];
 	let cur = { chars: [], startIdx: -1, endIdx: -1 };
-	let lastRealEnd = -Infinity;
-	const MAX_CHARS = 15;
-	const GAP_SEC = 0.5;
 
-	// 10 ms slop for silence-range containment: phone timings and silence
-	// timings both round to 3 decimals but come from different subprocess
-	// runs, so allow tiny misalignment at the edges.
-	const SLOP = 0.01;
-	const hasSilenceInfo = silenceRanges && silenceRanges.length > 0;
-	// Sorted copy + advancing pointer — avoids an O(N*M) scan when both are
-	// large.  Silences are monotone in time; so is the char loop.
-	const silences = hasSilenceInfo ? [...silenceRanges].sort((a, b) => a.start - b.start) : [];
-	let silenceCursor = 0;
-
-	const hasSilenceBetween = (prevEnd, curStart) => {
-		// Advance past silences that ended before prevEnd — they belong to an
-		// earlier gap and can't split this pair.
-		while (silenceCursor < silences.length && silences[silenceCursor].end < prevEnd - SLOP) {
-			silenceCursor++;
-		}
-		for (let k = silenceCursor; k < silences.length; k++) {
-			const s = silences[k];
-			if (s.start > curStart + SLOP) break; // past the gap — none remaining can match
-			if (s.start >= prevEnd - SLOP && s.end <= curStart + SLOP) return true;
-		}
-		return false;
-	};
-
-	const closeSentence = () => {
+	const closePage = () => {
 		if (!cur.chars.length) return;
 		cur.start = cur.chars[0].start;
 		cur.end = cur.chars[cur.chars.length - 1].end;
-		sentences.push(cur);
+		pages.push(cur);
 		cur = { chars: [], startIdx: -1, endIdx: -1 };
 	};
 
 	for (let i = 0; i < chars.length; i++) {
 		const c = chars[i];
-		if (!c.char) continue; // skip spacer cells
-
-		if (cur.chars.length > 0) {
-			const shouldSplit = hasSilenceInfo ? hasSilenceBetween(lastRealEnd, c.start) : c.start - lastRealEnd > GAP_SEC;
-			if (shouldSplit || cur.chars.length >= MAX_CHARS) {
-				closeSentence();
-			}
-		}
-
+		if (!c.char) continue; // spacer cells don't count toward page capacity
 		if (cur.startIdx === -1) cur.startIdx = i;
 		cur.endIdx = i;
 		cur.chars.push(c);
-		lastRealEnd = c.end;
+		if (cur.chars.length >= N) closePage();
 	}
-	closeSentence();
-
-	return sentences;
+	closePage();
+	return pages;
 }
 
 /**

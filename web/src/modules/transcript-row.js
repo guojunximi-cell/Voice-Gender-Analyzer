@@ -2,16 +2,15 @@
  * transcript-row.js — Sentence-paginated hanzi transcript.
  *
  * Two explicit entry points for sentence switching:
- *   setActiveSentenceFromPlayback(idx) — playback-driven, NEVER scrolls the page
- *   setActiveSentenceFromUserNav(idx)  — user clicked prev/next, may scrollIntoView
+ *   setActiveSentenceFromPlayback(idx) — playback-driven
+ *   setActiveSentenceFromUserNav(idx)  — user clicked prev/next
  *
+ * Neither scrolls the document — see results.js for the rationale (page-level
+ * scrollIntoView cascades to ancestors and visibly jumps the whole page).
  * The distinction is semantic (two named methods), not heuristic — no
  * timestamps, no flags guessing intent.  PlaybackSync calls the first,
  * nav-button handlers call the second.
  *
- * Within the currently-displayed sentence, the active-char highlight still
- * uses scrollIntoView (char-level, not window-level) so karaoke sync inside
- * the visible transcript keeps working.
  */
 
 const FADE_MS = 150;
@@ -148,8 +147,7 @@ export class TranscriptRow {
 	}
 
 	/**
-	 * User-nav: rebuild and scroll the wrap into view ({block: 'nearest'},
-	 * so a fully-visible wrap stays put; only scrolls if scrolled off).
+	 * User-nav: rebuild the wrap in place — no page-level scroll.
 	 *
 	 * Also emits activeSentenceChanged so the two HeatmapBand instances and
 	 * GenderLegend follow the user's choice — without this, the transcript
@@ -160,7 +158,6 @@ export class TranscriptRow {
 	 */
 	setActiveSentenceFromUserNav(idx) {
 		this._renderSentence(idx, { animate: true });
-		this._wrap?.scrollIntoView({ block: "nearest" });
 		this.state.activeSentenceIdx = idx;
 		this.bus.emit("activeSentenceChanged", {
 			prevIdx: -1,
@@ -177,49 +174,34 @@ export class TranscriptRow {
 		this.currentSentenceIdx = clamped;
 		const s = this.sentences[clamped];
 
-		// Sentence's time window — used to compute each char's left/width as
-		// percentages of the row, mirroring HeatmapBand's `viewBox="0 0 sDur 1"`
-		// so column positions match exactly between the two rows.
-		const sStart = s.start;
-		const sDur = Math.max(0.001, s.end - s.start);
-
 		const rebuild = () => {
 			this._group.innerHTML = "";
 			this._btnByCharIdx = new Map();
 			this._activeBtn = null;
 
-			// Container width × widthPct = the time-allocated pixel width of each
-			// button.  We pick ONE uniform font size for every char in the
-			// sentence — driven by the narrowest cell — so the row reads as a
-			// proper line of text rather than a ransom-note mix of sizes.  The
-			// narrowest cell still fits its glyph (Chinese width ≈ font-size, ~10 %
-			// safety margin), and wider cells just show the same-size glyph
-			// centred in extra whitespace.
-			const groupWidth = this._group.clientWidth || this._wrap?.clientWidth || 360;
-			const CHAR_FONT_MAX = 28;
-			const CHAR_FONT_MIN = 14;
-			let minWidthPx = Infinity;
-			for (let i = 0; i < s.chars.length; i++) {
-				const c = s.chars[i];
-				const widthPct = ((c.end - c.start) / sDur) * 100;
-				const expectedPx = (widthPct / 100) * groupWidth;
-				if (expectedPx < minWidthPx) minWidthPx = expectedPx;
+			// Equal-width slot layout: each char gets exactly 1/N of the row
+			// width, mirroring HeatmapBand's `viewBox="0 0 N 1"`.  Column i in
+			// all three rows (pitch band / hanzi / resonance band) occupies
+			// the same pixel range at any viewport width, and glyphs never
+			// overlap because the slot is always ≥ PX_PER_CHAR (32 px).
+			const N = s.chars.length;
+			if (!N) {
+				this._updateNav();
+				return;
 			}
-			const charFont = Math.max(CHAR_FONT_MIN, Math.min(CHAR_FONT_MAX, Math.floor(minWidthPx * 0.9)));
+			const GLYPH_PX = 28;
+			const slotPct = 100 / N;
 
-			for (let i = 0; i < s.chars.length; i++) {
+			for (let i = 0; i < N; i++) {
 				const c = s.chars[i];
-				const leftPct = ((c.start - sStart) / sDur) * 100;
-				const widthPct = ((c.end - c.start) / sDur) * 100;
-
 				const btn = document.createElement("button");
 				btn.type = "button";
 				btn.className = "phone";
 				btn.tabIndex = i === 0 ? 0 : -1;
 				btn.setAttribute("aria-current", "false");
-				btn.style.left = `${leftPct}%`;
-				btn.style.width = `${widthPct}%`;
-				btn.innerHTML = `<span class="phone__char" style="font-size:${charFont}px">${_esc(c.char)}</span>`;
+				btn.style.left = `${i * slotPct}%`;
+				btn.style.width = `${slotPct}%`;
+				btn.innerHTML = `<span class="phone__char" style="font-size:${GLYPH_PX}px">${_esc(c.char)}</span>`;
 				btn._charData = c;
 				btn.addEventListener("click", () => {
 					this.bus.emit("seek", c.start);

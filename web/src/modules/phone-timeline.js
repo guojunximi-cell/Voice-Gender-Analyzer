@@ -15,11 +15,18 @@ import { divergingPitch, divergingResonance } from "./diverging.js";
 import { renderFallback, renderLowPhoneBanner, renderNoSpeech } from "./engine-c-fallback.js";
 import { GenderLegend } from "./gender-legend.js";
 import { HeatmapBand } from "./heatmap-band.js";
-import { groupCharsIntoSentences, groupPhonesByChar } from "./phone-utils.js";
+import { findSentenceIdx, groupCharsByWidth, groupPhonesByChar } from "./phone-utils.js";
 import { PlaybackSync } from "./playback-sync.js";
 import { TranscriptRow } from "./transcript-row.js";
 
 const LOW_PHONE_THRESHOLD = 8;
+
+// Width-based pagination: one page per ⌊contentWidth / PX_PER_CHAR⌋ real hanzi.
+// 32 px/char is the user-confirmed readability target (≈ 28 px glyph + padding).
+// MIN_CHARS_PER_PAGE keeps extremely narrow containers (<200 px) from producing
+// single-char pages that nav-spam the user.
+const PX_PER_CHAR = 32;
+const MIN_CHARS_PER_PAGE = 6;
 
 const pitchTitleFn = (p) => {
 	const charLabel = p.char || "\u2205";
@@ -58,10 +65,15 @@ export class PhoneTimeline {
 		this._onCursorMove = null;
 		this._onCursorLeave = null;
 		this._cursorRowsEl = null;
+		this._resizeObs = null;
+		this._state = null;
+		this._charsPerPage = 0;
 	}
 
 	/** Show the loading skeleton. */
 	setLoading() {
+		this._resizeObs?.disconnect();
+		this._resizeObs = null;
 		this._destroyChildren();
 		this.root.innerHTML = `
 			<div class="vga-timeline" data-state="skeleton">
@@ -78,6 +90,8 @@ export class PhoneTimeline {
 	 */
 	setData(engineC) {
 		if (!this._rendered) return;
+		this._resizeObs?.disconnect();
+		this._resizeObs = null;
 		this._destroyChildren();
 
 		const timeline = this.root.querySelector(".vga-timeline");
@@ -104,48 +118,10 @@ export class PhoneTimeline {
 			return;
 		}
 
-		// Group phones into character cells, then characters into sentences.
-		// silence_ranges (Level 2) is the authoritative split signal when the
-		// sidecar returns it; groupCharsIntoSentences falls back to a phone-
-		// gap heuristic if it's empty or absent.
+		// Group phones into character cells.  Pagination happens below, after
+		// the layout DOM is in place so we can measure the band's real width.
 		this._chars = groupPhonesByChar(engineC.phones);
-		this._sentences = groupCharsIntoSentences(this._chars, engineC.silence_ranges || []);
-
-		// Dev diagnostic: expose the aggregated data + silence ranges so we
-		// can verify Level 2 is doing the splitting.  In DevTools, look at:
-		//   window._vgaSilenceRanges   → authoritative pauses from ffmpeg
-		//   window._vgaSentences       → resulting sentence cuts
-		//   window._vgaChars           → full char cells with gap-to-prev
-		if (import.meta.env.DEV && typeof window !== "undefined") {
-			let lastRealEnd = -Infinity;
-			window._vgaChars = this._chars.map((c, i) => {
-				const gap = c.char ? c.start - lastRealEnd : null;
-				if (c.char) lastRealEnd = c.end;
-				return {
-					i,
-					char: c.char || "·spacer·",
-					start: +c.start.toFixed(3),
-					end: +c.end.toFixed(3),
-					dur: +(c.end - c.start).toFixed(3),
-					gapToPrev: gap == null ? "" : +gap.toFixed(3),
-					phoneLabels: c.phones.map((p) => p.phone).join(","),
-				};
-			});
-			window._vgaSentences = this._sentences.map((s, i) => ({
-				i,
-				start: +s.start.toFixed(3),
-				end: +s.end.toFixed(3),
-				text: s.chars.map((c) => c.char).join(""),
-				len: s.chars.length,
-			}));
-			window._vgaSilenceRanges = engineC.silence_ranges || [];
-			// biome-ignore lint/suspicious/noConsole: dev-only diagnostic
-			console.log(
-				`[Engine C] ${window._vgaSentences.length} sentences, ${window._vgaSilenceRanges.length} silence ranges`,
-			);
-			// biome-ignore lint/suspicious/noConsole: dev-only diagnostic
-			console.table(window._vgaSentences);
-		}
+		this._engineC = engineC;
 
 		// Dev-mode scroll monitor: verify no unexpected scroll occurs during
 		// playback.  The app uses a fixed-height .app-layout with the actual
@@ -215,7 +191,66 @@ export class PhoneTimeline {
 			renderLowPhoneBanner(timeline, engineC.phone_count);
 		}
 
-		// Create shared state + bus
+		// Measure real content width now that the layout DOM exists, slice
+		// chars into width-sized pages, log dev diagnostics, then mount the
+		// interactive children.  _mountInteractive is reused by _maybeReslice
+		// on resize.
+		this._charsPerPage = this._computeCharsPerPage();
+		this._sentences = groupCharsByWidth(this._chars, { charCount: this._charsPerPage });
+		this._logDevDiagnostic();
+		this._mountInteractive({ initialSentenceIdx: 0 });
+
+		// Rebuild pagination when content width crosses a char boundary.
+		const pitchBandEl = timeline.querySelector(".vga-timeline__band--pitch");
+		if (pitchBandEl) {
+			this._resizeObs = new ResizeObserver(() => this._maybeReslice());
+			this._resizeObs.observe(pitchBandEl);
+		}
+	}
+
+	/**
+	 * Measure content-slot width and derive `⌊w / PX_PER_CHAR⌋` page size.
+	 * Falls back through rows → root when an inner slot hasn't laid out yet.
+	 */
+	_computeCharsPerPage() {
+		const pitchBand = this.root.querySelector(".vga-timeline__band--pitch");
+		const rowsEl = this.root.querySelector(".vga-timeline__rows");
+		const w = pitchBand?.clientWidth || rowsEl?.clientWidth || this.root.clientWidth || 320;
+		return Math.max(MIN_CHARS_PER_PAGE, Math.floor(w / PX_PER_CHAR));
+	}
+
+	/**
+	 * Re-slice chars when N changes on resize.  Destroys + re-mounts the
+	 * interactive children so their internal sentence caches stay in sync;
+	 * the ResizeObserver's `next === current` early-return keeps this from
+	 * running on every px of resize drag.
+	 */
+	_maybeReslice() {
+		const next = this._computeCharsPerPage();
+		if (next === this._charsPerPage || !this._chars?.length) return;
+		this._charsPerPage = next;
+		this._sentences = groupCharsByWidth(this._chars, { charCount: next });
+
+		// Preserve visual continuity: land on the page containing the currently
+		// active char.  -1 or not-found → first page.
+		const activeCharIdx = this._state?.activeCharIdx ?? -1;
+		const targetPage = Math.max(0, findSentenceIdx(activeCharIdx, this._sentences));
+
+		this._destroyChildren();
+		this._logDevDiagnostic();
+		this._mountInteractive({ initialSentenceIdx: targetPage });
+	}
+
+	/**
+	 * Mount HeatmapBand x 2, TranscriptRow, GenderLegend, crosshair handlers
+	 * and PlaybackSync against the current `this._sentences`.  Reused by
+	 * initial `setData` and by `_maybeReslice`.
+	 */
+	_mountInteractive({ initialSentenceIdx }) {
+		const timeline = this.root.querySelector(".vga-timeline");
+		if (!timeline) return;
+		const engineC = this._engineC;
+
 		const reducedMotion =
 			matchMedia("(prefers-reduced-motion: reduce)").matches || localStorage.getItem("vga.reducedMotion") === "1";
 
@@ -224,15 +259,15 @@ export class PhoneTimeline {
 			sentences: this._sentences,
 			currentTime: 0,
 			activeCharIdx: -1,
-			activeSentenceIdx: 0,
+			activeSentenceIdx: initialSentenceIdx,
 			isPlaying: false,
 			autoScroll: true,
 			reducedMotion,
 		};
+		this._state = state;
 
 		this._bus = createBus();
 
-		// Mount children
 		const pitchBandEl = timeline.querySelector(".vga-timeline__band--pitch");
 		const resonanceBandEl = timeline.querySelector(".vga-timeline__band--resonance");
 		const transcriptEl = timeline.querySelector(".vga-timeline__transcript");
@@ -254,10 +289,10 @@ export class PhoneTimeline {
 			colorFn: (p) => divergingPitch(p.charPitch),
 			titleFn: pitchTitleFn,
 			ariaLabel: "音高热力带，每个汉字的音高（不发声辅音继承该字的元音值）",
-			ariaDescription: "当前句的音高热力带",
+			ariaDescription: "当前页的音高热力带",
 		});
 
-		// Transcript row (paginated by sentence).  navContainer / readoutContainer
+		// Transcript row (paginated by width).  navContainer / readoutContainer
 		// lift the nav (below resonance) and the active-char readout (above
 		// pitch band) out of the transcript wrap, keeping the three time-
 		// aligned rows (pitch / hanzi / resonance) as one uninterrupted block.
@@ -271,6 +306,7 @@ export class PhoneTimeline {
 			navContainer: navEl,
 			readoutContainer: readoutEl,
 		});
+		if (initialSentenceIdx > 0) this._transcript.setActiveSentenceFromUserNav(initialSentenceIdx);
 
 		// Resonance heatmap (bottom)
 		this._resonanceBand = new HeatmapBand();
@@ -282,7 +318,7 @@ export class PhoneTimeline {
 			colorFn: (p) => divergingResonance(p.resonance),
 			titleFn: resonanceTitleFn,
 			ariaLabel: "共鸣热力带，每格代表一个音素的共鸣值 0–1",
-			ariaDescription: "当前句的共鸣热力带；女声阈值 = 0.587",
+			ariaDescription: "当前页的共鸣热力带；女声阈值 = 0.587",
 		});
 
 		this._legend = new GenderLegend();
@@ -316,8 +352,40 @@ export class PhoneTimeline {
 			this._sync.init();
 		}
 
-		// Announce completion to screen readers
-		this._announceReady(this._chars.filter((c) => c.char).length);
+		// Announce completion to screen readers (initial mount only).
+		if (initialSentenceIdx === 0) this._announceReady(this._chars.filter((c) => c.char).length);
+	}
+
+	_logDevDiagnostic() {
+		if (!(import.meta.env.DEV && typeof window !== "undefined")) return;
+		let lastRealEnd = -Infinity;
+		window._vgaChars = this._chars.map((c, i) => {
+			const gap = c.char ? c.start - lastRealEnd : null;
+			if (c.char) lastRealEnd = c.end;
+			return {
+				i,
+				char: c.char || "·spacer·",
+				start: +c.start.toFixed(3),
+				end: +c.end.toFixed(3),
+				dur: +(c.end - c.start).toFixed(3),
+				gapToPrev: gap == null ? "" : +gap.toFixed(3),
+				phoneLabels: c.phones.map((p) => p.phone).join(","),
+			};
+		});
+		window._vgaSentences = this._sentences.map((s, i) => ({
+			i,
+			start: +s.start.toFixed(3),
+			end: +s.end.toFixed(3),
+			text: s.chars.map((c) => c.char).join(""),
+			len: s.chars.length,
+		}));
+		window._vgaSilenceRanges = this._engineC?.silence_ranges || [];
+		// biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+		console.log(
+			`[Engine C] ${window._vgaSentences.length} pages × ${this._charsPerPage} chars (width-sliced, silence_ranges unused)`,
+		);
+		// biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+		console.table(window._vgaSentences);
 	}
 
 	/** Set error/failure state. */
@@ -333,10 +401,14 @@ export class PhoneTimeline {
 
 	/** Clean up everything. */
 	destroy() {
+		this._resizeObs?.disconnect();
+		this._resizeObs = null;
 		this._destroyChildren();
 		this.root.innerHTML = "";
 		this._rendered = false;
 		this._chars = [];
+		this._engineC = null;
+		this._state = null;
 	}
 
 	/** Tear down child components without clearing the root container. */

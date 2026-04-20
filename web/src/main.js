@@ -683,7 +683,6 @@ async function initScatterFromStorage() {
 	document.addEventListener("segment-select", () => {
 		if (mq.matches) {
 			applyTab("metrics");
-			rightPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 		}
 	});
 

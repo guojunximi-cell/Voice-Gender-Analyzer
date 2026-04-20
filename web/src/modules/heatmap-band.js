@@ -1,12 +1,17 @@
 /**
- * heatmap-band.js — SVG heatmap band, rendered per current sentence.
+ * heatmap-band.js — SVG heatmap band, rendered per current page.
  *
  * Each visible <rect> is one phone, colored through a caller-supplied
  * `colorFn(phone)`.  Two bands live in the timeline: one keyed on pitch,
  * one on resonance.  Null / non-finite color → hatch pattern fallback.
  *
- * The heatmap follows the currently-active sentence: viewBox = the
- * sentence's duration, so each row always fills the full width.
+ * Layout: char-slot aligned, not time-proportional.  viewBox width = number
+ * of real hanzi in the page; each char occupies exactly 1 unit.  Inside a
+ * char's slot, its phones subdivide by their relative durations within the
+ * char, so sub-char timing is preserved while macro columns (pitch cell /
+ * hanzi / resonance cell at index i) stay rigidly aligned across the three
+ * rows at any viewport width.  Silence phones between chars are skipped —
+ * the page has exactly N slots for N real hanzi.
  */
 
 import { divergingResonance } from "./diverging.js";
@@ -102,19 +107,18 @@ export class HeatmapBand {
 
 	_highlightAt(t) {
 		if (!this.rects?.length) return;
-		const s = this.sentences[this.currentSentenceIdx];
-		if (!s || t < s.start || t > s.end) {
+		const page = this.sentences[this.currentSentenceIdx];
+		if (!page || t < page.start || t > page.end) {
 			if (this._activeRect) {
 				this._activeRect.classList.remove("active");
 				this._activeRect = null;
 			}
 			return;
 		}
-		// Linear find — phones per sentence are small (<40 typically)
+		// Linear find — phones per page are small (typically <60)
 		let hit = null;
 		for (let j = 0; j < this.rects.length; j++) {
-			const pIdx = this.phoneIdxByRect[j];
-			const p = this.phones[pIdx];
+			const p = this.phoneRefs[j];
 			if (t >= p.start && t < p.end) {
 				hit = this.rects[j];
 				break;
@@ -131,52 +135,64 @@ export class HeatmapBand {
 		if (!this.sentences.length) return;
 		const clamped = Math.max(0, Math.min(this.sentences.length - 1, idx));
 		this.currentSentenceIdx = clamped;
-		const s = this.sentences[clamped];
-		const sDur = Math.max(0.01, s.end - s.start);
+		const page = this.sentences[clamped];
+		const N = page.chars.length;
 
-		// Clear previous rects/refline (keep <defs>)
+		// Clear previous rects (keep <defs>)
 		while (this.svg.children.length > 1) {
 			this.svg.removeChild(this.svg.lastChild);
 		}
-		this.svg.setAttribute("viewBox", `0 0 ${sDur} 1`);
-
 		this.rects = [];
-		this.phoneIdxByRect = [];
+		this.phoneRefs = [];
 
-		// Filter phones within the sentence's time window
-		for (let i = 0; i < this.phones.length; i++) {
-			const p = this.phones[i];
-			if (p.start >= s.end || p.end <= s.start) continue;
-			const x = Math.max(0, p.start - s.start);
-			const w = Math.max(0.001, Math.min(sDur, p.end - s.start) - x);
+		if (!N) {
+			this.svg.setAttribute("aria-description", this.ariaDescription);
+			return;
+		}
 
-			const rect = document.createElementNS(NS, "rect");
-			rect.setAttribute("x", x);
-			rect.setAttribute("width", w);
-			rect.setAttribute("y", "0");
-			rect.setAttribute("height", "1");
+		// viewBox unit = one char slot. preserveAspectRatio=none stretches the
+		// N unit-wide slots to fill the container, guaranteeing column i here
+		// aligns with hanzi cell i (TranscriptRow uses `left: (i/N)*100%`).
+		this.svg.setAttribute("viewBox", `0 0 ${N} 1`);
 
-			const color = this.colorFn(p);
-			rect.setAttribute("fill", color ?? `url(#${this._hatchId})`);
-			rect.dataset.phoneIdx = i;
-			rect.setAttribute("tabindex", "0");
-			rect.setAttribute("role", "img");
+		for (let i = 0; i < N; i++) {
+			const c = page.chars[i];
+			const cDur = Math.max(0.001, c.end - c.start);
+			const phones = c.phones || [];
+			for (const p of phones) {
+				const localStart = Math.max(0, p.start - c.start);
+				const localEnd = Math.min(cDur, p.end - c.start);
+				if (localEnd <= localStart) continue;
+				const x = i + localStart / cDur;
+				const w = Math.max(0.001, (localEnd - localStart) / cDur);
 
-			const title = document.createElementNS(NS, "title");
-			title.textContent = this.titleFn(p);
-			rect.appendChild(title);
+				const rect = document.createElementNS(NS, "rect");
+				rect.setAttribute("x", x);
+				rect.setAttribute("width", w);
+				rect.setAttribute("y", "0");
+				rect.setAttribute("height", "1");
 
-			rect.addEventListener("click", () => this.bus.emit("seek", p.start));
-			rect.addEventListener("keydown", (e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					e.preventDefault();
-					this.bus.emit("seek", p.start);
-				}
-			});
+				const color = this.colorFn(p);
+				rect.setAttribute("fill", color ?? `url(#${this._hatchId})`);
+				rect.setAttribute("tabindex", "0");
+				rect.setAttribute("role", "img");
 
-			this.svg.appendChild(rect);
-			this.rects.push(rect);
-			this.phoneIdxByRect.push(i);
+				const title = document.createElementNS(NS, "title");
+				title.textContent = this.titleFn(p);
+				rect.appendChild(title);
+
+				rect.addEventListener("click", () => this.bus.emit("seek", p.start));
+				rect.addEventListener("keydown", (e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						this.bus.emit("seek", p.start);
+					}
+				});
+
+				this.svg.appendChild(rect);
+				this.rects.push(rect);
+				this.phoneRefs.push(p);
+			}
 		}
 
 		this.svg.setAttribute("aria-description", this.ariaDescription);
@@ -190,5 +206,6 @@ export class HeatmapBand {
 		this.svg?.remove();
 		this.svg = null;
 		this.rects = [];
+		this.phoneRefs = [];
 	}
 }
