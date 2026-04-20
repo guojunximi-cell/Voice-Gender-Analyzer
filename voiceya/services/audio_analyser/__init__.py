@@ -33,12 +33,17 @@ async def do_analyse(content: BytesIO, publish: PublisherT):
     await publish(ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…"))
 
     sample.seek(0)
-    analyse_results = await do_analyse_segments(sample, segmentation_results, publish)
+    # 开 Engine C 时给"开小灶"阶段留一大段进度预算（72→94）——它是最慢的一环，
+    # 进度太靠右会让用户以为马上就好，其实还要等 ASR + MFA + Praat 跑完。
+    seg_end_pct = 70 if CFG.engine_c_enabled else 95
+    analyse_results = await do_analyse_segments(
+        sample, segmentation_results, publish, end_pct=seg_end_pct
+    )
 
     # ── Engine C: 进阶分析（feature-flagged，默认关）────────
     engine_c_summary = None
     if CFG.engine_c_enabled:
-        await publish(ProgressSSE(pct=85, msg="鸭鸭开小灶做进阶分析…"))
+        await publish(ProgressSSE(pct=72, msg="鸭鸭开小灶做进阶分析…"))
         sample.seek(0)
         audio_bytes = sample.read()
         engine_c_summary = await run_engine_c(audio_bytes, analyse_results)

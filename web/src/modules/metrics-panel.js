@@ -102,9 +102,11 @@ export function renderMetricsPanel(summary, analysis) {
 	content.hidden = false;
 
 	// ── F0 card ─────────────────────────────────────────────
-	const pitch = ec.mean_pitch_hz;
+	// 卡片上的数字与下方"音高范围"指示器必须同源，否则 164 Hz 的文字会配
+	// 落在 200 Hz 附近的滑块，看起来自相矛盾。统一走 median（更鲁棒，也
+	// 与后端 overall_f0_median_hz 命名一致），mean 仅作 fallback。
+	const pitch = ec.median_pitch_hz ?? ec.mean_pitch_hz;
 	const pitchStd = ec.stdev_pitch_hz;
-	const pitchMedian = ec.median_pitch_hz ?? pitch;
 	animNum(document.getElementById("mc-f0-median"), Math.round(pitch ?? 0), " Hz");
 	const stdEl = document.getElementById("mc-f0-std");
 	if (stdEl) stdEl.textContent = `±${pitchStd != null ? Math.round(pitchStd) : "—"} Hz`;
@@ -124,12 +126,13 @@ export function renderMetricsPanel(summary, analysis) {
 	setFormant("mc-f2", f2);
 	setFormant("mc-f3", f3);
 
-	// ── Pitch range reference bar (indicator = median) ──────
+	// ── Pitch range reference bar ───────────────────────────
+	// 指示器必须与上面卡片的 pitch 同值，避免视觉不一致。
 	const pitchIndicator = document.getElementById("mc-pitch-indicator");
-	if (pitchIndicator && pitchMedian) {
+	if (pitchIndicator && pitch) {
 		const logMin = Math.log2(80),
 			logMax = Math.log2(320);
-		const logVal = Math.log2(Math.max(80, Math.min(320, pitchMedian)));
+		const logVal = Math.log2(Math.max(80, Math.min(320, pitch)));
 		const pct = ((logVal - logMin) / (logMax - logMin)) * 100;
 		requestAnimationFrame(() => {
 			pitchIndicator.style.left = `${pct}%`;
