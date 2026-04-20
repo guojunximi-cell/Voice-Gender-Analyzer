@@ -1098,17 +1098,32 @@ body {
 	position: absolute;
 	top: 50%;
 	transform: translateY(-50%);
-	height: 14px;
+	height: 16px;
 	left: 50%;
 	width: 0;
-	background: rgba(20, 20, 20, 0.35);
-	border: 1px solid var(--text-primary);
-	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.32);
+	backdrop-filter: blur(6px) saturate(1.25);
+	-webkit-backdrop-filter: blur(6px) saturate(1.25);
+	border: 1px solid rgba(255, 255, 255, 0.55);
+	border-radius: 999px;
+	box-shadow:
+		0 1px 4px rgba(0, 0, 0, 0.12),
+		inset 0 1px 0 rgba(255, 255, 255, 0.55);
 	box-sizing: border-box;
 	pointer-events: none;
 	transition:
 		left 500ms cubic-bezier(0.4, 0, 0.2, 1),
 		width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+	.pitch-range-span {
+		background: rgba(255, 255, 255, 0.12);
+		border-color: rgba(255, 255, 255, 0.28);
+		box-shadow:
+			0 1px 4px rgba(0, 0, 0, 0.35),
+			inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	}
 }
 
 .pitch-range-labels {
