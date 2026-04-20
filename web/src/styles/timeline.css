@@ -585,6 +585,14 @@
 }
 
 /* ── Engine A/B panel refinements ─────────────────────────────── */
+.mc-nn-segment-note {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	line-height: 1.55;
+	margin: 8px 0 0;
+	padding: 0 2px;
+}
+
 .mc-nn-disclaimer {
 	font-size: 0.78rem;
 	color: var(--text-muted);

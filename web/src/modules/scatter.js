@@ -9,6 +9,8 @@
  */
 
 import { scoreToColor as _scoreToColorUtil, resolveCSSVar } from "../utils.js";
+import { classifyForMode, dominantForMode } from "./classify.js";
+import { getMode } from "./classify-mode.js";
 
 // ─── Layout constants ────────────────────────────────────────
 const PAD = { top: 36, right: 44, bottom: 24, left: 48 };
@@ -87,11 +89,17 @@ function _h() {
 	return canvas.height / dpr;
 }
 
-/** Resolve gender score — mirrors renderGenderBar in metrics-panel.js. */
+/** Resolve gender score under the current classify mode.  engineA falls
+ *  through to the session's stored `label`/`confidence`; pitch/resonance
+ *  reclassify from Engine C phones when available, with graceful fallback. */
 function _getScore(s) {
-	const label = s.label;
+	const mode = getMode();
+	const { label, confidence } =
+		mode === "engineA"
+			? { label: s.label, confidence: s.confidence }
+			: dominantForMode(s, mode);
 	if (label !== "female" && label !== "male") return 50;
-	const conf = s.confidence != null ? s.confidence : s.gender_score != null ? s.gender_score / 100 : 0.5;
+	const conf = confidence != null ? confidence : s.gender_score != null ? s.gender_score / 100 : 0.5;
 	return label === "female" ? 50 + Math.min(conf, 1) * 50 : 50 - Math.min(conf, 1) * 50;
 }
 
@@ -232,7 +240,8 @@ function _draw() {
 
 		// Range extent line — shows min/max voiced segment score for selected session
 		if (isSelected && s.analysis) {
-			const voicedScores = s.analysis
+			const segs = classifyForMode(s, getMode());
+			const voicedScores = segs
 				.filter((seg) => seg.label === "male" || seg.label === "female")
 				.map((seg) => {
 					const c = seg.confidence ?? 0.5;

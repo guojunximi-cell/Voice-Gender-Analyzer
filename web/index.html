@@ -327,6 +327,40 @@
 				<section id="stats-section" class="card stats-section" hidden>
 					<div class="section-header">
 						<h2 class="section-title">声音占比</h2>
+						<div
+							id="classify-mode-switcher"
+							class="classify-mode-switcher"
+							role="radiogroup"
+							aria-label="占比依据"
+						>
+							<button
+								class="classify-mode-btn is-active"
+								data-mode="engineA"
+								role="radio"
+								aria-checked="true"
+								title="依 inaSpeechSegmenter 神经网络标签"
+							>
+								神经网络
+							</button>
+							<button
+								class="classify-mode-btn"
+								data-mode="pitch"
+								role="radio"
+								aria-checked="false"
+								title="依每个音素的基频（165 Hz 为中性线）"
+							>
+								音高
+							</button>
+							<button
+								class="classify-mode-btn"
+								data-mode="resonance"
+								role="radio"
+								aria-checked="false"
+								title="依每个音素的共鸣值（0.5 为中性线）"
+							>
+								共鸣
+							</button>
+						</div>
 					</div>
 					<div class="stats-grid">
 						<div class="stat-card stat-male">
@@ -366,7 +400,7 @@
 			<!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
 			<aside class="panel panel-right">
 				<div class="panel-header">
-					<span class="panel-title">声学特征</span>
+					<span class="panel-title">综合声学特征</span>
 					<span id="mc-segment-label" class="mc-segment-label"></span>
 				</div>
 
@@ -437,7 +471,7 @@
 
 					<!-- Engine A: Neural network estimate (reference only) -->
 					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header">神经网络估计 (供参考)</summary>
+						<summary class="mc-collapsible-header">神经网络估计</summary>
 						<div class="mc-collapsible-body">
 							<p class="mc-nn-disclaimer">
 								此估计来自一个在大规模语音数据上训练的分类器。它反映的是「典型听者可能如何感知你的声音」，不代表你的身份。
@@ -453,6 +487,9 @@
 								</div>
 							</div>
 							<div id="mc-certainty-tag" class="certainty-tag" hidden></div>
+							<p class="mc-nn-segment-note">
+								↑ 整段加权均值。分段详情里偏男/偏女交替是 AI 对中性区边界敏感的正常现象——不代表多说话者。
+							</p>
 						</div>
 					</details>
 

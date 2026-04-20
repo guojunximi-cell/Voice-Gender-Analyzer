@@ -1,5 +1,7 @@
 import { analyzeAudio, cancelAnalysis } from "./modules/analyzer.js";
 import * as audioCache from "./modules/audio-cache.js";
+import { classifyForMode, hasEngineC } from "./modules/classify.js";
+import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
 import { clearMetricsPanel, renderMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
@@ -50,6 +52,55 @@ function setAudioUnavailableHint(show) {
 	if (el) el.hidden = !show;
 }
 
+// ─── Classify mode (stats bar + waveform overlay + history scatter) ──
+// Rebuilds the virtual segments for the currently loaded analysis whenever
+// the user flips the switcher, and pushes them to the three display sites.
+function _renderClassifiedForCurrent() {
+	if (!analysisData) return;
+	const mode = getMode();
+	const segs = classifyForMode(analysisData, mode);
+	// Stats cards (声音占比) + waveform overlay both consume the same shape.
+	renderStats(segs);
+	drawTimeline(segs);
+}
+
+function _updateClassifyModeSwitcher() {
+	const switcher = $("classify-mode-switcher");
+	if (!switcher) return;
+	const mode = getMode();
+	const ecAvailable = hasEngineC(analysisData?.summary);
+	switcher.querySelectorAll(".classify-mode-btn").forEach((btn) => {
+		const m = btn.dataset.mode;
+		const isActive = m === mode;
+		btn.classList.toggle("is-active", isActive);
+		btn.setAttribute("aria-checked", isActive ? "true" : "false");
+		// pitch / resonance depend on Engine C phone data — lock them out when absent.
+		const needsEC = m === "pitch" || m === "resonance";
+		btn.disabled = needsEC && !ecAvailable;
+		btn.title = btn.disabled
+			? "该文件无 Engine C 音素数据（可能 Engine C 未启用或失败）"
+			: btn.dataset.originalTitle || btn.title;
+	});
+}
+
+function _initClassifyModeSwitcher() {
+	const switcher = $("classify-mode-switcher");
+	if (!switcher) return;
+	switcher.querySelectorAll(".classify-mode-btn").forEach((btn) => {
+		btn.dataset.originalTitle = btn.title;
+	});
+	switcher.addEventListener("click", (e) => {
+		const btn = e.target.closest(".classify-mode-btn");
+		if (!btn || btn.disabled) return;
+		setMode(btn.dataset.mode);
+	});
+	onModeChange(() => {
+		_updateClassifyModeSwitcher();
+		_renderClassifiedForCurrent();
+		scatterRedraw();
+	});
+}
+
 // ─── Toast ────────────────────────────────────────────────────
 let toastTimer = null;
 function showToast(msg, type = "") {
@@ -93,6 +144,14 @@ const _DUCK_MESSAGES = [
 let _duckRaf = null;
 let _duckMsgTimer = null;
 let _engineAInterp = null;
+let _engineCInterp = null;
+// High-water mark within a single analysis run — prevents backward motion
+// when out-of-order events (e.g. Engine C start after Engine B ramp) would
+// otherwise retract the bar. Reset in _finishDuck / _hideDuck.
+let _duckPctHighWater = 0;
+// Engine C start pct — must match backend `pct=72` in audio_analyser/__init__.py.
+const ENGINE_C_START_PCT = 72;
+const ENGINE_C_CAP_PCT = 94;
 
 // ── Real progress: set duck bar to exact percentage ──────────
 function _setDuckProgress(pct, msg) {
@@ -102,9 +161,13 @@ function _setDuckProgress(pct, msg) {
 	const label = $("duck-label");
 	if (!fill) return;
 
+	const clamped = Math.max(0, Math.min(100, pct));
+	const display = Math.max(clamped, _duckPctHighWater);
+	_duckPctHighWater = display;
+
 	bar.hidden = false;
-	fill.style.width = pct + "%";
-	emoji.style.left = Math.max(0, Math.min(100, pct)) + "%";
+	fill.style.width = display + "%";
+	emoji.style.left = display + "%";
 	if (msg && label) label.textContent = msg;
 }
 
@@ -133,9 +196,37 @@ function _stopEngineAInterp() {
 	}
 }
 
+// ── Engine C interpolation (slow visual hint while sidecar runs ASR/MFA) ──
+function _startEngineCInterp() {
+	_stopEngineCInterp();
+	const start = Date.now();
+	const FROM = ENGINE_C_START_PCT,
+		TO = ENGINE_C_CAP_PCT;
+	// Engine C on CPU typically runs 30-120s (FunASR + MFA + Praat). ease-out
+	// sqrt curve moves fast early then creeps — same pattern as Engine A interp.
+	const DURATION_MS = 120_000;
+
+	function tick() {
+		const elapsed = Date.now() - start;
+		const t = Math.min(1, Math.sqrt(elapsed / DURATION_MS));
+		const pct = FROM + t * (TO - FROM);
+		_setDuckProgress(pct, null);
+		_engineCInterp = requestAnimationFrame(tick);
+	}
+	_engineCInterp = requestAnimationFrame(tick);
+}
+
+function _stopEngineCInterp() {
+	if (_engineCInterp) {
+		cancelAnimationFrame(_engineCInterp);
+		_engineCInterp = null;
+	}
+}
+
 // ── Finish duck: snap to 100% then hide ─────────────────────
 function _finishDuck() {
 	_stopEngineAInterp();
+	_stopEngineCInterp();
 	const bar = $("duck-progress");
 	const fill = $("duck-fill");
 	const emoji = $("duck-emoji");
@@ -149,12 +240,14 @@ function _finishDuck() {
 		if (bar) bar.hidden = true;
 		fill.style.width = "0%";
 		emoji.style.left = "0%";
+		_duckPctHighWater = 0;
 	}, 800);
 }
 
 // ── Hide duck immediately (error / cancel) ──────────────────
 function _hideDuck() {
 	_stopEngineAInterp();
+	_stopEngineCInterp();
 	// Also cancel fake animation if running
 	cancelAnimationFrame(_duckRaf);
 	clearInterval(_duckMsgTimer);
@@ -166,6 +259,7 @@ function _hideDuck() {
 	if (bar) bar.hidden = true;
 	fill.style.width = "0%";
 	emoji.style.left = "0%";
+	_duckPctHighWater = 0;
 }
 
 // ── Fake animation (initial wait + batch mode) ──────────────
@@ -184,6 +278,7 @@ function _startDuckFake() {
 	bar.hidden = false;
 	fill.style.width = "0%";
 	emoji.style.left = "0%";
+	_duckPctHighWater = 0;
 
 	const start = Date.now();
 	const MAX_PCT = 88;
@@ -440,10 +535,14 @@ $("analyze-btn")?.addEventListener("click", async () => {
 				}
 
 				if (pct > 10) _stopEngineAInterp();
+				if (pct > ENGINE_C_START_PCT) _stopEngineCInterp();
 
 				if (pct === 10) {
 					_setDuckProgress(10, msg);
 					_startEngineAInterp();
+				} else if (pct === ENGINE_C_START_PCT) {
+					_setDuckProgress(ENGINE_C_START_PCT, msg);
+					_startEngineCInterp();
 				} else {
 					_setDuckProgress(pct, msg);
 				}
@@ -451,11 +550,15 @@ $("analyze-btn")?.addEventListener("click", async () => {
 		});
 		analysisData = data;
 
-		// Draw timeline overlay on waveform
-		drawTimeline(data.analysis);
+		// Sync classify mode buttons (lock pitch/resonance when no Engine C)
+		_updateClassifyModeSwitcher();
 
-		// Render stats + segment list
-		renderStats(data.analysis);
+		// Stats cards + waveform overlay both follow the current classify mode.
+		const segs = classifyForMode(data, getMode());
+		drawTimeline(segs);
+		renderStats(segs);
+
+		// Segment list always reflects Engine A — it's the "AI 分段详情" card.
 		renderSegments(data.analysis);
 
 		// Whole-file acoustic averages (Engine C + duration-weighted Engine A).
@@ -530,7 +633,9 @@ function onScatterDotClick(session) {
 	if ($("analyze-btn")) $("analyze-btn").disabled = true;
 	if ($("analyze-text")) $("analyze-text").textContent = "已分析";
 
-	renderStats(session.analysis);
+	_updateClassifyModeSwitcher();
+	const _segs = classifyForMode(session, getMode());
+	renderStats(_segs);
 	renderSegments(session.analysis);
 	renderMetricsPanel(session.summary, session.analysis);
 
@@ -545,7 +650,7 @@ function onScatterDotClick(session) {
 		initWaveform(cachedFile, {
 			onReady: () => {
 				// 段落 overlay 依赖 waveform 模块内部的 duration，必须在 ready 后画
-				drawTimeline(session.analysis);
+				drawTimeline(classifyForMode(session, getMode()));
 				// waveform.js 的 ready handler 会把 analyze-btn 重新启用，这里再锁回去
 				if ($("analyze-btn")) $("analyze-btn").disabled = true;
 				if (_timelineEnabled && tlRoot) {
@@ -700,4 +805,6 @@ async function initScatterFromStorage() {
 // ─── Boot ─────────────────────────────────────────────────────
 initTheme();
 setPhase("idle");
+_initClassifyModeSwitcher();
+_updateClassifyModeSwitcher();
 initScatterFromStorage();
