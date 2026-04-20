@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import enum
 from contextlib import AsyncExitStack
 from typing import TYPE_CHECKING
 
 from taskiq import TaskiqEvents, TaskiqMiddleware
 from taskiq.abc.formatter import TaskiqFormatter
-from taskiq.message import TaskiqMessage
+from taskiq.depends.progress_tracker import TaskProgress
+from taskiq.message import BrokerMessage, TaskiqMessage
 from taskiq.serializers import PickleSerializer
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
@@ -12,8 +15,6 @@ from voiceya.config import CFG
 
 if TYPE_CHECKING:
     from taskiq import TaskiqState
-    from taskiq.depends.progress_tracker import TaskProgress
-    from taskiq.message import BrokerMessage
 
 
 class TaskStage(enum.StrEnum):

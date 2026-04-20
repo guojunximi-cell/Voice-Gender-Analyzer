@@ -3,7 +3,13 @@ from pathlib import Path
 
 
 def init_iss_module(proj_root: Path):
-    sys.path.append(str(proj_root / "voiceya/inaSpeechSegmenter"))
+    ina_root = proj_root / "voiceya/inaSpeechSegmenter"
+    sys.path.append(str(ina_root))
+    sys.path.append(str(proj_root))
+
+    from voiceya.utils.patch_ina import patch_ina_submodule
+
+    patch_ina_submodule(ina_root / "inaSpeechSegmenter")
 
     from inaSpeechSegmenter import Segmenter
 
