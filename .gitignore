@@ -38,3 +38,6 @@ Thumbs.db
 
 # Models
 *.hdf5
+
+# Claude Code runtime locks (committed settings stay tracked)
+.claude/scheduled_tasks.lock
