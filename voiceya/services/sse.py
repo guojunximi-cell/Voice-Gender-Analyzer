@@ -1,26 +1,17 @@
-from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+from voiceya.services.events_stream import PayloadT
 
 if TYPE_CHECKING:
-    from redis.typing import EncodableT, FieldT
-
-    PayloadDictT = dict[FieldT, EncodableT]
-
-
-class PayloadT(ABC):
-    @abstractmethod
-    def to_dict(self) -> "PayloadDictT": ...
-
-
-PublisherT = Callable[["PayloadT"], Awaitable[None]]
+    from voiceya.services.events_stream import PayloadDictT
 
 
 @dataclass(frozen=True, kw_only=True)
 class SSE(PayloadT):
     type: Literal["wait", "progress", "error", "result"]
 
-    def to_dict(self) -> "PayloadDictT":
+    def to_dict(self) -> PayloadDictT:
         return asdict(self)  # type: ignore
 
 

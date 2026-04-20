@@ -1,27 +1,30 @@
 import asyncio
 import json
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
-from taskiq.depends.progress_tracker import TaskProgress
 
 from voiceya.config import CFG
 from voiceya.services.redis import get_redis
-from voiceya.services.sse import ErrorSSE, PayloadT, PublisherT, ResultSSE
+from voiceya.services.sse import ErrorSSE, ResultSSE
 from voiceya.taskiq import TaskStage, broker
 
 if TYPE_CHECKING:
-    from voiceya.services.sse import PayloadDictT
+    from typing import Any, AsyncGenerator, Awaitable, Callable
 
-__all__ = [
-    "PayloadT",
-    "PayloadDictT",
-    "PublisherT",
-    "events_exist_for_task",
-    "get_event_publister",
-    "subscribe_to_events",
-    "subscribe_to_events_and_generate_sse",
-]
+    from redis.typing import EncodableT, FieldT
+    from taskiq.depends.progress_tracker import TaskProgress
+
+
+class PayloadT(ABC):
+
+    @abstractmethod
+    def to_dict(self) -> dict[FieldT, EncodableT]: ...
+
+
+PayloadDictT = dict[FieldT, EncodableT]
+PublisherT = Callable[[PayloadT], Awaitable[None]]
 
 
 def _events_key(task_id: str) -> str:
@@ -51,7 +54,7 @@ def get_event_publister(task_id: str) -> PublisherT:
 
 async def subscribe_to_events(
     task_id: str, block_ms: int = 15_000
-) -> "AsyncGenerator[PayloadDictT | None]":
+) -> AsyncGenerator[PayloadDictT | None]:
     """Async generator yielding event JSON strings; yields ``None`` on idle tick."""
 
     r = get_redis()

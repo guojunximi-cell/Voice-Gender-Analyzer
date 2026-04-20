@@ -1,17 +1,21 @@
 import asyncio
 import logging
-from io import BytesIO
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 
-from voiceya.services.audio_analyser import seg as _seg
+from voiceya.services.audio_analyser.seg import SEG
+
+if TYPE_CHECKING:
+    from io import BytesIO
+
 
 logger = logging.getLogger(__name__)
 
 
 async def do_segmentation(sample: BytesIO):
     try:
-        return await asyncio.to_thread(_seg.SEG, sample)
+        return await asyncio.to_thread(SEG, sample)
 
     except Exception as e:
         logger.error("Engine A 分析失败: %s", e)
