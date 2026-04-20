@@ -127,15 +127,43 @@ export function renderMetricsPanel(summary, analysis) {
 	setFormant("mc-f3", f3);
 
 	// ── Pitch range reference bar ───────────────────────────
-	// 指示器必须与上面卡片的 pitch 同值，避免视觉不一致。
+	// 整个范围条都是线性 Hz 刻度（ticks 用 space-between，zones 按线性 Hz 算宽度）。
+	// 之前 log2 映射会把 166 Hz 推到 53%（= "200" 位置），视觉不一致。
+	const hzToPct = (hz) => ((Math.max(80, Math.min(320, hz)) - 80) / (320 - 80)) * 100;
+
+	// 范围条：优先从 phones.pitch 取 p5~p95（比 min/max 抗 outlier）；
+	// 样本不足时兜底为 median ± stdev。
+	const rangeEl = document.getElementById("mc-pitch-range");
+	if (rangeEl) {
+		const pitches = (ec.phones || [])
+			.map((p) => p.pitch)
+			.filter((v) => typeof v === "number" && v >= 40 && v <= 600)
+			.sort((a, b) => a - b);
+		let lo, hi;
+		if (pitches.length >= 5) {
+			lo = pitches[Math.floor(pitches.length * 0.05)];
+			hi = pitches[Math.floor(pitches.length * 0.95)];
+		} else if (pitch != null && pitchStd != null) {
+			lo = pitch - pitchStd;
+			hi = pitch + pitchStd;
+		}
+		if (lo != null && hi != null && hi > lo) {
+			const loPct = hzToPct(lo);
+			const hiPct = hzToPct(hi);
+			requestAnimationFrame(() => {
+				rangeEl.style.left = `${loPct}%`;
+				rangeEl.style.width = `${hiPct - loPct}%`;
+			});
+		} else {
+			rangeEl.style.width = "0";
+		}
+	}
+
+	// Median tick：与上面卡片的 pitch 同值，落在范围条内部作为中位标记。
 	const pitchIndicator = document.getElementById("mc-pitch-indicator");
 	if (pitchIndicator && pitch) {
-		const logMin = Math.log2(80),
-			logMax = Math.log2(320);
-		const logVal = Math.log2(Math.max(80, Math.min(320, pitch)));
-		const pct = ((logVal - logMin) / (logMax - logMin)) * 100;
 		requestAnimationFrame(() => {
-			pitchIndicator.style.left = `${pct}%`;
+			pitchIndicator.style.left = `${hzToPct(pitch)}%`;
 		});
 	}
 

@@ -1094,6 +1094,23 @@ body {
 	transition: left 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.pitch-range-span {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	height: 14px;
+	left: 50%;
+	width: 0;
+	background: rgba(20, 20, 20, 0.35);
+	border: 1px solid var(--text-primary);
+	border-radius: 4px;
+	box-sizing: border-box;
+	pointer-events: none;
+	transition:
+		left 500ms cubic-bezier(0.4, 0, 0.2, 1),
+		width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .pitch-range-labels {
 	display: flex;
 	justify-content: space-between;
