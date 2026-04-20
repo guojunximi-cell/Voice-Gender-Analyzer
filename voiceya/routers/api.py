@@ -12,7 +12,7 @@ from fastapi_limiter.depends import RateLimiter
 
 from voiceya.config import CFG
 from voiceya.services.audio_analyser.audio_tools import get_duraton_sec
-from voiceya.services.events_stream import subscribe_to_events_and_generate_sse
+from voiceya.services.sse import subscribe_to_events_and_generate_sse
 from voiceya.taskiq import broker
 from voiceya.tasks.analyser import analyse_voice
 from voiceya.utils.is_valid_audio_file import is_valid_audio_file
