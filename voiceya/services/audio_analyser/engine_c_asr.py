@@ -12,9 +12,11 @@ singleton.  If ENGINE_C_ENABLED=False, this module never imports funasr.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import threading
+from collections import OrderedDict
 from io import BytesIO
 
 import librosa
@@ -25,6 +27,39 @@ _MODEL_CACHE: object | None = None
 # Serialise FunASR generate() calls — the model singleton is not thread-safe
 # under concurrent asyncio.to_thread() invocations on the same worker process.
 _MODEL_LOCK = threading.Lock()
+
+# ── ASR transcript cache ────────────────────────────────────────────
+# Identical audio bytes → identical transcript (the model is deterministic
+# at temperature 0).  When a user re-submits the same file (history replay,
+# double-click "analyze", or client-side retry after a transient error),
+# skip the 2-5 s Paraformer pass entirely.  Keyed by SHA-256 of the raw
+# bytes so distinct-but-equivalent encodings don't collide.
+#
+# Sized small on purpose — the memory cost is the transcript string (typ.
+# < 1 KiB), not the audio; 64 entries ≈ 64 KiB.  LRU eviction via
+# OrderedDict.move_to_end on hit.  Lock is independent of _MODEL_LOCK so
+# cache hits don't serialize behind in-flight ASR.
+_ASR_CACHE_MAX = int(os.environ.get("ENGINE_C_ASR_CACHE_SIZE", "64"))
+_ASR_CACHE: OrderedDict[str, str] = OrderedDict()
+_ASR_CACHE_LOCK = threading.Lock()
+
+
+def _cache_get(key: str) -> str | None:
+    with _ASR_CACHE_LOCK:
+        if key not in _ASR_CACHE:
+            return None
+        _ASR_CACHE.move_to_end(key)
+        return _ASR_CACHE[key]
+
+
+def _cache_put(key: str, value: str) -> None:
+    if _ASR_CACHE_MAX <= 0:
+        return
+    with _ASR_CACHE_LOCK:
+        _ASR_CACHE[key] = value
+        _ASR_CACHE.move_to_end(key)
+        while len(_ASR_CACHE) > _ASR_CACHE_MAX:
+            _ASR_CACHE.popitem(last=False)
 
 
 def _load_model() -> object:
@@ -83,8 +118,21 @@ async def transcribe_zh(audio_bytes: bytes) -> str:
     if not audio_bytes:
         return ""
 
+    key = hashlib.sha256(audio_bytes).hexdigest()
+    cached = _cache_get(key)
+    if cached is not None:
+        logger.info("FunASR cache hit (%d chars)", len(cached))
+        return cached
+
     try:
-        return await asyncio.to_thread(_transcribe_sync, audio_bytes)
+        text = await asyncio.to_thread(_transcribe_sync, audio_bytes)
     except Exception as exc:
         logger.warning("FunASR transcribe failed: %s", exc)
         return ""
+
+    # Only cache non-empty results — empty transcript means noise/non-speech,
+    # and a retry on the same file has a tiny chance of different luck
+    # (it won't, but the ambiguity isn't worth a sticky negative cache).
+    if text:
+        _cache_put(key, text)
+    return text

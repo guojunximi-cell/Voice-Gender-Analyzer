@@ -19,6 +19,7 @@ Design notes
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import json
 import logging
@@ -82,11 +83,17 @@ LANG = "zh"
 
 # ── MFA fast-mode patch ──────────────────────────────────────────────
 # Vendored preprocessing.py:119-125 calls MFA with `--clean --beam 100
-# --retry_beam 400`.  `--clean` wipes MFA's acoustic-model cache on *every*
-# request so each run pays the 10-30 s cold-boot cost of reloading the
-# Mandarin model.  Dropping `--clean` is correctness-neutral — MFA's default
-# cache behavior is "reuse across runs" — but stays within upstream's exact
-# beam widths, so alignment quality on noisy / accented speech is unchanged.
+# --retry_beam 400`.  Three tweaks, each independently env-gated:
+#   1. Drop `--clean` — wipes MFA's acoustic-model cache every run, paying
+#      the 10-30 s cold-boot cost of reloading the Mandarin model.  Removing
+#      is correctness-neutral (MFA's default is "reuse across runs").
+#   2. Shrink `--beam` 100 → 50 (env: ENGINE_C_MFA_BEAM).
+#   3. Shrink `--retry_beam` 400 → 200 (env: ENGINE_C_MFA_RETRY_BEAM).
+#      Narrower beams trade alignment robustness for speed — upstream chose
+#      wide values for noisy/accented speech, but our inputs are mostly
+#      clean studio-ish voice samples, so a 2× shrink is usually safe.
+#      MFA falls back to `--retry_beam` automatically when the initial pass
+#      fails, so correctness degrades gracefully rather than losing frames.
 #
 # We can't edit the vendored file (upstream sync policy — see
 # voiceya/sidecars/README.md), so we rebind the `subprocess` name inside
@@ -97,6 +104,8 @@ LANG = "zh"
 #
 # Opt-out: set ENGINE_C_FAST_MFA=0 to run upstream's original args verbatim.
 _FAST_MFA = os.environ.get("ENGINE_C_FAST_MFA", "1").lower() in ("1", "true", "yes", "on")
+_MFA_BEAM = os.environ.get("ENGINE_C_MFA_BEAM", "50").strip()
+_MFA_RETRY_BEAM = os.environ.get("ENGINE_C_MFA_RETRY_BEAM", "200").strip()
 
 
 def _looks_like_mfa_align(args: object) -> bool:
@@ -111,7 +120,21 @@ def _looks_like_mfa_align(args: object) -> bool:
 
 def _tune_mfa_args(args: list) -> list:
     tuned = [a for a in args if a != "--clean"]
-    return tuned
+    out: list = []
+    i = 0
+    while i < len(tuned):
+        tok = tuned[i]
+        if tok == "--beam" and i + 1 < len(tuned) and _MFA_BEAM:
+            out.extend(["--beam", _MFA_BEAM])
+            i += 2
+            continue
+        if tok == "--retry_beam" and i + 1 < len(tuned) and _MFA_RETRY_BEAM:
+            out.extend(["--retry_beam", _MFA_RETRY_BEAM])
+            i += 2
+            continue
+        out.append(tok)
+        i += 1
+    return out
 
 
 if _FAST_MFA:
@@ -136,7 +159,11 @@ if _FAST_MFA:
     _sp_shim.check_output = _patched_check_output
     preprocessing.subprocess = _sp_shim
 
-    logger.info("Engine C: MFA fast-mode enabled (--clean dropped; beams kept at upstream).")
+    logger.info(
+        "Engine C: MFA fast-mode enabled (--clean dropped; beam=%s, retry_beam=%s).",
+        _MFA_BEAM or "upstream",
+        _MFA_RETRY_BEAM or "upstream",
+    )
 
 # ── Silence detection ───────────────────────────────────────────────
 # The vendored preprocessing.process() already runs ffmpeg silencedetect
@@ -285,13 +312,25 @@ async def analyze(
         os.chdir(saved_cwd)
 
     try:
-        # Run silencedetect alongside the main pipeline.  Independent of MFA,
-        # so even if alignment fails we'd still have the ranges — but we
-        # only reach the return on full success anyway, so we compute it
-        # here to keep the happy path linear.
-        silence_ranges = _detect_silence(audio_bytes)
+        # Run silencedetect in parallel with the main MFA pipeline — they're
+        # independent (silencedetect forks its own ffmpeg; preprocessing.process
+        # chdir's into tmp_dir for MFA) and the silence path is typically
+        # 100-300 ms while MFA is 5-30 s, so the ffmpeg cost hides entirely
+        # behind MFA.  asyncio.to_thread bridges the blocking calls into the
+        # event loop; asyncio.gather waits for both.
+        #
+        # Safety note: preprocessing.process() does its own `os.chdir(tmp_dir)`,
+        # so running two `analyze()` requests truly in parallel within one
+        # worker would collide on cwd.  That's already an existing constraint
+        # (see engine-c-multithread.md) — concurrent requests still need to be
+        # serialized at the worker or uvicorn --workers level.  This change is
+        # purely *intra-request* parallelism, which is safe.
+        silence_task = asyncio.to_thread(_detect_silence, audio_bytes)
+        pipeline_task = asyncio.to_thread(
+            preprocessing.process, audio_bytes, transcript, tmp_dir, LANG
+        )
+        silence_ranges, praat_output = await asyncio.gather(silence_task, pipeline_task)
 
-        praat_output = preprocessing.process(audio_bytes, transcript, tmp_dir, LANG)
         data = phones.parse(praat_output, LANG)
         if not data.get("phones"):
             raise RuntimeError("MFA produced no alignment output")
