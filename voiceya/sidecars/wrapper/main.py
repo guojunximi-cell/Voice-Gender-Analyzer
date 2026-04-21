@@ -83,17 +83,22 @@ LANG = "zh"
 
 # ── MFA fast-mode patch ──────────────────────────────────────────────
 # Vendored preprocessing.py:119-125 calls MFA with `--clean --beam 100
-# --retry_beam 400`.  Three tweaks, each independently env-gated:
-#   1. Drop `--clean` — wipes MFA's acoustic-model cache every run, paying
-#      the 10-30 s cold-boot cost of reloading the Mandarin model.  Removing
-#      is correctness-neutral (MFA's default is "reuse across runs").
-#   2. Shrink `--beam` 100 → 50 (env: ENGINE_C_MFA_BEAM).
-#   3. Shrink `--retry_beam` 400 → 200 (env: ENGINE_C_MFA_RETRY_BEAM).
-#      Narrower beams trade alignment robustness for speed — upstream chose
-#      wide values for noisy/accented speech, but our inputs are mostly
-#      clean studio-ish voice samples, so a 2× shrink is usually safe.
-#      MFA falls back to `--retry_beam` automatically when the initial pass
-#      fails, so correctness degrades gracefully rather than losing frames.
+# --retry_beam 400`.  We rewrite this to narrow the beams for speed:
+#   * `--beam` 100 → 50 (env: ENGINE_C_MFA_BEAM)
+#   * `--retry_beam` 400 → 200 (env: ENGINE_C_MFA_RETRY_BEAM)
+# Upstream chose wide values for noisy/accented speech; our inputs are
+# mostly clean studio-ish voice samples, so a 2× shrink is usually safe.
+# MFA falls back to `--retry_beam` automatically when the initial pass
+# fails, so correctness degrades gracefully rather than losing frames.
+#
+# `--clean` is KEPT.  MFA keys its per-corpus session directory on the
+# *corpus folder name* (`corpus` every run for us), and without `--clean`
+# MFA tries to reuse references from the previous request's tmp_dir,
+# which we rm -rf'd in our finally block → FileNotFoundError on the 2nd+
+# request.  An earlier commit (9799fa0) dropped `--clean` believing it
+# wiped the acoustic-model cache; it does not — that cache lives at
+# ~/Documents/MFA/pretrained_models/ and is orthogonal.  Keeping `--clean`
+# is a correctness requirement, not a perf choice.
 #
 # We can't edit the vendored file (upstream sync policy — see
 # voiceya/sidecars/README.md), so we rebind the `subprocess` name inside
@@ -119,16 +124,15 @@ def _looks_like_mfa_align(args: object) -> bool:
 
 
 def _tune_mfa_args(args: list) -> list:
-    tuned = [a for a in args if a != "--clean"]
     out: list = []
     i = 0
-    while i < len(tuned):
-        tok = tuned[i]
-        if tok == "--beam" and i + 1 < len(tuned) and _MFA_BEAM:
+    while i < len(args):
+        tok = args[i]
+        if tok == "--beam" and i + 1 < len(args) and _MFA_BEAM:
             out.extend(["--beam", _MFA_BEAM])
             i += 2
             continue
-        if tok == "--retry_beam" and i + 1 < len(tuned) and _MFA_RETRY_BEAM:
+        if tok == "--retry_beam" and i + 1 < len(args) and _MFA_RETRY_BEAM:
             out.extend(["--retry_beam", _MFA_RETRY_BEAM])
             i += 2
             continue
@@ -160,7 +164,7 @@ if _FAST_MFA:
     preprocessing.subprocess = _sp_shim
 
     logger.info(
-        "Engine C: MFA fast-mode enabled (--clean dropped; beam=%s, retry_beam=%s).",
+        "Engine C: MFA fast-mode enabled (--clean kept; beam=%s, retry_beam=%s).",
         _MFA_BEAM or "upstream",
         _MFA_RETRY_BEAM or "upstream",
     )
