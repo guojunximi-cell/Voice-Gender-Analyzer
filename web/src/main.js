@@ -606,7 +606,7 @@ $("analyze-btn")?.addEventListener("click", async () => {
 // ─── Scatter dot click → restore session ────────────────────
 let _selectedSessionId = null;
 
-function onScatterDotClick(session) {
+async function onScatterDotClick(session) {
 	// 若正在分析，先取消——避免与历史还原竞争 _phoneTimeline / 波形的构建
 	if (phase === "analyzing") cancelAnalysis();
 
@@ -640,7 +640,9 @@ function onScatterDotClick(session) {
 	renderMetricsPanel(session.summary, session.analysis);
 
 	const tlRoot = $("phone-timeline-root");
-	const cachedFile = audioCache.get(session.id);
+	const cachedFile = await audioCache.get(session.id);
+	// 快速连点不同条目时，后发制人：await 期间若选择已被切走就放弃当前还原
+	if (_selectedSessionId !== session.id) return;
 
 	if (cachedFile) {
 		// Hot：内存里还有原文件，完整还原播放器 + 音素时间线（带卡拉 OK 同步）

@@ -1,38 +1,151 @@
-// 前端内存音频缓存：Map<sessionId, File>，用于在点击散点图历史条目时
-// 还原波形播放器。不持久化、不落盘、不同步到后端——与 session-store
-// 走 /api/history 的"阅后即焚"内存模型保持一致。
+// 音频文件持久化到 IndexedDB——用户刷新或切换条目后仍能回放历史音频。
+// 与 session-store 共用 vga-store 数据库。双重上限：COUNT_CAP 条 + BYTES_CAP 字节，
+// 按 createdAt 升序 LRU 淘汰；任一上限超限就从最老的开始删。
+// IDB 不可用（隐私模式等）时回退到内存 Map，行为与旧版一致（刷新即失）。
 //
-// 容量与后端 voiceya/routers/api.py 的 _HISTORY_CAP 保持一致；超出时按
-// 插入序 LRU 淘汰最老条目。偶发 miss（刷新/被淘汰）由 main.js 的冷路径
-// 优雅降级为"仅音素时间线"。
+// 接口变动：get()/has() 改为 async，返回 Promise。set/remove/clear 仍为 fire-and-forget。
 
-const AUDIO_CACHE_CAP = 50;
+import { STORE_AUDIO, openDB } from "./idb.js";
 
-const _cache = new Map();
+const COUNT_CAP = 50;
+const BYTES_CAP = 500 * 1024 * 1024; // 500 MB
 
-export function set(id, file) {
-	if (!id || !file) return;
-	if (_cache.has(id)) _cache.delete(id);
-	_cache.set(id, file);
-	while (_cache.size > AUDIO_CACHE_CAP) {
-		const oldest = _cache.keys().next().value;
+const _memFallback = new Map();
+
+function _memFallbackSet(id, file) {
+	if (_memFallback.has(id)) _memFallback.delete(id); // reinsert keeps LRU order
+	_memFallback.set(id, file);
+	while (_memFallback.size > COUNT_CAP) {
+		const oldest = _memFallback.keys().next().value;
 		if (oldest === undefined) break;
-		_cache.delete(oldest);
+		_memFallback.delete(oldest);
 	}
 }
 
-export function get(id) {
-	return _cache.get(id);
+export function set(id, file) {
+	if (!id || !file) return;
+	_put(id, file).catch((e) => {
+		console.warn("audioCache.set failed, falling back to memory", e);
+		_memFallbackSet(id, file);
+	});
 }
 
-export function has(id) {
-	return _cache.has(id);
+export async function get(id) {
+	if (!id) return null;
+	if (_memFallback.has(id)) return _memFallback.get(id);
+	try {
+		const db = await openDB();
+		return await new Promise((resolve, reject) => {
+			const tx = db.transaction(STORE_AUDIO, "readonly");
+			const r = tx.objectStore(STORE_AUDIO).get(id);
+			r.onsuccess = () => {
+				const row = r.result;
+				if (!row || !row.blob) {
+					resolve(null);
+					return;
+				}
+				const name = row.name || id;
+				const mime = row.mime || row.blob.type || "";
+				resolve(new File([row.blob], name, { type: mime }));
+			};
+			r.onerror = () => reject(r.error);
+		});
+	} catch (e) {
+		console.warn("audioCache.get failed", e);
+		return null;
+	}
+}
+
+export async function has(id) {
+	if (!id) return false;
+	if (_memFallback.has(id)) return true;
+	try {
+		const db = await openDB();
+		return await new Promise((resolve, reject) => {
+			const tx = db.transaction(STORE_AUDIO, "readonly");
+			const r = tx.objectStore(STORE_AUDIO).getKey(id);
+			r.onsuccess = () => resolve(r.result !== undefined);
+			r.onerror = () => reject(r.error);
+		});
+	} catch {
+		return false;
+	}
 }
 
 export function remove(id) {
-	_cache.delete(id);
+	_memFallback.delete(id);
+	_remove(id).catch((e) => console.warn("audioCache.remove failed", e));
 }
 
 export function clear() {
-	_cache.clear();
+	_memFallback.clear();
+	_clearAll().catch((e) => console.warn("audioCache.clear failed", e));
+}
+
+async function _put(id, file) {
+	const db = await openDB();
+	const row = {
+		id,
+		blob: file,
+		name: file.name || id,
+		mime: file.type || "",
+		size: file.size || 0,
+		createdAt: Date.now(),
+	};
+	await new Promise((resolve, reject) => {
+		const tx = db.transaction(STORE_AUDIO, "readwrite");
+		const store = tx.objectStore(STORE_AUDIO);
+		store.put(row);
+
+		// 按 createdAt 升序游标（最老的先被遍历到），只读 id+size 做淘汰决策。
+		// IDB 的 Blob 是惰性引用，访问 .size / .type 不会触发磁盘读，内存占用可控。
+		const cursorReq = store.index("createdAt").openCursor();
+		const entries = [];
+		let totalBytes = 0;
+		cursorReq.onsuccess = () => {
+			const c = cursorReq.result;
+			if (c) {
+				entries.push({ id: c.value.id, size: c.value.size || 0 });
+				totalBytes += c.value.size || 0;
+				c.continue();
+				return;
+			}
+			let count = entries.length;
+			let i = 0;
+			while ((count > COUNT_CAP || totalBytes > BYTES_CAP) && i < entries.length) {
+				if (entries[i].id === id) {
+					i++;
+					continue;
+				}
+				store.delete(entries[i].id);
+				totalBytes -= entries[i].size;
+				count--;
+				i++;
+			}
+		};
+		cursorReq.onerror = () => reject(cursorReq.error);
+		tx.oncomplete = resolve;
+		tx.onerror = () => reject(tx.error);
+		tx.onabort = () => reject(tx.error ?? new Error("tx aborted"));
+	});
+}
+
+async function _remove(id) {
+	const db = await openDB();
+	await new Promise((resolve, reject) => {
+		const tx = db.transaction(STORE_AUDIO, "readwrite");
+		tx.objectStore(STORE_AUDIO).delete(id);
+		tx.oncomplete = resolve;
+		tx.onerror = () => reject(tx.error);
+	});
+}
+
+async function _clearAll() {
+	const db = await openDB();
+	await new Promise((resolve, reject) => {
+		const tx = db.transaction(STORE_AUDIO, "readwrite");
+		tx.objectStore(STORE_AUDIO).clear();
+		tx.oncomplete = resolve;
+		tx.onerror = () => reject(tx.error);
+	});
 }

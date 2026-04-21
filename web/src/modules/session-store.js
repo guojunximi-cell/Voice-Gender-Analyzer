@@ -1,47 +1,83 @@
-// 历史记录存储：仅通过后端内存保存，不落盘、不用 localStorage，
-// 进程退出即清空（"阅后即焚"式隐私策略）。
-// 所有接口保持同步函数签名不变，内部改为异步；调用方通常无需感知
-// 返回值（出错时静默降级，避免阻塞分析流程）。
+// 历史记录存储：持久化在浏览器 IndexedDB 中，刷新和切换音频都不丢。
+// 老版本走 /api/history 的"阅后即焚"内存模型已下线；现在数据留在用户本地磁盘，
+// 只能由用户主动清空（见 main.js 的"清空历史"按钮）。
+//
+// 所有写接口都是 fire-and-forget（签名保留 void），调用方无需感知异步；
+// 出错时只打日志，不阻塞分析流程。容量上限 CAP 条，按 createdAt 升序 LRU 淘汰。
 
-const BASE = "/api/history";
+import { STORE_SESSIONS, openDB, reqOK } from "./idb.js";
 
-async function _req(method, path = "", body) {
-	const opts = { method };
-	if (body !== undefined) {
-		opts.headers = { "Content-Type": "application/json" };
-		opts.body = JSON.stringify(body);
-	}
-	const res = await fetch(BASE + path, opts);
-	if (!res.ok) throw new Error(`history ${method} ${path} -> ${res.status}`);
-	return res.json();
-}
+const CAP = 50;
 
-/** Load all sessions from backend memory. */
 export async function loadSessions() {
 	try {
-		const data = await _req("GET");
-		return Array.isArray(data) ? data : [];
-	} catch {
+		const db = await openDB();
+		const tx = db.transaction(STORE_SESSIONS, "readonly");
+		const rows = await reqOK(tx.objectStore(STORE_SESSIONS).index("createdAt").getAll());
+		return Array.isArray(rows) ? rows : [];
+	} catch (e) {
+		console.warn("loadSessions failed", e);
 		return [];
 	}
 }
 
-/**
- * Save a session to backend memory (fire-and-forget with logging).
- * session = { id, filename, f0_median, gender_score, color, summary, analysis }
- */
 export function saveSession(session) {
-	_req("POST", "", session).catch((e) => console.warn("saveSession failed", e));
+	_put(session).catch((e) => console.warn("saveSession failed", e));
 }
 
-/** Clear all sessions. */
 export function clearSessions() {
-	_req("DELETE").catch((e) => console.warn("clearSessions failed", e));
+	_clearAll().catch((e) => console.warn("clearSessions failed", e));
 }
 
-/** Remove a single session by id. */
 export function removeSession(id) {
-	_req("DELETE", `/${encodeURIComponent(id)}`).catch((e) =>
-		console.warn("removeSession failed", e),
-	);
+	_remove(id).catch((e) => console.warn("removeSession failed", e));
+}
+
+async function _put(session) {
+	const db = await openDB();
+	const row = { ...session, createdAt: session.createdAt ?? Date.now() };
+	await new Promise((resolve, reject) => {
+		const tx = db.transaction(STORE_SESSIONS, "readwrite");
+		const store = tx.objectStore(STORE_SESSIONS);
+		store.put(row);
+		const countReq = store.count();
+		countReq.onsuccess = () => {
+			const need = countReq.result - CAP;
+			if (need <= 0) return;
+			const cursorReq = store.index("createdAt").openCursor();
+			let removed = 0;
+			cursorReq.onsuccess = () => {
+				const c = cursorReq.result;
+				if (!c || removed >= need) return;
+				if (c.value.id !== row.id) {
+					c.delete();
+					removed++;
+				}
+				c.continue();
+			};
+		};
+		tx.oncomplete = resolve;
+		tx.onerror = () => reject(tx.error);
+		tx.onabort = () => reject(tx.error ?? new Error("tx aborted"));
+	});
+}
+
+async function _remove(id) {
+	const db = await openDB();
+	await new Promise((resolve, reject) => {
+		const tx = db.transaction(STORE_SESSIONS, "readwrite");
+		tx.objectStore(STORE_SESSIONS).delete(id);
+		tx.oncomplete = resolve;
+		tx.onerror = () => reject(tx.error);
+	});
+}
+
+async function _clearAll() {
+	const db = await openDB();
+	await new Promise((resolve, reject) => {
+		const tx = db.transaction(STORE_SESSIONS, "readwrite");
+		tx.objectStore(STORE_SESSIONS).clear();
+		tx.oncomplete = resolve;
+		tx.onerror = () => reject(tx.error);
+	});
 }
