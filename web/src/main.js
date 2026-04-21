@@ -644,8 +644,18 @@ async function onScatterDotClick(session) {
 	// 快速连点不同条目时，后发制人：await 期间若选择已被切走就放弃当前还原
 	if (_selectedSessionId !== session.id) return;
 
+	// 音素时间线独立于音频加载：先立即渲染（无卡拉 OK 同步），
+	// 热路径的 waveform onReady 再补挂 wavesurfer 启用同步。
+	// setLoading 必须先于 setData——否则 _rendered=false 会让 setData 静默早返回。
+	if (_timelineEnabled && tlRoot) {
+		tlRoot.hidden = false;
+		_phoneTimeline = new PhoneTimeline({ container: tlRoot, wavesurfer: null });
+		_phoneTimeline.setLoading();
+		_phoneTimeline.setData(session.summary?.engine_c ?? null);
+	}
+
 	if (cachedFile) {
-		// Hot：内存里还有原文件，完整还原播放器 + 音素时间线（带卡拉 OK 同步）
+		// Hot：内存/IDB 里还有原文件，完整还原播放器 + 卡拉 OK 同步
 		setAudioUnavailableHint(false);
 		const loading = $("waveform-loading");
 		if (loading) loading.style.display = "flex";
@@ -655,29 +665,16 @@ async function onScatterDotClick(session) {
 				drawTimeline(classifyForMode(session, getMode()));
 				// waveform.js 的 ready handler 会把 analyze-btn 重新启用，这里再锁回去
 				if ($("analyze-btn")) $("analyze-btn").disabled = true;
-				if (_timelineEnabled && tlRoot) {
-					tlRoot.hidden = false;
-					_phoneTimeline = new PhoneTimeline({
-						container: tlRoot,
-						wavesurfer: getWaveSurfer(),
-					});
-					_phoneTimeline.setData(session.summary?.engine_c ?? null);
-				}
+				_phoneTimeline?.attachWavesurfer(getWaveSurfer());
 			},
 			onTimeUpdate: (t) => {
 				if (analysisData) highlightActiveSegment(t, analysisData.analysis);
 			},
 		});
 	} else {
-		// Cold：缓存里没有原文件（刷新后 / 被淘汰 / 批量旧数据），
-		// 仅还原音素时间线静态图，段落用右侧列表承担（段落 overlay 依赖
-		// waveform duration，duration===0 时 drawTimeline 会 no-op）。
+		// Cold：缓存里没有原文件（首刷被淘汰等），段落用右侧列表承担
+		// （段落 overlay 依赖 waveform duration，duration===0 时 drawTimeline 会 no-op）。
 		setAudioUnavailableHint(true);
-		if (_timelineEnabled && tlRoot) {
-			tlRoot.hidden = false;
-			_phoneTimeline = new PhoneTimeline({ container: tlRoot, wavesurfer: null });
-			_phoneTimeline.setData(session.summary?.engine_c ?? null);
-		}
 	}
 }
 

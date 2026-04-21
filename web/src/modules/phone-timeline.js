@@ -388,6 +388,17 @@ export class PhoneTimeline {
 		console.table(window._vgaSentences);
 	}
 
+	/**
+	 * 渲染完成后再补挂 wavesurfer——用于"先显示静态音素轨，音频就绪后补卡拉 OK"的流程。
+	 * 重复调用或在未渲染时调用均安全（no-op）。
+	 */
+	attachWavesurfer(ws) {
+		if (!ws || !this._rendered || this._sync || !this._state || !this._bus) return;
+		this.ws = ws;
+		this._sync = new PlaybackSync({ wavesurfer: ws, state: this._state, bus: this._bus });
+		this._sync.init();
+	}
+
 	/** Set error/failure state. */
 	setError(_err) {
 		if (!this._rendered) return;
