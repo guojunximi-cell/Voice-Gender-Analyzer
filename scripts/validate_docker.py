@@ -46,6 +46,7 @@ import wave
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 # Force UTF-8 output so Unicode tick/cross work on Windows (GBK default).
 if hasattr(sys.stdout, "buffer"):
@@ -57,6 +58,16 @@ if hasattr(sys.stderr, "buffer"):
 BASE_URL = "http://localhost:8080"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
+
+
+def _conn(timeout: int) -> http.client.HTTPConnection:
+    """HTTP(S)Connection parsed from BASE_URL.  One choke-point so --base-url
+    actually takes effect; every HTTP helper in this script goes through here."""
+    parts = urlsplit(BASE_URL)
+    host = parts.hostname or "localhost"
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    return cls(host, port, timeout=timeout)
 
 _RESULTS: list[tuple[str, bool, str]] = []
 
@@ -129,7 +140,7 @@ def _wait_for_api(max_wait: int = 90) -> bool:
     deadline = time.time() + max_wait
     while time.time() < deadline:
         try:
-            conn = http.client.HTTPConnection("localhost", 8080, timeout=5)
+            conn = _conn(timeout=5)
             conn.request("GET", "/api/config")
             resp = conn.getresponse()
             resp.read()
@@ -172,7 +183,7 @@ def _make_sine_wav(duration_sec: float, freq: float = 220.0, sr: int = 16_000) -
 
 def _post_audio(audio: bytes, timeout: int = 30) -> str:
     """POST raw audio bytes → task_id string."""
-    conn = http.client.HTTPConnection("localhost", 8080, timeout=timeout)
+    conn = _conn(timeout=timeout)
     conn.request("POST", "/api/analyze-voice", audio, {"Content-Type": "audio/wav"})
     resp = conn.getresponse()
     body = resp.read()
@@ -184,7 +195,7 @@ def _post_audio(audio: bytes, timeout: int = 30) -> str:
 
 def _await_result(task_id: str, timeout: int = 300) -> dict[str, Any]:
     """Stream SSE until type='result' event; return its data dict."""
-    conn = http.client.HTTPConnection("localhost", 8080, timeout=timeout)
+    conn = _conn(timeout=timeout)
     conn.request("GET", f"/api/status/{task_id}", headers={"Accept": "text/event-stream"})
     resp = conn.getresponse()
     if resp.status != 200:
