@@ -80,6 +80,64 @@ def _load_weights() -> list[float]:
 WEIGHTS: list[float] = _load_weights()
 LANG = "zh"
 
+# ── MFA fast-mode patch ──────────────────────────────────────────────
+# Vendored preprocessing.py:119-125 calls MFA with `--clean --beam 100
+# --retry_beam 400`.  `--clean` wipes MFA's acoustic-model cache on *every*
+# request so each run pays the 10-30 s cold-boot cost of reloading the
+# Mandarin model.  Dropping `--clean` is correctness-neutral — MFA's default
+# cache behavior is "reuse across runs" — but stays within upstream's exact
+# beam widths, so alignment quality on noisy / accented speech is unchanged.
+#
+# We can't edit the vendored file (upstream sync policy — see
+# voiceya/sidecars/README.md), so we rebind the `subprocess` name inside
+# preprocessing's namespace to a shim that rewrites the MFA align args on
+# the fly.  The shim delegates every other attribute (STDOUT, Popen, …) and
+# every non-MFA `check_output` call to the real subprocess module, so the
+# noise-reduction / resample / Praat subprocess calls are untouched.
+#
+# Opt-out: set ENGINE_C_FAST_MFA=0 to run upstream's original args verbatim.
+_FAST_MFA = os.environ.get("ENGINE_C_FAST_MFA", "1").lower() in ("1", "true", "yes", "on")
+
+
+def _looks_like_mfa_align(args: object) -> bool:
+    # preprocessing.py passes args as a plain list; first element is either
+    # the mfa shell shim path (Linux/macOS) or [python, mfa-script.py]
+    # (Windows).  "align" is always the immediate positional after the
+    # executable on both platforms — keep detection cheap + explicit.
+    if not isinstance(args, (list, tuple)):
+        return False
+    return "align" in args and "--beam" in args
+
+
+def _tune_mfa_args(args: list) -> list:
+    tuned = [a for a in args if a != "--clean"]
+    return tuned
+
+
+if _FAST_MFA:
+    import types as _types
+
+    _real_subprocess = preprocessing.subprocess
+    _real_check_output = _real_subprocess.check_output
+
+    def _patched_check_output(cmd, *a, **kw):
+        if _looks_like_mfa_align(cmd):
+            cmd = _tune_mfa_args(list(cmd))
+        return _real_check_output(cmd, *a, **kw)
+
+    # Lightweight namespace that proxies every attribute of the real
+    # subprocess module except check_output.  Scoped to preprocessing's
+    # module globals only — the rest of the process (wrapper, uvicorn,
+    # FastAPI, future maintainers) sees the unmodified subprocess module.
+    _sp_shim = _types.SimpleNamespace()
+    for _name in dir(_real_subprocess):
+        if not _name.startswith("_"):
+            setattr(_sp_shim, _name, getattr(_real_subprocess, _name))
+    _sp_shim.check_output = _patched_check_output
+    preprocessing.subprocess = _sp_shim
+
+    logger.info("Engine C: MFA fast-mode enabled (--clean dropped; beams kept at upstream).")
+
 # ── Silence detection ───────────────────────────────────────────────
 # The vendored preprocessing.process() already runs ffmpeg silencedetect
 # internally (for noise-profile extraction) but discards the ranges.  We
