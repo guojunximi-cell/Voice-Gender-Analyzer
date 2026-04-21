@@ -27,13 +27,46 @@ def get_duraton_sec(s: InputContainer) -> float:
     # （单位为 AV_TIME_BASE = 1e6 微秒）。
     if i_stm.duration is not None:
         duration = float(i_stm.duration * i_stm.time_base)  # type: ignore
-    elif s.duration is not None:
+        logger.info("音频时长 %.2f 秒", duration)
+        return duration
+    if s.duration is not None:
         duration = s.duration / 1_000_000
-    else:
+        logger.info("音频时长 %.2f 秒", duration)
+        return duration
+
+    # 浏览器 MediaRecorder 产出的 webm/ogg 两级 duration 都缺失 —
+    # 只能实打实扫一遍流。先尝试 demux 累加包时长（不用解码，最便宜），
+    # 失败再退到 decode 数采样。文件大小已被 max_file_size_mb 封顶。
+    tb = i_stm.time_base
+    if tb is not None:
+        try:
+            ticks = 0
+            n_pkts = 0
+            for pkt in s.demux(i_stm):
+                if pkt.duration is not None:
+                    ticks += pkt.duration
+                    n_pkts += 1
+            if n_pkts > 0 and ticks > 0:
+                duration = float(ticks * tb)
+                logger.info("duration 回退到包时长累加：%d 包 / %.2f 秒", n_pkts, duration)
+                return duration
+        except av.FFmpegError as e:
+            logger.warning("demux 累加包时长失败，回退到 decode 数采样: %s", e)
+
+    # 上面的 demux 已经把读指针推到末尾，需要重新 seek 到起点才能 decode。
+    s.seek(0)
+    sample_rate = i_stm.rate
+    if sample_rate is None or sample_rate <= 0:
         raise HTTPException(status_code=400, detail="无法读取音频时长")
-
-    logger.info("音频时长 %.2f 秒", duration)
-
+    try:
+        n_samples = sum(frame.samples for frame in s.decode(i_stm))
+    except av.FFmpegError as e:
+        logger.error("fallback decode 读取音频时长失败: %s", e)
+        raise HTTPException(status_code=400, detail="无法读取音频时长") from e
+    if n_samples <= 0:
+        raise HTTPException(status_code=400, detail="无法读取音频时长")
+    duration = n_samples / sample_rate
+    logger.info("duration 回退到样本计数：%d 采样 / %.2f 秒", n_samples, duration)
     return duration
 
 

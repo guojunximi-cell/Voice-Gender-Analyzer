@@ -1,5 +1,9 @@
-# 一键起 app + Redis，匹配 Railway 部署的 2 服务结构。
+# 一键起 app + Redis（+ 可选 Engine C sidecar），匹配 Railway 部署结构。
 # 用法：cp .env.example .env && docker compose up -d --build
+#
+# Engine C (visualizer-backend) 默认不起——占盘 ~2.5 GB、冷启动慢。
+# 需要时：docker compose --profile engine-c up -d --build
+# 并在 .env 里 ENGINE_C_ENABLED=true。
 services:
   redis:
     image: redis:7-alpine
@@ -15,10 +19,40 @@ services:
       - .env
     environment:
       # compose 网络里 app 用服务名 redis 访问
+      # config.py 的 AliasChoices 优先取 REDIS_URI，必须两个都覆盖，
+      # 否则 .env 里的 localhost 值会通过 REDIS_URI 抢先生效。
       REDIS_URL: redis://redis:6379/0
+      REDIS_URI: redis://redis:6379/0
+      # Engine C sidecar 内部地址——若 sidecar 未起，app 端会在调用时失败降级为 null
+      ENGINE_C_SIDECAR_URL: http://visualizer-backend:8001
+      # H2 共享密钥：worker 端字段名是 ENGINE_C_SIDECAR_TOKEN（在 .env 里设一次）。
+      # 留空则 sidecar 端不强制鉴权（仅 dev / 隔离内网场景）。
     depends_on:
       - redis
     restart: unless-stopped
+
+  visualizer-backend:
+    # Engine C 进阶分析 sidecar：MFA + Praat + 源项目 resonance 链。
+    # 只在 --profile engine-c 下启动。
+    profiles: ["engine-c"]
+    build:
+      context: .
+      dockerfile: voiceya/sidecars/visualizer-backend.Dockerfile
+    expose:
+      - "8001"
+    environment:
+      # H2: sidecar 读 ENGINE_C_TOKEN，与 worker 的 ENGINE_C_SIDECAR_TOKEN
+      # 共享同一份秘密；compose 把单一 .env 值映射到两边的命名。
+      ENGINE_C_TOKEN: ${ENGINE_C_SIDECAR_TOKEN:-}
+      # H2: 单请求 audio 体积上限（MiB），防止 sidecar 端内部 DoS。
+      ENGINE_C_MAX_AUDIO_MB: ${ENGINE_C_MAX_AUDIO_MB:-50}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
 volumes:
   redis-data:

@@ -1,0 +1,623 @@
+/* ============================================================
+   TIMELINE — Phone-level interactive timeline tokens & styles
+   ============================================================ */
+
+/* ── Timeline tokens ─────────────────────────────────────────── */
+:root {
+	/* Diverging palette (soft pink/blue, CVD-verified min ΔE₇₆ = 8.87):
+	   blue = masc direction, pink = fem direction, warm-white midpoint.
+	   See docs/COLOR_SCHEME.md for the verification matrix. */
+	--dv-0: #3a6b8d;
+	--dv-1: #5b8fb0;
+	--dv-2: #8bb0c9;
+	--dv-3: #bdd3e0;
+	--dv-4: #ede8e4;
+	--dv-5: #e6c8d2;
+	--dv-6: #d9a1b6;
+	--dv-7: #bc738f;
+	--dv-8: #964b69;
+
+	/* Legacy Cividis (kept for fallback / future toggle) */
+	--cv-0: #00224e;
+	--cv-8: #fde737;
+
+	/* Pitch accent (Okabe-Ito orange, CVD-validated) */
+	--pitch: #e69f00;
+	--pitch-halo: #0b1220;
+
+	/* Active character highlight (Okabe-Ito blue) */
+	--active: #0072b2;
+	--active-bg: #e3f2fd;
+}
+
+[data-theme="dark"] {
+	--cv-0: #13386c;
+	--pitch-halo: rgba(0, 0, 0, 0.6);
+	--active: #56b4e9;
+	--active-bg: #1e3a5f;
+}
+
+/* ── Skeleton (loading state) ────────────────────────────────── */
+.vga-timeline {
+	margin-top: 0;
+	contain: layout style;
+}
+
+.vga-timeline[data-state="skeleton"] .vga-skel {
+	background: var(--bg-secondary);
+	border-radius: var(--radius-sm);
+	animation: vga-skel-pulse 1.5s ease-in-out infinite;
+}
+
+.vga-skel--band {
+	height: 18px;
+	margin-bottom: 8px;
+}
+
+.vga-skel--row {
+	height: 60px;
+	margin-bottom: 12px;
+}
+
+@keyframes vga-skel-pulse {
+	0%,
+	100% {
+		opacity: 0.4;
+	}
+	50% {
+		opacity: 0.7;
+	}
+}
+
+/* ── Active-char readout (header above the sandwich) ─────────── */
+.vga-timeline__readout-row {
+	margin-bottom: 8px;
+}
+
+.vga-timeline__readout-row:empty {
+	display: none;
+}
+
+/* ── Row grid: [label | content] ─────────────────────────────
+   .vga-timeline__rows hosts the sandwich (pitch / transcript / resonance)
+   with position:relative so the hover cursor can layer across all three.
+   Each row shares the same [label-slot | content-slot] structure so the
+   three content slots line up to the pixel, keeping time-alignment intact. */
+.vga-timeline__rows {
+	position: relative;
+}
+
+.vga-timeline__row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.vga-timeline__row--pitch {
+	margin-bottom: 6px;
+}
+
+.vga-timeline__row--resonance {
+	margin-top: 6px;
+}
+
+.vga-timeline__label {
+	flex: 0 0 36px;
+	text-align: right;
+	font-size: 0.72rem;
+	color: var(--text-secondary);
+	user-select: none;
+	letter-spacing: 0.02em;
+}
+
+/* Transcript row's label slot is empty — it still reserves width so the
+   hanzi row's left edge sits at the same x as the two bands'. */
+.vga-timeline__row--transcript .vga-timeline__label {
+	min-height: 1px;
+}
+
+.vga-timeline__band,
+.vga-timeline__transcript {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* Hover crosshair: a 1px vertical line across the rows.  Anchored by
+   JS (phone-timeline.js) on mousemove inside the content slot. */
+.vga-timeline__cursor {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: var(--active);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 100ms linear;
+	z-index: 2;
+}
+
+.vga-timeline__cursor.visible {
+	opacity: 0.35;
+}
+
+/* ── Heatmap band ────────────────────────────────────────────── */
+.vga-heatmap {
+	display: block;
+	width: 100%;
+	height: 18px;
+}
+
+.vga-heatmap rect {
+	transition: filter 80ms linear;
+	cursor: pointer;
+}
+
+/* Suppress the browser-default focus ring on plain :focus too — clicking a
+   rect (tabindex=0) sets focus, and some Chromium builds don't promote that
+   to :focus-visible for SVG elements, leaving a 3px black outline drawn
+   around the clicked (often wide / silent-hatch) rect.  See:
+   diagnose-heatmap-click.mjs.  Keyboard users still get a focus indicator
+   via :focus-visible below. */
+.vga-heatmap rect:focus {
+	outline: none;
+}
+
+.vga-heatmap rect:hover {
+	filter: brightness(1.15);
+}
+
+.vga-heatmap rect:focus-visible {
+	filter: brightness(1.15);
+	outline: 2px solid var(--active);
+	outline-offset: 1px;
+}
+
+.vga-heatmap rect.active {
+	/* `vector-effect: non-scaling-stroke` is essential here — without it the
+	   stroke-width is multiplied by the viewBox→viewport scale on each axis
+	   independently (preserveAspectRatio="none" + viewBox `0 0 sDur 1`), so
+	   a stroke set in viewBox units renders as wildly different thickness
+	   horizontally vs vertically and can look broken on wide rects.  With
+	   non-scaling-stroke the stroke stays at the literal CSS pixel width. */
+	stroke: var(--active);
+	stroke-width: 2;
+	vector-effect: non-scaling-stroke;
+}
+
+/* ── Transcript wrapper + sentence nav ──────────────────────── */
+.vga-transcript-wrap {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.vga-transcript {
+	/* Time-aligned column layout: children (.phone) are absolutely positioned
+	   with left/width as percentages of the sentence's duration, matching the
+	   HeatmapBand SVG's viewBox above so each hanzi sits directly under its
+	   phone span in the gender bar.  Height shrunk now that pitch/resonance
+	   numbers no longer live inside each cell — only the char glyph does. */
+	position: relative;
+	height: 40px;
+	margin: 6px 0 4px;
+	contain: content;
+	transition: opacity 150ms linear;
+}
+
+.vga-transcript-readout {
+	/* Single-line readout shown above the transcript; updated when the
+	   active char changes (playback or click).  Replaces the per-char
+	   pitch/res rows that used to overlap visually in dense passages. */
+	display: flex;
+	align-items: baseline;
+	gap: 14px;
+	padding: 6px 10px;
+	background: var(--bg-secondary);
+	border-radius: var(--radius-sm);
+	font-size: 0.82rem;
+	color: var(--text-secondary);
+	min-height: 28px;
+}
+
+.vga-transcript-readout__char {
+	font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+	font-size: 1.05rem;
+	font-weight: 500;
+	color: var(--active);
+	min-width: 1.4em;
+	text-align: center;
+}
+
+.vga-transcript-readout__metric {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 4px;
+}
+
+.vga-transcript-readout__label {
+	color: var(--text-muted);
+	font-size: 0.75rem;
+}
+
+.vga-transcript-readout__pitch,
+.vga-transcript-readout__res {
+	font-family: "SF Mono", "JetBrains Mono", "Fira Mono", monospace;
+	color: var(--text-primary);
+	font-variant-numeric: tabular-nums;
+}
+
+.vga-sentence-nav {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	padding: 4px 0;
+}
+
+.vga-sentence-nav__btn {
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 14px;
+	border: 1px solid var(--border);
+	border-radius: 22px;
+	background: var(--surface);
+	color: var(--text-primary);
+	font-size: 18px;
+	cursor: pointer;
+	transition:
+		background-color 120ms linear,
+		border-color 120ms linear;
+}
+
+.vga-sentence-nav__btn:hover:not(:disabled) {
+	background: var(--bg-secondary);
+	border-color: var(--active);
+}
+
+.vga-sentence-nav__btn:focus-visible {
+	outline: 3px solid var(--active);
+	outline-offset: 2px;
+}
+
+.vga-sentence-nav__btn:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.vga-sentence-nav__counter {
+	font-family: "SF Mono", "JetBrains Mono", "Fira Mono", monospace;
+	font-size: 14px;
+	color: var(--text-secondary);
+	min-width: 56px;
+	text-align: center;
+}
+
+.phone {
+	all: unset;
+	box-sizing: border-box;
+	cursor: pointer;
+	/* Absolute positioning + inline left/width set by transcript-row.js — these
+	   anchor each char to its phone span in the heatmap above.  No min-width:
+	   the cell's pixel width must equal exactly its time-allocated %, so dense
+	   passages don't push neighbouring buttons into geometric overlap.  The
+	   char glyph's font-size is set inline by transcript-row.js to fit the
+	   allocated width, so the glyph itself never spills past its cell. */
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border-radius: 4px;
+	font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+	transition:
+		background-color 80ms linear,
+		color 80ms linear;
+}
+
+.phone:focus-visible {
+	outline: 3px solid var(--active);
+	outline-offset: 2px;
+}
+
+.phone__char {
+	display: block;
+	font-weight: 500;
+	line-height: 1;
+	text-align: center;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.phone[aria-current="true"] {
+	background: var(--active-bg);
+	color: var(--active);
+	will-change: background-color, color;
+}
+
+/* ── Sentence nav row ─────────────────────────────────────────
+   Own row between the resonance band and the footer — keeps the three
+   time-aligned rows (pitch / hanzi / resonance) as a single uninterrupted
+   block.  Centered; no label column. */
+.vga-timeline__nav-row {
+	display: flex;
+	justify-content: center;
+	margin-top: 10px;
+}
+
+.vga-timeline__nav-row:empty {
+	display: none;
+}
+
+/* ── Timeline footer (shared palette legend only) ─────────────── */
+.vga-timeline__footer {
+	margin-top: 10px;
+}
+
+.vga-timeline__footer-legend {
+	width: 100%;
+}
+
+/* ── Gender legend ───────────────────────────────────────────── */
+.vga-gender-legend {
+	position: relative;
+}
+
+.vga-gender-legend__bar-wrap {
+	position: relative;
+	height: 8px;
+	border-radius: 4px;
+	border: 1px solid var(--border);
+	overflow: hidden;
+}
+
+.vga-gender-legend__bar {
+	height: 100%;
+}
+
+.vga-gender-legend__labels {
+	/* Three labels (left/mid/right) anchored to the bar's left/center/right edges
+	   via absolute positioning, plus a flex-flow info button pushed to the
+	   row's right end via margin-left:auto.
+	   Earlier version used `justify-content: space-between` over the four
+	   children, but `--mid` is absolute (out of flow), leaving three flex items
+	   distributed at start/center/end — which made "女声方向" land in the dead
+	   center, overlapping with the absolute "中性" label and looking like the
+	   middle label was missing. */
+	display: flex;
+	align-items: center;
+	padding-top: 4px;
+	font-size: 0.78rem;
+	color: var(--text-secondary);
+	position: relative;
+}
+
+.vga-gender-legend__label--mid {
+	position: absolute;
+	left: 50%;
+	transform: translateX(-50%);
+	color: var(--text-muted);
+}
+
+.vga-gender-legend__label--right {
+	/* Anchor to the bar's right edge.  28px = info-button width (20px) + 8px gap. */
+	position: absolute;
+	right: 28px;
+}
+
+.vga-gender-legend__info {
+	all: unset;
+	box-sizing: border-box;
+	margin-left: auto;
+	width: 20px;
+	height: 20px;
+	border: 1px solid var(--border);
+	border-radius: 50%;
+	text-align: center;
+	line-height: 18px;
+	font-size: 12px;
+	cursor: pointer;
+	color: var(--text-secondary);
+}
+
+.vga-gender-legend__info:hover,
+.vga-gender-legend__info:focus-visible {
+	background: var(--bg-secondary);
+	outline: none;
+	border-color: var(--active);
+}
+
+.vga-gender-legend__popover {
+	/* Flip upward — the legend sits at the very bottom of the center panel,
+	   so a `top: 100%` popover hits the panel edge and gets clipped / covers
+	   the scrollbar.  Anchoring to `bottom: 100%` opens over the timeline
+	   instead, where there's always room. */
+	position: absolute;
+	bottom: calc(100% + 6px);
+	right: 0;
+	max-width: 360px;
+	padding: 10px 12px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	box-shadow: var(--shadow-md);
+	z-index: 10;
+	font-size: 0.82rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+.vga-gender-legend__popover p {
+	margin: 0 0 6px 0;
+}
+
+.vga-gender-legend__popover p:last-child {
+	margin-bottom: 0;
+}
+
+.vga-gender-legend__note {
+	padding-top: 4px;
+	border-top: 1px solid var(--border);
+	color: var(--text-muted);
+	font-size: 0.75rem;
+}
+
+/* Screen-reader-only data table (behind the chart canvas) */
+.vga-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ── Fallback / empty state ──────────────────────────────────── */
+.vga-fallback {
+	padding: 24px 20px;
+	border: 1px dashed var(--border-strong);
+	border-radius: var(--radius-md);
+	background: var(--bg-secondary);
+	color: var(--text-secondary);
+	font-size: 0.875rem;
+	line-height: 1.7;
+}
+
+.vga-fallback h3 {
+	font-size: 0.95rem;
+	font-weight: 600;
+	color: var(--text-primary);
+	margin-bottom: 8px;
+}
+
+.vga-fallback h4 {
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+	margin-top: 12px;
+	margin-bottom: 4px;
+}
+
+.vga-fallback ul,
+.vga-fallback ol {
+	padding-left: 20px;
+	margin-bottom: 8px;
+}
+
+.vga-fallback__actions {
+	margin-top: 16px;
+	display: flex;
+	gap: 8px;
+}
+
+/* ── Low phone count banner ──────────────────────────────────── */
+.vga-low-phone-banner {
+	padding: 8px 12px;
+	border-radius: var(--radius-sm);
+	background: var(--accent-subtle);
+	color: var(--text-secondary);
+	font-size: 0.82rem;
+	margin-bottom: 8px;
+}
+
+/* ── Return-to-current button ────────────────────────────────── */
+.vga-return-btn {
+	position: sticky;
+	bottom: 8px;
+	margin-left: auto;
+	margin-right: auto;
+	display: none;
+	padding: 4px 12px;
+	border-radius: 16px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text-secondary);
+	font-size: 0.75rem;
+	cursor: pointer;
+	box-shadow: var(--shadow-sm);
+	z-index: 2;
+}
+
+.vga-return-btn.show {
+	display: block;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 767px) {
+	.vga-heatmap {
+		height: 14px;
+	}
+
+	.vga-timeline__label {
+		flex: 0 0 28px;
+		font-size: 0.68rem;
+	}
+
+	.vga-timeline__row {
+		gap: 6px;
+	}
+
+	.vga-transcript {
+		height: 32px;
+	}
+
+	.vga-transcript-readout {
+		font-size: 0.78rem;
+		gap: 10px;
+		padding: 4px 8px;
+	}
+
+	.vga-transcript-readout__char {
+		font-size: 0.95rem;
+	}
+
+	.vga-sentence-nav__btn {
+		min-width: 44px;
+		min-height: 44px;
+		padding: 0 12px;
+	}
+}
+
+/* ── Engine A/B panel refinements ─────────────────────────────── */
+.mc-nn-segment-note {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	line-height: 1.55;
+	margin: 8px 0 0;
+	padding: 0 2px;
+}
+
+.mc-nn-disclaimer {
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	line-height: 1.6;
+	margin-bottom: 10px;
+	padding: 6px 8px;
+	background: var(--bg-secondary);
+	border-radius: var(--radius-sm);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+	.phone,
+	.vga-transcript,
+	.vga-sentence-nav__btn,
+	.vga-timeline__cursor {
+		transition: none;
+	}
+
+	.vga-skel {
+		animation: none;
+		opacity: 0.5;
+	}
+
+	.vga-return-btn {
+		animation: none;
+	}
+}

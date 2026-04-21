@@ -25,6 +25,6 @@ indent_style = tab
 indent_size = 2
 indent_style = tab
 
-[*.{js,ts,jsx,tsx}]
+[*.{js,ts,mjs,mts,jsx,tsx}]
 indent_size = 2
 indent_style = tab

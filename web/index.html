@@ -9,11 +9,13 @@
 			})();
 		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="color-scheme" content="light dark" />
 		<title>声音分析鸭 — 声音性别分析</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 		<link rel="stylesheet" href="/src/styles/main.css" />
+		<link rel="stylesheet" href="/src/styles/timeline.css" />
 	</head>
 	<body>
 		<!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
@@ -232,7 +234,7 @@
 							<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
 							<path d="M7 11V7a5 5 0 0 1 10 0v4" />
 						</svg>
-						<span>您的文件将被严格阅后即焚，上传时不会保留任何特征数据</span>
+						<span>服务器不留存音频与分析结果；历史记录保存在您本地浏览器，可随时清空</span>
 					</p>
 				</section>
 
@@ -253,6 +255,7 @@
 							<path d="M9 2v4h3" />
 						</svg>
 						<span id="file-name" class="file-name">—</span>
+						<span id="audio-unavailable-hint" class="hint-muted" hidden>原音频不可用（页面刷新后丢失）</span>
 						<button id="change-file-btn" class="link-btn small">更换文件</button>
 					</div>
 					<div id="waveform-container" class="waveform-container">
@@ -309,8 +312,56 @@
 					</div>
 				</section>
 
-				<!-- Stats cards -->
-				<section id="stats-section" class="stats-section" hidden>
+				<!-- Phone-level timeline (Engine C, feature-flagged) — drill-down detail -->
+				<div id="phone-timeline-root" hidden></div>
+
+				<!-- Mobile tabs (visible only on narrow screens) -->
+				<div class="mobile-tabs" id="mobile-tabs" hidden>
+					<button class="mobile-tab active" data-tab="segments">分段详情</button>
+					<button class="mobile-tab" data-tab="metrics">声学特征</button>
+				</div>
+
+				<!-- Stats cards — macro conclusion, sits directly above segment list so
+				     the two summary panels (overall composition + per-segment detail)
+				     are visually grouped at the bottom of the center column. -->
+				<section id="stats-section" class="card stats-section" hidden>
+					<div class="section-header">
+						<h2 class="section-title">声音占比</h2>
+						<div
+							id="classify-mode-switcher"
+							class="classify-mode-switcher"
+							role="radiogroup"
+							aria-label="占比依据"
+						>
+							<button
+								class="classify-mode-btn is-active"
+								data-mode="engineA"
+								role="radio"
+								aria-checked="true"
+								title="依 inaSpeechSegmenter 神经网络标签"
+							>
+								神经网络
+							</button>
+							<button
+								class="classify-mode-btn"
+								data-mode="pitch"
+								role="radio"
+								aria-checked="false"
+								title="依每个音素的基频（165 Hz 为中性线）"
+							>
+								音高
+							</button>
+							<button
+								class="classify-mode-btn"
+								data-mode="resonance"
+								role="radio"
+								aria-checked="false"
+								title="依每个音素的共鸣值（0.5 为中性线）"
+							>
+								共鸣
+							</button>
+						</div>
+					</div>
 					<div class="stats-grid">
 						<div class="stat-card stat-male">
 							<div class="stat-dot"></div>
@@ -336,12 +387,6 @@
 					</div>
 				</section>
 
-				<!-- Mobile tabs (visible only on narrow screens) -->
-				<div class="mobile-tabs" id="mobile-tabs" hidden>
-					<button class="mobile-tab active" data-tab="segments">分段详情</button>
-					<button class="mobile-tab" data-tab="metrics">声学特征</button>
-				</div>
-
 				<!-- Segment list -->
 				<section id="segments-section" class="card" hidden>
 					<div class="section-header">
@@ -355,7 +400,7 @@
 			<!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
 			<aside class="panel panel-right">
 				<div class="panel-header">
-					<span class="panel-title">声学特征</span>
+					<span class="panel-title">综合声学特征</span>
 					<span id="mc-segment-label" class="mc-segment-label"></span>
 				</div>
 
@@ -390,14 +435,6 @@
 						</div>
 					</div>
 
-					<!-- Collapsible: Confidence timeline -->
-					<details class="mc-collapsible" id="mc-dist-section" hidden>
-						<summary class="mc-collapsible-header">置信度时间线</summary>
-						<div class="mc-collapsible-body">
-							<canvas id="mc-dist-canvas" height="64" style="width: 100%; display: block; border-radius: 6px"></canvas>
-						</div>
-					</details>
-
 					<!-- Collapsible: Pitch range -->
 					<details class="mc-collapsible" open>
 						<summary class="mc-collapsible-header">音高范围 (80~320 Hz)</summary>
@@ -406,6 +443,7 @@
 								<div class="pitch-zone pitch-zone-male" title="男性 85~155 Hz"></div>
 								<div class="pitch-zone pitch-zone-overlap" title="中间 145~185 Hz"></div>
 								<div class="pitch-zone pitch-zone-female" title="女性 175~255 Hz"></div>
+								<div class="pitch-range-span" id="mc-pitch-range"></div>
 								<div class="pitch-indicator" id="mc-pitch-indicator"></div>
 							</div>
 							<div class="pitch-range-labels">
@@ -432,11 +470,13 @@
 						</div>
 					</details>
 
-					<!-- Collapsible: Gender expression (Engine A as primary) -->
+					<!-- Engine A: Neural network estimate (reference only) -->
 					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header">综合性别表达</summary>
+						<summary class="mc-collapsible-header">神经网络估计</summary>
 						<div class="mc-collapsible-body">
-							<div class="gender-primary-label">分类置信度 (Engine A · inaSpeechSegmenter)</div>
+							<p class="mc-nn-disclaimer">
+								此估计来自一个在大规模语音数据上训练的分类器。它反映的是「典型听者可能如何感知你的声音」，不代表你的身份。
+							</p>
 							<div class="gender-spectrum">
 								<div class="gender-track">
 									<div class="gender-thumb" id="mc-gender-thumb" style="left: 50%"></div>
@@ -448,7 +488,9 @@
 								</div>
 							</div>
 							<div id="mc-certainty-tag" class="certainty-tag" hidden></div>
-							<div id="mc-subscores" class="mc-subscores"></div>
+							<p class="mc-nn-segment-note">
+								↑ 整段加权均值。分段详情里偏男/偏女交替是 AI 对中性区边界敏感的正常现象——不代表多说话者。
+							</p>
 						</div>
 					</details>
 
@@ -478,27 +520,45 @@
 			</div>
 			<section class="vga-help-section">
 				<h4>这是什么？</h4>
-				<p>上传或录制一段音频，自动分析声音中的性别声学特征，输出 AI 分类置信度与多维声学评分，适合声音训练参考。</p>
+				<p>上传或录制一段中文音频，分析声音的性别声学特征。输出整段均值 + 逐字音高/共鸣色彩，可用作声音训练参考。</p>
 			</section>
 			<section class="vga-help-section">
 				<h4>如何使用？</h4>
 				<ol>
-					<li>拖拽音频文件 / 点击上传 / 点击麦克风录音</li>
+					<li>拖拽音频 / 点击上传 / 录音（≤ 5 MB，&lt; 3 分钟）</li>
 					<li>点击「开始分析」，等待鸭子跑完进度条</li>
-					<li>在右侧面板查看声学指标，点击音段查看详情</li>
+					<li>三块面板自动填充，无需额外点击</li>
 				</ol>
 			</section>
 			<section class="vga-help-section">
-				<h4>结果怎么看？</h4>
+				<h4>界面导览</h4>
 				<dl>
-					<dt>Engine A · 分类置信度</dt>
-					<dd>AI 神经网络对「女声/男声」的判断置信度，越高说明声音特征越典型。</dd>
-					<dt>音高（F0）</dt>
-					<dd>说话基频中位数。&lt;120 Hz 典型男性，155~185 Hz 中性区，&gt;225 Hz 典型女性。</dd>
-					<dt>共振峰（F1/F2/F3）</dt>
-					<dd>声道共鸣频率。F2 &lt;1400 Hz 偏男性，1600~1900 Hz 中性区，&gt;2200 Hz 偏女性。</dd>
-					<dt>共鸣（声道长度）</dt>
-					<dd>由 F3 推算的声道长度。&gt;17.5 cm 典型男性，15.5~16.5 cm 中性区，&lt;14.5 cm 典型女性。</dd>
+					<dt>上方波形</dt>
+					<dd>时间轴；拖动跳转播放，分段着色代表 AI 识别的语音 / 音乐 / 静音。</dd>
+					<dt>中央时间轴</dt>
+					<dd>
+						音高色带 → 汉字 →
+						共鸣色带的三明治：三行按字严格同轴，每字一格槽位；字内多个音素按时长细分。点击色块或汉字跳转播放；← N/M →
+						翻页浏览全文。
+					</dd>
+					<dt>右侧面板</dt>
+					<dd>整段音频的均值：基频、共鸣、F1/F2/F3 与音高范围参考条，底部为 AI 分类器的加权置信度。</dd>
+				</dl>
+			</section>
+			<section class="vga-help-section">
+				<h4>色彩与区间</h4>
+				<dl>
+					<dt>色彩方向</dt>
+					<dd>
+						<strong>蓝色</strong> = 男声方向（低音高 / 宽声道共鸣）；<strong>粉色</strong> = 女声方向（高音高 /
+						窄声道共鸣）。
+					</dd>
+					<dt>基频 F0</dt>
+					<dd>&lt; 155 Hz 典型男声，155~185 Hz 中性区，&gt; 185 Hz 偏女声。</dd>
+					<dt>共振峰 F2</dt>
+					<dd>&lt; 1400 Hz 偏男，1600~1900 Hz 中性，&gt; 2200 Hz 偏女。</dd>
+					<dt>共鸣（0~100%）</dt>
+					<dd>基于 F1/F2/F3 z-score 的合成分，越高越偏女声方向。</dd>
 				</dl>
 			</section>
 		</div>

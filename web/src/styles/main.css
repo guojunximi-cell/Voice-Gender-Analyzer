@@ -298,6 +298,12 @@ body {
 	font-size: 0.78rem;
 }
 
+.hint-muted {
+	color: var(--text-muted);
+	font-size: 0.78rem;
+	font-weight: normal;
+}
+
 .btn-primary {
 	display: inline-flex;
 	align-items: center;
@@ -345,6 +351,26 @@ body {
 		background var(--transition),
 		transform 80ms ease;
 }
+
+/* Play / pause icon swap.  Default: show play, hide pause.  When the button
+   gains `.is-playing` (set by waveform.js on wavesurfer's `play` event), swap.
+   The `[hidden]` attribute on the inline SVGs in index.html is a no-JS
+   fallback; these rules deterministically override it once JS runs and avoid
+   the inline-SVG-inside-flex hidden-attr quirk seen in some Chromium builds. */
+.play-btn .icon-play,
+.play-btn .icon-pause {
+	display: block;
+}
+.play-btn .icon-pause {
+	display: none;
+}
+.play-btn.is-playing .icon-play {
+	display: none;
+}
+.play-btn.is-playing .icon-pause {
+	display: block;
+}
+
 .play-btn:hover:not(:disabled) {
 	background: var(--accent-hover);
 	transform: scale(1.05);
@@ -535,35 +561,30 @@ body {
 .stats-section {
 }
 
+/* Stats list mirrors .segments-list visual language: a column of transparent
+   grid rows inside a single .card wrapper (no per-row borders / shadows / left
+   accent stripes).  Per-type dominance is conveyed by a subtle tinted
+   background — kept here because it carries information that the segment list's
+   uniform .active state doesn't need. */
 .stats-grid {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 12px;
+	padding: 0 12px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
 }
 
 .stat-card {
-	background: var(--surface);
-	border: 1px solid var(--border);
-	border-left: 3px solid transparent;
-	border-radius: var(--radius-md);
-	padding: 18px 16px 14px;
-	box-shadow: var(--shadow-sm);
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+	display: grid;
+	grid-template-columns: 10px 44px 56px 1fr 36px;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 8px;
+	border-radius: var(--radius-sm);
+	border: 1px solid transparent;
+	font-size: 0.85rem;
 	transition:
 		background var(--transition),
 		border-color var(--transition);
-}
-
-.stat-male {
-	border-left-color: var(--male);
-}
-.stat-female {
-	border-left-color: var(--female);
-}
-.stat-other {
-	border-left-color: var(--noise);
 }
 
 .stat-male.dominant {
@@ -580,7 +601,6 @@ body {
 	width: 10px;
 	height: 10px;
 	border-radius: 3px;
-	margin-bottom: 2px;
 }
 
 .stat-male .stat-dot {
@@ -594,23 +614,19 @@ body {
 }
 
 .stat-label {
-	font-size: 0.78rem;
-	color: var(--text-secondary);
+	color: var(--text-primary);
 	font-weight: 500;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
 }
 
 .stat-pct {
-	font-size: 1.6rem;
 	font-weight: 600;
-	letter-spacing: -0.03em;
+	letter-spacing: -0.01em;
 	color: var(--text-primary);
-	line-height: 1.1;
+	font-variant-numeric: tabular-nums;
 }
 
 .stat-bar-wrap {
-	height: 5px;
+	height: 4px;
 	background: var(--border-strong);
 	border-radius: 99px;
 	overflow: hidden;
@@ -634,9 +650,10 @@ body {
 }
 
 .stat-duration {
-	font-size: 0.8rem;
+	font-size: 0.78rem;
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
+	text-align: right;
 }
 
 /* ============================================================
@@ -664,6 +681,46 @@ body {
 	background: var(--bg-secondary);
 	color: var(--text-muted);
 	border: 1px solid var(--border);
+}
+
+/* Classify-mode segmented control — swaps the classification source driving
+   the stats bar, waveform overlay, and history scatter. */
+.classify-mode-switcher {
+	display: inline-flex;
+	gap: 2px;
+	padding: 2px;
+	border-radius: 8px;
+	background: var(--bg-secondary);
+	border: 1px solid var(--border);
+}
+.classify-mode-btn {
+	font: inherit;
+	font-size: 0.7rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	background: transparent;
+	border: 0;
+	padding: 3px 9px;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: background-color 0.12s ease, color 0.12s ease;
+	line-height: 1.3;
+}
+.classify-mode-btn:hover:not(:disabled):not(.is-active) {
+	color: var(--text-primary);
+}
+.classify-mode-btn.is-active {
+	background: var(--bg-primary);
+	color: var(--text-primary);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.classify-mode-btn:disabled {
+	opacity: 0.38;
+	cursor: not-allowed;
+}
+.classify-mode-btn:focus-visible {
+	outline: 2px solid var(--accent, #7aa);
+	outline-offset: 1px;
 }
 
 .segments-list {
@@ -1029,12 +1086,58 @@ body {
 	position: absolute;
 	top: 50%;
 	transform: translate(-50%, -50%);
-	width: 3px;
-	height: 18px;
-	background: var(--text-primary);
-	border-radius: 2px;
+	width: 4px;
+	height: 20px;
 	left: 50%;
+	background: rgba(255, 255, 255, 0.5);
+	backdrop-filter: blur(4px) saturate(1.2);
+	-webkit-backdrop-filter: blur(4px) saturate(1.2);
+	border-radius: 2px;
+	box-shadow:
+		0 1px 3px rgba(0, 0, 0, 0.14),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 	transition: left 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+	.pitch-indicator {
+		background: rgba(255, 255, 255, 0.18);
+		box-shadow:
+			0 1px 3px rgba(0, 0, 0, 0.4),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+	}
+}
+
+.pitch-range-span {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	height: 16px;
+	left: 50%;
+	width: 0;
+	background: rgba(255, 255, 255, 0.32);
+	backdrop-filter: blur(6px) saturate(1.25);
+	-webkit-backdrop-filter: blur(6px) saturate(1.25);
+	border: 1px solid rgba(255, 255, 255, 0.55);
+	border-radius: 999px;
+	box-shadow:
+		0 1px 4px rgba(0, 0, 0, 0.12),
+		inset 0 1px 0 rgba(255, 255, 255, 0.55);
+	box-sizing: border-box;
+	pointer-events: none;
+	transition:
+		left 500ms cubic-bezier(0.4, 0, 0.2, 1),
+		width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+	.pitch-range-span {
+		background: rgba(255, 255, 255, 0.12);
+		border-color: rgba(255, 255, 255, 0.28);
+		box-shadow:
+			0 1px 4px rgba(0, 0, 0, 0.35),
+			inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	}
 }
 
 .pitch-range-labels {
@@ -1094,7 +1197,8 @@ body {
 	font-variant-numeric: tabular-nums;
 }
 
-/* Gender spectrum bar */
+/* Gender spectrum bar — visually aligned with the pitch-range bar:
+   soft gray base + low-alpha gradient overlay + frosted-glass indicator. */
 .gender-spectrum {
 	display: flex;
 	flex-direction: column;
@@ -1103,34 +1207,50 @@ body {
 
 .gender-track {
 	position: relative;
-	height: 12px;
+	height: 10px;
 	border-radius: 99px;
+	background: var(--border-strong);
+	overflow: visible;
+}
+
+.gender-track::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
 	background: linear-gradient(
 		to right,
-		rgba(91, 141, 239, 0.85) 0%,
+		rgba(91, 141, 239, 0.45) 0%,
 		rgba(160, 120, 210, 0.35) 50%,
-		rgba(224, 122, 170, 0.85) 100%
+		rgba(224, 122, 170, 0.45) 100%
 	);
+	pointer-events: none;
 }
 
 .gender-thumb {
 	position: absolute;
 	top: 50%;
 	transform: translate(-50%, -50%);
-	width: 14px;
-	height: 14px;
-	border-radius: 50%;
-	background: var(--surface);
-	border: 2.5px solid var(--text-primary);
+	width: 4px;
+	height: 20px;
+	border-radius: 2px;
 	left: 50%;
+	background: rgba(255, 255, 255, 0.5);
+	backdrop-filter: blur(4px) saturate(1.2);
+	-webkit-backdrop-filter: blur(4px) saturate(1.2);
+	box-shadow:
+		0 1px 3px rgba(0, 0, 0, 0.14),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 	transition: left 600ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.gender-thumb[data-gender="male"] {
-	border-color: var(--male);
-}
-.gender-thumb[data-gender="female"] {
-	border-color: var(--female);
+@media (prefers-color-scheme: dark) {
+	.gender-thumb {
+		background: rgba(255, 255, 255, 0.18);
+		box-shadow:
+			0 1px 3px rgba(0, 0, 0, 0.4),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+	}
 }
 
 .gender-labels {
@@ -1153,106 +1273,6 @@ body {
 	color: var(--text-muted);
 	text-align: center;
 	margin-top: 4px;
-}
-
-/* Sub-scores: spectrum range chart */
-.mc-subscores {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-	margin-top: 10px;
-}
-
-.src-row {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-
-.src-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: baseline;
-	font-size: 0.8rem;
-}
-
-.src-label {
-	color: var(--text-secondary);
-	white-space: nowrap;
-}
-
-.src-weight {
-	font-size: 0.68rem;
-	color: var(--text-muted);
-}
-
-.src-val {
-	color: var(--text-primary);
-	font-weight: 500;
-	font-variant-numeric: tabular-nums;
-	min-width: 32px;
-	text-align: right;
-}
-
-.src-track-wrap {
-	padding: 5px 0;
-}
-
-.src-track {
-	position: relative;
-	height: 6px;
-	border-radius: 99px;
-	background: linear-gradient(to right, var(--male-subtle) 0%, var(--border-strong) 50%, var(--female-subtle) 100%);
-}
-
-.src-tick {
-	position: absolute;
-	top: -3px;
-	bottom: -3px;
-	width: 1px;
-	background: var(--border-strong);
-	transform: translateX(-50%);
-	border-radius: 1px;
-	pointer-events: none;
-}
-
-.src-marker {
-	position: absolute;
-	top: 50%;
-	width: 10px;
-	height: 10px;
-	transform: translate(-50%, -50%) rotate(45deg);
-	border-radius: 2px;
-	background: var(--text-muted);
-	border: 1.5px solid var(--surface);
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-	transition: left 600ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.src-marker[data-zone="male"] {
-	background: var(--male);
-}
-.src-marker[data-zone="female"] {
-	background: var(--female);
-}
-.src-marker[data-zone="neutral"] {
-	background: var(--text-muted);
-}
-
-.src-zone-legend {
-	display: flex;
-	justify-content: space-between;
-	font-size: 0.66rem;
-	color: var(--text-muted);
-	margin-top: 2px;
-	padding: 0 2px;
-}
-
-.src-legend-male {
-	color: var(--male);
-}
-.src-legend-female {
-	color: var(--female);
 }
 
 /* Segment acoustic dot indicator */
@@ -1489,16 +1509,8 @@ body {
 	.upload-zone {
 		padding: 36px 20px;
 	}
-	.stats-grid {
-		grid-template-columns: repeat(3, 1fr);
-		gap: 8px;
-	}
-	.stat-pct {
-		font-size: 1.3rem;
-	}
-	.stat-card {
-		padding: 14px 12px 10px;
-	}
+	/* .stats-grid / .stat-card use the same single-line row layout at all
+	   widths now (see base rules above) — no per-breakpoint overrides needed. */
 	.mc-cards-row {
 		grid-template-columns: 1fr 1fr;
 	}
@@ -1815,16 +1827,8 @@ body {
 	.upload-hint {
 		font-size: 0.72rem;
 	}
-	.stats-grid {
-		grid-template-columns: 1fr;
-		gap: 8px;
-	}
-	.stat-pct {
-		font-size: 1.1rem;
-	}
-	.stat-card {
-		padding: 12px 10px 10px;
-	}
+	/* Stats already use a compact single-line row layout — no narrow-screen
+	   override needed. */
 	.controls {
 		flex-wrap: wrap;
 		gap: 8px;

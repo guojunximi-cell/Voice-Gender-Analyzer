@@ -1,5 +1,0 @@
-include *.py *.cfg LICENSE *.md *.ipynb
-include scripts *.py
-include inaSpeechSegmenter/*.py
-include versioneer.py
-include inaSpeechSegmenter/_version.py
