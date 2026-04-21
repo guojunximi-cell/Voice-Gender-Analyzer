@@ -42,7 +42,7 @@ Phone-Level Timeline 使用 **柔和蓝 → 暖白 → 柔粉** 的 9 档 diverg
 **方法**：Viénot-Brettel-Mollon 1999 的 sRGB → LMS → dichromat 投影 → LMS → sRGB → Lab → CIE76 ΔE。实现在 `web/src/modules/diverging.js` 的 `_verifyCVD()`；CLI 跑法：
 
 ```bash
-node web/scripts/verify-diverging-cvd.mjs
+node tools/diagnose/verify-diverging-cvd.mjs
 ```
 
 **阈值**：相邻档在 deuteranopia 与 protanopia 视角下的 ΔE₇₆ 都必须 > 3（远高于训练观察者的 JND ~2.3）。
@@ -101,7 +101,7 @@ resonance = clamp(0, 1, w₁·F1_z + w₂·F2_z + w₃·F3_z + 0.5)
 ## 实现文件
 
 - `web/src/modules/diverging.js` — 调色板 + 映射函数 + `_verifyCVD()`
-- `web/scripts/verify-diverging-cvd.mjs` — CLI 验证脚本
+- `tools/diagnose/verify-diverging-cvd.mjs` — CLI 验证脚本
 - `web/src/modules/gender-legend.js` — 色条 legend
 - `web/src/modules/heatmap-band.js` — 热力带
 - `web/src/styles/timeline.css` — `--dv-0` ~ `--dv-8` tokens
@@ -112,7 +112,7 @@ Cividis 保留在 `cividis.js` 作为未来 toggle 备份。
 
 **每次改动 `STOPS` 必须**：
 ```bash
-node web/scripts/verify-diverging-cvd.mjs
+node tools/diagnose/verify-diverging-cvd.mjs
 ```
 未通过不提交。通过后把新矩阵贴到本文档"CVD 验证 / 结果"段。
 
