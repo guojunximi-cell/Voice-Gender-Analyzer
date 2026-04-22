@@ -25,8 +25,8 @@
 |-|-|
 | 前端 | Vanilla JS · Vite · WaveSurfer.js · uPlot |
 | 后端 | Python 3.13 · FastAPI · Uvicorn · Taskiq · Redis |
-| Engine A | [inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) (Keras 3 / TensorFlow 2) |
-| Engine B | librosa · scipy（仓内自研） |
+| Engine A | [inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) (K-3 / TensorFlow 2) |
+| Engine B | librosa · scipy|
 | Engine C | [FunASR](https://github.com/modelscope/FunASR) · [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) · [Praat](https://www.fon.hum.uva.nl/praat/) · [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) sidecar |
 | 部署 | Docker Compose · Railway |
 
@@ -131,7 +131,7 @@ railway.toml / railway.sidecar.toml
 ## 致谢
 
 * [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) — Doukhan et al., ICASSP 2018（MIT）
-* [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) — Keras 3 兼容 fork
+* [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) — K-3 兼容 fork
 * [FunASR](https://github.com/modelscope/FunASR) — Paraformer-zh ASR（Apache-2.0）
 * [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) — 强制对齐（MIT）
 * [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) — Engine C sidecar 源
