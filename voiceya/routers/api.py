@@ -1,10 +1,11 @@
 import asyncio
 import io
 import logging
+from typing import Literal
 
 import av
 import pyrate_limiter as pl
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
 
@@ -26,6 +27,7 @@ API_CONFIGS = {
     "allow_concurrent": CFG.max_concurrent > 1,
     "max_file_size_mb": CFG.max_file_size_mb,
     "max_audio_duration_sec": CFG.max_audio_duration_sec,
+    "engine_c_enabled": CFG.engine_c_enabled,
 }
 
 
@@ -46,35 +48,38 @@ __RATE_LIMITER = pl.Limiter(
 )
 
 
+Mode = Literal["free", "script"]
+
+
 @router.post(
     "/analyze-voice",
     dependencies=[
         Depends(RateLimiter(limiter=__RATE_LIMITER)),
     ],
 )
-async def new_analyse(request: Request):
+async def new_analyse(
+    audio: UploadFile,
+    mode: Mode = Form("free"),
+    script: str | None = Form(None),
+):
     # ── 3. 队列控制：超出最大等待数时拒绝，否则排队 ───────────
     # TODO: await NotifyingQueue.enqueue()
 
-    # ── 2. 加载文件 ──────────────────────────────────────
-    file_stream = request.stream()
+    # ── 2. 加载文件（分块读，边读边检大小上限） ───────────
     buf = io.BytesIO()
-    # read the minimum amount of bytes that is required to check validity
-    while (pos := buf.tell()) < 12:
-        buf.write(await anext(file_stream))
-
-    # check if file is valid
-    buf.seek(0)
-    is_valid_audio_file(buf.read(12))
-    buf.seek(pos)
-
-    async for chunk in file_stream:
+    max_bytes = CFG.max_file_size_mb * 1024 * 1024
+    while chunk := await audio.read(64 * 1024):
         buf.write(chunk)
-
-        if buf.tell() > CFG.max_file_size_mb * 1024 * 1024:
+        if buf.tell() > max_bytes:
             raise FILE_EXCEED_SIZE_LIMIT_EXCEPTION
 
-    logger.info("收到文件 (%d B)", buf.tell())
+    if buf.tell() < 12:
+        raise HTTPException(status_code=400, detail="上传的音频文件过小或为空")
+
+    buf.seek(0)
+    is_valid_audio_file(buf.read(12))
+
+    logger.info("收到文件 (%d B, mode=%s)", buf.tell(), mode)
     buf.seek(0)
 
     # ── 时长限制 ───────────────────────────────────────────
@@ -88,8 +93,25 @@ async def new_analyse(request: Request):
 
     buf.seek(0)
 
+    # ── script 模式参数校验 ───────────────────────────────
+    # Engine C 关闭时 script 字段被忽略（engine_c.py 自会跳过）；这里不报错，
+    # 保持 "Engine C 是可选模块" 的契约——前端应已隐藏切换。
+    if mode == "script":
+        script_clean = (script or "").strip()
+        if not script_clean:
+            raise HTTPException(
+                status_code=400,
+                detail="跟读模式需要提供 script 文本",
+            )
+    else:
+        script_clean = None
+
     # ── kick task ─────────────────────────────────────────
-    task = await analyse_voice.kiq(content=buf.read())  # pyright: ignore[reportCallIssue]
+    task = await analyse_voice.kiq(  # pyright: ignore[reportCallIssue]
+        content=buf.read(),
+        mode=mode,
+        script=script_clean,
+    )
 
     # POST→303→GET 这条链在 fetch / vite 代理 / curl 下各有坑（body 处理、Accept 是否传递、SSE
     # 连接语义），把两步拆开最稳。

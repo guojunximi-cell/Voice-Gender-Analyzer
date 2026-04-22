@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from voiceya.config import CFG
 from voiceya.services.audio_analyser.audio_tools import normalize_audio_for_analysis
@@ -19,7 +19,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def do_analyse(content: BytesIO, publish: PublisherT):
+async def do_analyse(
+    content: BytesIO,
+    publish: PublisherT,
+    *,
+    mode: Literal["free", "script"] = "free",
+    script: str | None = None,
+):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     sample = await normalize_audio_for_analysis(content, publish)
 
@@ -43,10 +49,14 @@ async def do_analyse(content: BytesIO, publish: PublisherT):
     # ── Engine C: 进阶分析（feature-flagged，默认关）────────
     engine_c_summary = None
     if CFG.engine_c_enabled:
-        await publish(ProgressSSE(pct=72, msg="鸭鸭开小灶做进阶分析…"))
+        # script 模式跳过 ASR，直接把稿子喂给 MFA——文案同步换掉。
+        msg = "鸭鸭照着稿子逐字对齐…" if mode == "script" else "鸭鸭开小灶做进阶分析…"
+        await publish(ProgressSSE(pct=72, msg=msg))
         sample.seek(0)
         audio_bytes = sample.read()
-        engine_c_summary = await run_engine_c(audio_bytes, analyse_results)
+        engine_c_summary = await run_engine_c(
+            audio_bytes, analyse_results, mode=mode, script=script
+        )
 
     # ── 全局汇总统计 ───────────────────────────────────────
     await publish(ProgressSSE(pct=98, msg="鸭鸭快好了…"))

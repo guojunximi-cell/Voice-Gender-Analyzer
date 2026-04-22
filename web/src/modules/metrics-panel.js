@@ -101,6 +101,26 @@ export function renderMetricsPanel(summary, analysis) {
 	empty.hidden = true;
 	content.hidden = false;
 
+	// ── 对齐质量提示 ─────────────────────────────────────────
+	// phone_ratio < 0.8 / coverage < 0.3 时后端已标 low_quality，附上具体
+	// 百分比让用户判断到底是漏读还是干脆没读。script 模式下最常见原因是
+	// 跳读；free 模式下常见原因是噪音太大被 MFA 吞掉。
+	const warnEl = document.getElementById("mc-align-warning");
+	const warnTextEl = document.getElementById("mc-align-warning-text");
+	const ac = ec.alignment_confidence;
+	if (warnEl) {
+		if (ac?.low_quality) {
+			const parts = [];
+			if (ac.phone_ratio != null) parts.push(`音素/汉字比 ${ac.phone_ratio.toFixed(2)}`);
+			if (ac.coverage != null) parts.push(`覆盖 ${Math.round(ac.coverage * 100)}%`);
+			const hint = ec.mode === "script" ? "可能漏读或跳读；重录一次可改善。" : "可能因噪音或语速导致对齐偏弱。";
+			if (warnTextEl) warnTextEl.textContent = `${hint}（${parts.join("，")}）`;
+			warnEl.hidden = false;
+		} else {
+			warnEl.hidden = true;
+		}
+	}
+
 	// ── F0 card ─────────────────────────────────────────────
 	// 卡片上的数字与下方"音高范围"指示器必须同源，否则 164 Hz 的文字会配
 	// 落在 200 Hz 附近的滑块，看起来自相矛盾。统一走 median（更鲁棒，也
@@ -196,4 +216,6 @@ export function clearMetricsPanel() {
 		empty.hidden = false;
 	}
 	if (content) content.hidden = true;
+	const warnEl = document.getElementById("mc-align-warning");
+	if (warnEl) warnEl.hidden = true;
 }

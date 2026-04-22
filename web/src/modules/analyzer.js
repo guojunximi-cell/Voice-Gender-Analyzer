@@ -1,5 +1,5 @@
 // POST /api/analyze-voice
-// Body: raw audio bytes (single file)
+// Body: multipart/form-data — audio (file) + mode ("free" | "script") + script (optional string)
 // Response: { status, filename, summary, analysis: [{label, start_time, end_time, duration}] }
 
 const _controllers = new Set();
@@ -132,7 +132,7 @@ async function _readSSEStream(response, onProgress) {
 
 // ─────────────────────────────────────────────────────────────
 
-export async function analyzeAudio(file, { onProgress } = {}) {
+export async function analyzeAudio(file, { onProgress, mode = "free", script = null } = {}) {
 	const controller = new AbortController();
 	_controllers.add(controller);
 
@@ -148,14 +148,17 @@ export async function analyzeAudio(file, { onProgress } = {}) {
 	// 以前是一个 POST 配 303 让浏览器自动跟随，但 POST→303→GET 这条链在
 	// fetch / 代理 / curl 下各踩各的坑，拆成两步后定位问题就清爽了。
 
+	const fd = new FormData();
+	fd.append("audio", strippedFile);
+	fd.append("mode", mode === "script" ? "script" : "free");
+	if (mode === "script" && script) fd.append("script", script);
+
 	try {
 		const submitResp = await fetch("/api/analyze-voice", {
 			method: "POST",
-			body: strippedFile,
+			body: fd,
 			signal: controller.signal,
-			headers: {
-				"Content-Type": strippedFile.type || "application/octet-stream",
-			},
+			// multipart boundary: 让浏览器自动加，手动写 Content-Type 会少 boundary
 		});
 
 		if (!submitResp.ok) {

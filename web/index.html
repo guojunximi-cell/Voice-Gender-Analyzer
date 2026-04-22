@@ -184,6 +184,41 @@
 					<p class="upload-subtitle">或 <button class="link-btn" id="browse-btn">点击选择文件</button></p>
 					<p class="upload-hint">支持 MP3 · WAV · OGG · M4A · FLAC · 最大 5 MB / 3 分钟</p>
 
+					<!-- 录音模式切换 + 跟读稿件（仅 Engine C 开启时可见） -->
+					<div id="record-mode-panel" class="record-mode-panel" hidden>
+						<div class="record-mode-header">
+							<span class="record-mode-label">录音模式</span>
+							<div id="record-mode-switcher" class="classify-mode-switcher" role="radiogroup" aria-label="录音模式">
+								<button
+									class="classify-mode-btn is-active"
+									data-mode="script"
+									role="radio"
+									aria-checked="true"
+									title="跟读下方稿件——跳过语音识别，分析更快更稳"
+								>
+									跟读稿件
+								</button>
+								<button
+									class="classify-mode-btn"
+									data-mode="free"
+									role="radio"
+									aria-checked="false"
+									title="自由朗读，由 AI 自动转写（较慢，占用更多资源）"
+								>
+									自由说话
+								</button>
+							</div>
+						</div>
+						<div id="record-script-panel" class="record-script-panel">
+							<div class="record-script-header">
+								<span id="record-script-title" class="record-script-title">—</span>
+								<button type="button" class="link-btn small" id="record-script-next">换一段</button>
+							</div>
+							<p id="record-script-text" class="record-script-text">—</p>
+							<p class="record-script-hint">朗读上方文字；鸭鸭会直接按这段稿子对齐，不再跑语音识别。</p>
+						</div>
+					</div>
+
 					<!-- 录音 -->
 					<div class="upload-divider"><span>或</span></div>
 
@@ -327,12 +362,7 @@
 				<section id="stats-section" class="card stats-section" hidden>
 					<div class="section-header">
 						<h2 class="section-title">声音占比</h2>
-						<div
-							id="classify-mode-switcher"
-							class="classify-mode-switcher"
-							role="radiogroup"
-							aria-label="占比依据"
-						>
+						<div id="classify-mode-switcher" class="classify-mode-switcher" role="radiogroup" aria-label="占比依据">
 							<button
 								class="classify-mode-btn is-active"
 								data-mode="engineA"
@@ -419,6 +449,25 @@
 				</div>
 
 				<div id="metrics-content" hidden>
+					<!-- 对齐质量软提示（仅在 script/free 模式下 MFA 对齐明显偏弱时显示） -->
+					<div id="mc-align-warning" class="mc-align-warning" hidden>
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+							<line x1="12" y1="9" x2="12" y2="13" />
+							<line x1="12" y1="17" x2="12.01" y2="17" />
+						</svg>
+						<span id="mc-align-warning-text">对齐质量偏低，结果仅供参考。</span>
+					</div>
 					<!-- F0 + Resonance cards side by side -->
 					<div class="mc-cards-row">
 						<div class="mc-card">
@@ -496,12 +545,19 @@
 
 					<!-- Disclaimer -->
 					<p class="mc-disclaimer">
-						本工具的神经网络驱动的分类器由开源项目提供，真挚的感谢前辈在酷儿语音分析领域的贡献。
-						<br />
-						<br />
+						真挚感谢两个开源项目：神经网络分类器来自
 						<a href="https://github.com/ina-foss/inaSpeechSegmenter" target="_blank" rel="noopener"
 							>inaSpeechSegmenter</a
-						>（Doukhan et al., ICASSP 2018, IEEE）
+						> 音素级共振峰 z-score 链路来自
+						<a href="https://github.com/lmcnulty/gender-voice-visualization" target="_blank" rel="noopener"
+							>gender-voice-visualization</a
+						>
+						<a
+							href="https://github.com/guojunximi-cell/gender-voice-visualization"
+							target="_blank"
+							rel="noopener"
+							>fork</a
+						>
 					</p>
 				</div>
 				<!-- /metrics-content -->
@@ -655,6 +711,11 @@
 
 		<!-- 💬 意见反馈悬浮窗 -->
 		<style>
+			@property --vga-lp {
+				syntax: "<angle>";
+				initial-value: 0deg;
+				inherits: false;
+			}
 			.vga-feedback-btn {
 				position: fixed;
 				bottom: 28px;
@@ -675,11 +736,90 @@
 					background var(--transition),
 					box-shadow var(--transition);
 				z-index: 9999;
+				--vga-lp: 0deg;
 			}
 			.vga-feedback-btn:hover {
 				background: var(--accent-hover);
 				transform: translateY(-2px);
 				box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+			}
+			/* 长按进度环 */
+			.vga-feedback-btn::before {
+				content: "";
+				position: absolute;
+				inset: -5px;
+				border-radius: 50%;
+				background: conic-gradient(rgba(255, 255, 255, 0.95) var(--vga-lp), transparent 0);
+				-webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+				mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity 0.15s ease;
+			}
+			.vga-feedback-btn.is-longpress {
+				transform: scale(0.94);
+				transition:
+					transform 0.8s ease,
+					background var(--transition);
+			}
+			.vga-feedback-btn.is-longpress::before {
+				opacity: 1;
+				--vga-lp: 360deg;
+				transition:
+					--vga-lp 0.8s linear,
+					opacity 0.12s ease;
+			}
+			/* 300ms 预警态：红底 + 红 X，告诉用户再按一会儿就关闭 */
+			.vga-feedback-btn.is-longpress-warn {
+				background: #e44b4b !important;
+				box-shadow: 0 0 0 4px rgba(228, 75, 75, 0.28);
+			}
+			.vga-feedback-btn.is-longpress-warn .vga-fb-icon-chat {
+				opacity: 0;
+			}
+			.vga-feedback-btn.is-longpress-warn .vga-fb-icon-x {
+				opacity: 1;
+				transform: scale(1);
+			}
+			/* 图标叠加：默认 chat，长按完成时换成红 X */
+			.vga-feedback-btn .vga-fb-icon-x {
+				position: absolute;
+				opacity: 0;
+				color: #fff;
+				transform: scale(0.4);
+				transition:
+					opacity 0.12s ease,
+					transform 0.18s cubic-bezier(0.2, 1.4, 0.4, 1);
+			}
+			.vga-feedback-btn.is-longpress-done .vga-fb-icon-chat {
+				opacity: 0;
+			}
+			.vga-feedback-btn.is-longpress-done .vga-fb-icon-x {
+				opacity: 1;
+				transform: scale(1);
+			}
+			.vga-feedback-btn.is-longpress-done {
+				background: #e44b4b !important;
+				box-shadow: 0 0 0 4px rgba(228, 75, 75, 0.28);
+				animation: vgaLongpressPop 0.42s ease forwards;
+			}
+			@keyframes vgaLongpressPop {
+				0% {
+					transform: scale(0.94);
+					opacity: 1;
+				}
+				25% {
+					transform: scale(1.12);
+					opacity: 1;
+				}
+				70% {
+					transform: scale(1);
+					opacity: 1;
+				}
+				100% {
+					transform: scale(0.5);
+					opacity: 0;
+				}
 			}
 			.vga-feedback-modal {
 				display: none;
@@ -753,8 +893,15 @@
 			}
 		</style>
 
-		<button class="vga-feedback-btn" onclick="toggleVgaFeedback()" aria-label="意见反馈">
+		<button
+			id="vgaFeedbackBtn"
+			class="vga-feedback-btn"
+			onclick="toggleVgaFeedback()"
+			aria-label="意见反馈（长按隐藏）"
+			title="长按隐藏此按钮"
+		>
 			<svg
+				class="vga-fb-icon-chat"
 				width="20"
 				height="20"
 				viewBox="0 0 24 24"
@@ -767,6 +914,19 @@
 				<path
 					d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
 				/>
+			</svg>
+			<svg
+				class="vga-fb-icon-x"
+				width="22"
+				height="22"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.8"
+				stroke-linecap="round"
+				aria-hidden="true"
+			>
+				<path d="M6 6l12 12M18 6L6 18" />
 			</svg>
 		</button>
 		<div class="vga-feedback-modal card" id="vgaFeedbackModal">
@@ -807,6 +967,69 @@
 			function toggleVgaFeedback() {
 				document.getElementById("vgaFeedbackModal").classList.toggle("show");
 			}
+
+			// 长按隐藏反馈按钮——URL 带 ?feedback=1 可强制恢复
+			(function () {
+				const btn = document.getElementById("vgaFeedbackBtn");
+				const KEY = "vga.feedbackHidden";
+				const forceShow = new URLSearchParams(location.search).get("feedback") === "1";
+				if (!forceShow && localStorage.getItem(KEY) === "1") {
+					btn.style.display = "none";
+					return;
+				}
+				let warnTimer = null;
+				let commitTimer = null;
+				let fired = false;
+				const start = () => {
+					fired = false;
+					btn.classList.add("is-longpress");
+					// 300ms：先显示红 X 作为"即将关闭"的预警
+					warnTimer = setTimeout(() => {
+						btn.classList.add("is-longpress-warn");
+					}, 300);
+					// 800ms：继续按住则真正关闭
+					commitTimer = setTimeout(() => {
+						fired = true;
+						btn.classList.remove("is-longpress", "is-longpress-warn");
+						btn.classList.add("is-longpress-done");
+						document.getElementById("vgaFeedbackModal").classList.remove("show");
+						localStorage.setItem(KEY, "1");
+						const toast = document.getElementById("toast");
+						if (toast) {
+							toast.textContent = "已隐藏反馈按钮（URL 加 ?feedback=1 可恢复）";
+							toast.classList.add("show");
+							setTimeout(() => toast.classList.remove("show"), 2600);
+						}
+						// pop 动画结束后真正 display:none（动画期间保留可见）
+						setTimeout(() => {
+							btn.style.display = "none";
+							btn.classList.remove("is-longpress-done");
+						}, 440);
+					}, 800);
+				};
+				const cancel = () => {
+					if (warnTimer) clearTimeout(warnTimer);
+					if (commitTimer) clearTimeout(commitTimer);
+					warnTimer = commitTimer = null;
+					btn.classList.remove("is-longpress", "is-longpress-warn");
+				};
+				btn.addEventListener("pointerdown", start);
+				btn.addEventListener("pointerup", cancel);
+				btn.addEventListener("pointerleave", cancel);
+				btn.addEventListener("pointercancel", cancel);
+				// 长按触发后，吞掉后续的 click（避免顺带把 modal 打开）
+				btn.addEventListener(
+					"click",
+					(e) => {
+						if (fired) {
+							e.preventDefault();
+							e.stopImmediatePropagation();
+							fired = false;
+						}
+					},
+					true,
+				);
+			})();
 
 			// 动态更新字数并控制发送按钮状态
 			const msgInput = document.getElementById("vgaFeedbackMsg");

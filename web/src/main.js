@@ -1,7 +1,7 @@
 import { analyzeAudio, cancelAnalysis } from "./modules/analyzer.js";
 import * as audioCache from "./modules/audio-cache.js";
-import { classifyForMode, hasEngineC } from "./modules/classify.js";
 import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
+import { classifyForMode, hasEngineC } from "./modules/classify.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
 import { clearMetricsPanel, renderMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
@@ -16,6 +16,7 @@ import {
 	removeSession as scatterRemoveSession,
 	selectSession,
 } from "./modules/scatter.js";
+import { PRESET_SCRIPTS } from "./modules/scripts.js";
 import {
 	clearSessions,
 	loadSessions,
@@ -50,6 +51,83 @@ const $ = (id) => document.getElementById(id);
 function setAudioUnavailableHint(show) {
 	const el = $("audio-unavailable-hint");
 	if (el) el.hidden = !show;
+}
+
+// ─── Record mode (free-speech vs. script mode for Engine C) ──────
+// When Engine C is on, script mode skips FunASR and feeds the preset text
+// straight to MFA — same phone alignment, lower CPU/RAM. Disabled and
+// forced to "free" when Engine C is off.
+let _recordMode = "script"; // 默认跟读；Engine C 关时强制 "free"
+let _scriptIdx = 0;
+
+function _getCurrentScript() {
+	return PRESET_SCRIPTS[_scriptIdx % PRESET_SCRIPTS.length];
+}
+
+function _getRecordOptions() {
+	if (_recordMode !== "script") return { mode: "free", script: null };
+	const s = _getCurrentScript();
+	return { mode: "script", script: s?.text ?? null };
+}
+
+function _applyRecordMode() {
+	const switcher = $("record-mode-switcher");
+	const scriptPanel = $("record-script-panel");
+	if (!switcher) return;
+	switcher.querySelectorAll(".classify-mode-btn").forEach((btn) => {
+		const active = btn.dataset.mode === _recordMode;
+		btn.classList.toggle("is-active", active);
+		btn.setAttribute("aria-checked", active ? "true" : "false");
+	});
+	if (scriptPanel) scriptPanel.hidden = _recordMode !== "script";
+}
+
+function _renderCurrentScript() {
+	const s = _getCurrentScript();
+	const titleEl = $("record-script-title");
+	const textEl = $("record-script-text");
+	if (titleEl) titleEl.textContent = s?.title ?? "";
+	if (textEl) textEl.textContent = s?.text ?? "";
+}
+
+function _initRecordMode(engineCEnabled) {
+	const panel = $("record-mode-panel");
+	if (!panel) return;
+	if (!engineCEnabled) {
+		panel.hidden = true;
+		_recordMode = "free";
+		return;
+	}
+	panel.hidden = false;
+
+	// #upload-section 整块都是点击上传热区（uploader.js:46），面板里的任何
+	// 点击都要吞掉，否则切换按钮/换稿/长按选稿都会顺带弹出文件选择框。
+	panel.addEventListener("click", (e) => e.stopPropagation());
+
+	const savedMode = localStorage.getItem("record-mode");
+	if (savedMode === "free" || savedMode === "script") _recordMode = savedMode;
+
+	const savedIdx = parseInt(localStorage.getItem("record-script-idx") || "0", 10);
+	if (Number.isFinite(savedIdx) && savedIdx >= 0 && savedIdx < PRESET_SCRIPTS.length) {
+		_scriptIdx = savedIdx;
+	}
+
+	_applyRecordMode();
+	_renderCurrentScript();
+
+	$("record-mode-switcher")?.addEventListener("click", (e) => {
+		const btn = e.target.closest(".classify-mode-btn");
+		if (!btn) return;
+		_recordMode = btn.dataset.mode === "free" ? "free" : "script";
+		localStorage.setItem("record-mode", _recordMode);
+		_applyRecordMode();
+	});
+
+	$("record-script-next")?.addEventListener("click", () => {
+		_scriptIdx = (_scriptIdx + 1) % PRESET_SCRIPTS.length;
+		localStorage.setItem("record-script-idx", String(_scriptIdx));
+		_renderCurrentScript();
+	});
 }
 
 // ─── Classify mode (stats bar + waveform overlay + history scatter) ──
@@ -386,7 +464,7 @@ function onFileSelected(file) {
 // ─── Batch analyze (multiple files, no waveform preview) ─────
 async function _silentAnalyzeAndSave(file) {
 	try {
-		const data = await analyzeAudio(file);
+		const data = await analyzeAudio(file, _getRecordOptions());
 		if (data.summary?.overall_f0_median_hz != null) {
 			const session = {
 				id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
@@ -447,12 +525,16 @@ async function initUploaders() {
 	let allowConcurrent = false;
 	let maxFileSizeMb = 5;
 	let maxDurationSec = 180;
+	let engineCEnabled = false;
 	try {
 		const cfg = await fetch("/api/config").then((r) => r.json());
 		allowConcurrent = cfg.allow_concurrent ?? cfg.max_concurrent > 1;
 		maxFileSizeMb = cfg.max_file_size_mb ?? 5;
 		maxDurationSec = cfg.max_audio_duration_sec ?? 180;
+		engineCEnabled = !!cfg.engine_c_enabled;
 	} catch (_) {}
+
+	_initRecordMode(engineCEnabled);
 
 	const maxBytes = maxFileSizeMb * 1024 * 1024;
 
@@ -526,6 +608,7 @@ $("analyze-btn")?.addEventListener("click", async () => {
 
 	try {
 		const data = await analyzeAudio(currentFile, {
+			..._getRecordOptions(),
 			onProgress(pct, msg) {
 				// First real SSE event: stop fake animation and switch to real progress
 				if (_duckRaf !== null) {
