@@ -13,6 +13,8 @@
  *
  */
 
+import { t } from "./i18n.js";
+
 const FADE_MS = 150;
 
 export class TranscriptRow {
@@ -48,8 +50,8 @@ export class TranscriptRow {
 		this._readout.setAttribute("aria-live", "polite");
 		this._readout.innerHTML =
 			`<span class="vga-transcript-readout__char">\u2014</span>` +
-			`<span class="vga-transcript-readout__metric"><span class="vga-transcript-readout__label">\u97f3\u9ad8</span><span class="vga-transcript-readout__pitch">\u2014</span></span>` +
-			`<span class="vga-transcript-readout__metric"><span class="vga-transcript-readout__label">\u5171\u9e23</span><span class="vga-transcript-readout__res">\u2014</span></span>`;
+			`<span class="vga-transcript-readout__metric"><span class="vga-transcript-readout__label">${t("timeline.readoutPitch")}</span><span class="vga-transcript-readout__pitch">\u2014</span></span>` +
+			`<span class="vga-transcript-readout__metric"><span class="vga-transcript-readout__label">${t("timeline.readoutResonance")}</span><span class="vga-transcript-readout__res">\u2014</span></span>`;
 		// Readout is externally placed when readoutContainer is given (so
 		// PhoneTimeline can put it above the pitch band as a header, keeping
 		// the sandwich of bands + hanzi uninterrupted below).
@@ -81,6 +83,14 @@ export class TranscriptRow {
 
 		this._renderSentence(0, { animate: false });
 		this._installScrollWatcher(this._group);
+
+		// Responsive re-fit: slot widths change with viewport, so rescale
+		// overflowing glyphs whenever the group resizes.  CJK slots rarely
+		// overflow, English (word-per-slot) often does.
+		if ("ResizeObserver" in window) {
+			this._resizeObs = new ResizeObserver(() => this._fitGlyphsToSlots());
+			this._resizeObs.observe(this._group);
+		}
 
 		// Click on empty space within the transcript group → clear the active-
 		// char highlight, mirroring the waveform's "click outside a segment to
@@ -118,7 +128,7 @@ export class TranscriptRow {
 				this._returnBtn = document.createElement("button");
 				this._returnBtn.type = "button";
 				this._returnBtn.className = "vga-return-btn show";
-				this._returnBtn.textContent = "\u56de\u5230\u5f53\u524d";
+				this._returnBtn.textContent = t("timeline.returnToCurrent");
 				this._returnBtn.addEventListener("click", () => {
 					this.state.autoScroll = true;
 					bus.emit("autoScrollChanged", true);
@@ -225,6 +235,7 @@ export class TranscriptRow {
 
 			this._updateNav();
 			this._setActiveChar(-1, this.state.activeCharIdx);
+			this._fitGlyphsToSlots();
 		};
 
 		if (animate && !this.state.reducedMotion) {
@@ -244,12 +255,12 @@ export class TranscriptRow {
 		const root = document.createElement("div");
 		root.className = "vga-sentence-nav";
 		root.setAttribute("role", "navigation");
-		root.setAttribute("aria-label", "\u53e5\u5b50\u5206\u9875");
+		root.setAttribute("aria-label", t("timeline.pagerAria"));
 
 		const prev = document.createElement("button");
 		prev.type = "button";
 		prev.className = "vga-sentence-nav__btn";
-		prev.setAttribute("aria-label", "\u4e0a\u4e00\u53e5");
+		prev.setAttribute("aria-label", t("timeline.prevAria"));
 		prev.innerHTML = "&larr;";
 		prev.addEventListener("click", () => this._navClick(-1));
 
@@ -260,7 +271,7 @@ export class TranscriptRow {
 		const next = document.createElement("button");
 		next.type = "button";
 		next.className = "vga-sentence-nav__btn";
-		next.setAttribute("aria-label", "\u4e0b\u4e00\u53e5");
+		next.setAttribute("aria-label", t("timeline.nextAria"));
 		next.innerHTML = "&rarr;";
 		next.addEventListener("click", () => this._navClick(1));
 
@@ -356,6 +367,28 @@ export class TranscriptRow {
 		btns[nextPos].focus();
 	}
 
+	// Shrink a glyph via scaleX when its natural text width exceeds the
+	// time-allocated slot.  Preserves the equal-width grid (so pitch / hanzi /
+	// resonance cells stay column-aligned) while keeping long English words
+	// readable without bleeding into neighbours.  Floor at 0.35 so extremely
+	// dense passages still show recognisable letter shapes — the full word is
+	// also available in the readout above.
+	_fitGlyphsToSlots() {
+		if (!this._group) return;
+		const btns = this._group.querySelectorAll("button.phone");
+		for (const btn of btns) {
+			const glyph = btn.querySelector(".phone__char");
+			if (!glyph) continue;
+			glyph.style.transform = "";
+			const slotPx = btn.clientWidth;
+			const textPx = glyph.scrollWidth;
+			if (slotPx > 0 && textPx > slotPx) {
+				const ratio = Math.max(0.35, slotPx / textPx);
+				glyph.style.transform = `scaleX(${ratio})`;
+			}
+		}
+	}
+
 	_installScrollWatcher(el) {
 		let idleTimer;
 		const onUserScroll = () => {
@@ -379,6 +412,8 @@ export class TranscriptRow {
 			if (this._onAutoScroll) this.bus.off("autoScrollChanged", this._onAutoScroll);
 		}
 		if (this._group && this._onGroupClick) this._group.removeEventListener("click", this._onGroupClick);
+		this._resizeObs?.disconnect();
+		this._resizeObs = null;
 		this._returnBtn?.remove();
 		// Nav / readout live outside .vga-transcript-wrap when externally placed; remove explicitly.
 		this._nav?.root?.remove();

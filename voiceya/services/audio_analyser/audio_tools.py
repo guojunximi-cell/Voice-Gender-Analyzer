@@ -103,7 +103,7 @@ def normalize_to_pcm(s: InputContainer) -> BytesIO:
 async def normalize_audio_for_analysis(source: BytesIO, publish: PublisherT):
     with av.open(source, "r") as s:
         # ── 转码：统一为 16kbps 单声道 pcm，降低后续 I/O 开销 ──
-        await publish(ProgressSSE(pct=5, msg="鸭鸭正在处理音频…"))
+        await publish(ProgressSSE(pct=5, msg="鸭鸭正在处理音频…", msg_key="progress.processing"))
         try:
             sample = await asyncio.to_thread(normalize_to_pcm, s)
 

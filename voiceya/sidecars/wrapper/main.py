@@ -9,12 +9,14 @@ receives the phone-level JSON described in pipeline.md §6.
 Design notes
 ------------
 * Working directory must be /app at startup — the vendored library reads
-  stats_zh.json, weights_zh.json, mandarin_dict.txt and settings.json via
-  bare relative paths.  uvicorn's CMD in the Dockerfile sets WORKDIR=/app.
+  stats_{zh,en}.json, weights_{zh,en}.json, mandarin_dict.txt / cmudict.txt
+  and settings.json via bare relative paths.  uvicorn's CMD in the
+  Dockerfile sets WORKDIR=/app.
 * preprocessing.process() does its own shutil.rmtree(tmp_dir) on the happy
   path; the analyze endpoint adds a finally-block guard for the error path.
-* Engine C is Chinese-only for this iteration (per implementation plan); we
-  ignore any lang field and hard-code 'zh'.
+* Per-request `language` form field (zh-CN / en-US) picks the asset set;
+  default is zh-CN so existing worker clients without a language field keep
+  working.  Unsupported languages → 422.
 """
 
 from __future__ import annotations
@@ -69,17 +71,58 @@ def _check_auth(token_header: str | None) -> None:
         raise HTTPException(status_code=401, detail="invalid or missing engine_c token")
 
 
-def _load_weights() -> list[float]:
-    """Load Chinese resonance weights, falling back to English if missing."""
-    for candidate in ("weights_zh.json", "weights.json"):
-        if os.path.exists(candidate):
-            with open(candidate) as f:
-                return json.load(f)
-    return [0.7321428571428571, 0.26785714285714285, 0.0]
+# ── Language routing ─────────────────────────────────────────────────
+# Request-level `language` (zh-CN / en-US) → short code (zh / en) → asset
+# set.  The vendored library already branches on `lang` internally (see
+# acousticgender/library/preprocessing.py, phones.py, resonance.py), so the
+# wrapper just needs to validate + route.
+_LANG_ALIASES: dict[str, str] = {
+    "zh": "zh",
+    "zh-cn": "zh",
+    "zh_cn": "zh",
+    "cmn": "zh",
+    "mandarin": "zh",
+    "en": "en",
+    "en-us": "en",
+    "en_us": "en",
+    "english": "en",
+}
+_LANG_WEIGHTS_FILE: dict[str, str] = {"zh": "weights_zh.json", "en": "weights.json"}
+_LANG_STATS_FILE: dict[str, str] = {"zh": "stats_zh.json", "en": "stats.json"}
+_LANG_DICT_FILE: dict[str, str] = {"zh": "mandarin_dict.txt", "en": "cmudict.txt"}
 
 
-WEIGHTS: list[float] = _load_weights()
-LANG = "zh"
+def _normalize_lang(raw: str | None) -> str:
+    """Map `zh-CN` / `en-US` / etc. → short code; returns "" when invalid."""
+    if not raw:
+        return ""
+    return _LANG_ALIASES.get(raw.strip().lower(), "")
+
+
+def _load_weights(lang: str) -> list[float]:
+    """Load resonance weights for `lang`; raises FileNotFoundError if missing."""
+    path = _LANG_WEIGHTS_FILE[lang]
+    with open(path) as f:
+        return json.load(f)
+
+
+def _lang_available(lang: str) -> bool:
+    """True iff every asset required by the vendored pipeline exists on disk."""
+    return all(
+        os.path.exists(p)
+        for p in (_LANG_WEIGHTS_FILE[lang], _LANG_STATS_FILE[lang], _LANG_DICT_FILE[lang])
+    )
+
+
+_SUPPORTED_LANGS: list[str] = [lang for lang in ("zh", "en") if _lang_available(lang)]
+_WEIGHTS_BY_LANG: dict[str, list[float]] = {lang: _load_weights(lang) for lang in _SUPPORTED_LANGS}
+if not _SUPPORTED_LANGS:
+    logger.error(
+        "Engine C sidecar started but no language assets are available. "
+        "Expected stats_zh.json+weights_zh.json+mandarin_dict.txt or "
+        "stats.json+weights.json+cmudict.txt under %s.",
+        os.getcwd(),
+    )
 
 # ── MFA fast-mode patch ──────────────────────────────────────────────
 # Vendored preprocessing.py:119-125 calls MFA with `--clean --beam 100
@@ -123,6 +166,14 @@ def _looks_like_mfa_align(args: object) -> bool:
     return "align" in args and "--beam" in args
 
 
+# Vendored preprocessing.py:87 hardcodes `english_mfa` for non-zh requests,
+# but that model outputs IPA — incompatible with the ARPABET stats.json and
+# cmudict.txt this sidecar ships.  `english_us_arpa` is the ARPABET sibling,
+# same MFA v2+ generation.  Swap it at subprocess-invocation time so the
+# vendored source stays pristine (CLAUDE.md §2 / sidecars/README.md policy).
+_ENGLISH_MODEL_MAP: dict[str, str] = {"english_mfa": "english_us_arpa"}
+
+
 def _tune_mfa_args(args: list) -> list:
     out: list = []
     i = 0
@@ -136,7 +187,7 @@ def _tune_mfa_args(args: list) -> list:
             out.extend(["--retry_beam", _MFA_RETRY_BEAM])
             i += 2
             continue
-        out.append(tok)
+        out.append(_ENGLISH_MODEL_MAP.get(tok, tok))
         i += 1
     return out
 
@@ -256,15 +307,18 @@ def _detect_silence(
 
 @app.get("/healthz")
 def healthz() -> dict:
-    # M2: don't surface internal config (weights, lang) on an unauthenticated
-    # endpoint.  Health checks only need a 200 + minimal body.
-    return {"ok": True}
+    # M2: don't surface weights/token on an unauthenticated endpoint.  The
+    # `languages` list is cheap metadata the worker uses to decide whether
+    # to bother POSTing an en-US request at all — it can't route on its own
+    # anyway, so no information leakage beyond what's advertised by the API.
+    return {"ok": True, "languages": list(_SUPPORTED_LANGS)}
 
 
 @app.post("/engine_c/analyze")
 async def analyze(
     audio: UploadFile = File(...),
     transcript: str = Form(...),
+    language: str = Form("zh-CN"),
     x_engine_c_token: str | None = Header(default=None, alias="X-Engine-C-Token"),
 ) -> dict:
     """Run the upstream pipeline on a single audio clip + transcript.
@@ -277,6 +331,18 @@ async def analyze(
       - mean / stdev (F-vectors)
     """
     _check_auth(x_engine_c_token)
+
+    lang = _normalize_lang(language)
+    if not lang:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unsupported language: {language!r}",
+        )
+    if lang not in _SUPPORTED_LANGS:
+        raise HTTPException(
+            status_code=503,
+            detail=f"language {lang!r} assets not installed in sidecar",
+        )
 
     transcript = (transcript or "").strip()
     if not transcript:
@@ -331,14 +397,14 @@ async def analyze(
         # purely *intra-request* parallelism, which is safe.
         silence_task = asyncio.to_thread(_detect_silence, audio_bytes)
         pipeline_task = asyncio.to_thread(
-            preprocessing.process, audio_bytes, transcript, tmp_dir, LANG
+            preprocessing.process, audio_bytes, transcript, tmp_dir, lang
         )
         silence_ranges, praat_output = await asyncio.gather(silence_task, pipeline_task)
 
-        data = phones.parse(praat_output, LANG)
+        data = phones.parse(praat_output, lang)
         if not data.get("phones"):
             raise RuntimeError("MFA produced no alignment output")
-        resonance.compute_resonance(data, WEIGHTS, LANG)
+        resonance.compute_resonance(data, _WEIGHTS_BY_LANG[lang], lang)
         data["silenceRanges"] = silence_ranges
         return data
     except HTTPException:

@@ -15,35 +15,39 @@ import { divergingPitch, divergingResonance } from "./diverging.js";
 import { renderFallback, renderLowPhoneBanner, renderNoSpeech } from "./engine-c-fallback.js";
 import { GenderLegend } from "./gender-legend.js";
 import { HeatmapBand } from "./heatmap-band.js";
+import { getLang, t } from "./i18n.js";
 import { findSentenceIdx, groupCharsByWidth, groupPhonesByChar } from "./phone-utils.js";
 import { PlaybackSync } from "./playback-sync.js";
 import { TranscriptRow } from "./transcript-row.js";
 
 const LOW_PHONE_THRESHOLD = 8;
 
-// Width-based pagination: one page per ⌊contentWidth / PX_PER_CHAR⌋ real hanzi.
-// 32 px/char is the user-confirmed readability target (≈ 28 px glyph + padding).
-// MIN_CHARS_PER_PAGE keeps extremely narrow containers (<200 px) from producing
-// single-char pages that nav-spam the user.
-const PX_PER_CHAR = 32;
-const MIN_CHARS_PER_PAGE = 6;
+// Width-based pagination: one page per ⌊contentWidth / PX_PER_CHAR⌋ real "char".
+// For CJK each "char" is one hanzi (~28 px glyph + padding); for English each
+// "char" is a whole word whose mean rendered width is much larger, so the
+// per-char budget roughly doubles to keep words legible without needing
+// aggressive scaleX squashing.  MIN_CHARS_PER_PAGE keeps extremely narrow
+// containers (<200 px) from producing single-char pages that nav-spam the user.
+const PX_PER_CHAR_CJK = 32;
+const PX_PER_CHAR_EN = 80;
+const MIN_CHARS_PER_PAGE_CJK = 6;
+const MIN_CHARS_PER_PAGE_EN = 3;
 
 const pitchTitleFn = (p) => {
 	const charLabel = p.char || "\u2205";
 	// Show the phone's raw measured pitch in the tooltip (honest per-phone
 	// read-out) even though the fill color comes from the char-level value.
 	const raw = p.pitch != null && p.pitch > 0 ? `${p.pitch.toFixed(0)} Hz` : "\u2014";
-	const interp =
-		p.charPitch != null && (p.pitch == null || p.pitch <= 0)
-			? ` (\u5b57\u7ea7\u63a8\u7b97 ${p.charPitch.toFixed(0)} Hz)`
-			: "";
-	return `${charLabel} ${p.phone} \xb7 \u97f3\u9ad8 ${raw}${interp}`;
+	const useInterp = p.charPitch != null && (p.pitch == null || p.pitch <= 0);
+	return useInterp
+		? t("timeline.pitchTitleInterp", { char: charLabel, phone: p.phone, raw, interp: p.charPitch.toFixed(0) })
+		: t("timeline.pitchTitle", { char: charLabel, phone: p.phone, raw });
 };
 
 const resonanceTitleFn = (p) => {
 	const charLabel = p.char || "\u2205";
 	const resLabel = p.resonance != null ? p.resonance.toFixed(2) : "\u2014";
-	return `${charLabel} ${p.phone} \xb7 \u5171\u9e23 ${resLabel}`;
+	return t("timeline.resonanceTitle", { char: charLabel, phone: p.phone, res: resLabel });
 };
 
 export class PhoneTimeline {
@@ -168,7 +172,7 @@ export class PhoneTimeline {
 			<div class="vga-timeline__readout-row"></div>
 			<div class="vga-timeline__rows">
 				<div class="vga-timeline__row vga-timeline__row--pitch">
-					<span class="vga-timeline__label">音高</span>
+					<span class="vga-timeline__label">${t("timeline.pitch")}</span>
 					<div class="vga-timeline__band vga-timeline__band--pitch"></div>
 				</div>
 				<div class="vga-timeline__row vga-timeline__row--transcript">
@@ -176,7 +180,7 @@ export class PhoneTimeline {
 					<div class="vga-timeline__transcript"></div>
 				</div>
 				<div class="vga-timeline__row vga-timeline__row--resonance">
-					<span class="vga-timeline__label">共鸣</span>
+					<span class="vga-timeline__label">${t("timeline.resonance")}</span>
 					<div class="vga-timeline__band vga-timeline__band--resonance"></div>
 				</div>
 				<div class="vga-timeline__cursor" aria-hidden="true"></div>
@@ -216,7 +220,10 @@ export class PhoneTimeline {
 		const pitchBand = this.root.querySelector(".vga-timeline__band--pitch");
 		const rowsEl = this.root.querySelector(".vga-timeline__rows");
 		const w = pitchBand?.clientWidth || rowsEl?.clientWidth || this.root.clientWidth || 320;
-		return Math.max(MIN_CHARS_PER_PAGE, Math.floor(w / PX_PER_CHAR));
+		const isEn = getLang() === "en-US";
+		const pxPer = isEn ? PX_PER_CHAR_EN : PX_PER_CHAR_CJK;
+		const minChars = isEn ? MIN_CHARS_PER_PAGE_EN : MIN_CHARS_PER_PAGE_CJK;
+		return Math.max(minChars, Math.floor(w / pxPer));
 	}
 
 	/**
@@ -288,8 +295,8 @@ export class PhoneTimeline {
 			bus: this._bus,
 			colorFn: (p) => divergingPitch(p.charPitch),
 			titleFn: pitchTitleFn,
-			ariaLabel: "音高热力带，每个汉字的音高（不发声辅音继承该字的元音值）",
-			ariaDescription: "当前页的音高热力带",
+			ariaLabel: t("timeline.ariaPitch"),
+			ariaDescription: t("timeline.ariaPitchDesc"),
 		});
 
 		// Transcript row (paginated by width).  navContainer / readoutContainer
@@ -317,8 +324,8 @@ export class PhoneTimeline {
 			bus: this._bus,
 			colorFn: (p) => divergingResonance(p.resonance),
 			titleFn: resonanceTitleFn,
-			ariaLabel: "共鸣热力带，每格代表一个音素的共鸣值 0–1",
-			ariaDescription: "当前页的共鸣热力带；女声阈值 = 0.587",
+			ariaLabel: t("timeline.ariaResonance"),
+			ariaDescription: t("timeline.ariaResonanceDesc"),
 		});
 
 		this._legend = new GenderLegend();
@@ -456,6 +463,6 @@ export class PhoneTimeline {
 			announcer.className = "vga-sr-only";
 			document.body.appendChild(announcer);
 		}
-		announcer.textContent = `分析完成，共 ${charCount} 个字`;
+		announcer.textContent = t("timeline.announceReady", { n: charCount });
 	}
 }

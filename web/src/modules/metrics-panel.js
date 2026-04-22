@@ -10,6 +10,7 @@
  */
 
 import { certaintTag, fmt, LABEL_META } from "../utils.js";
+import { t } from "./i18n.js";
 
 function animNum(el, target, suffix = "", duration = 600) {
 	if (!el) return;
@@ -92,7 +93,7 @@ export function renderMetricsPanel(summary, analysis) {
 
 	const ec = summary?.engine_c;
 	if (!ec || !ec.phones?.length) {
-		empty.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/><path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>Engine C 未启用<br/>无法展示整段声学平均</span>`;
+		empty.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/><path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>${t("metrics.noEngineC")}</span>`;
 		empty.hidden = false;
 		content.hidden = true;
 		return;
@@ -111,9 +112,9 @@ export function renderMetricsPanel(summary, analysis) {
 	if (warnEl) {
 		if (ac?.low_quality) {
 			const parts = [];
-			if (ac.phone_ratio != null) parts.push(`音素/汉字比 ${ac.phone_ratio.toFixed(2)}`);
-			if (ac.coverage != null) parts.push(`覆盖 ${Math.round(ac.coverage * 100)}%`);
-			const hint = ec.mode === "script" ? "可能漏读或跳读；重录一次可改善。" : "可能因噪音或语速导致对齐偏弱。";
+			if (ac.phone_ratio != null) parts.push(t("metrics.alignPhoneRatio", { ratio: ac.phone_ratio.toFixed(2) }));
+			if (ac.coverage != null) parts.push(t("metrics.alignCoverage", { pct: Math.round(ac.coverage * 100) }));
+			const hint = t(ec.mode === "script" ? "metrics.alignHintScript" : "metrics.alignHintFree");
 			if (warnTextEl) warnTextEl.textContent = `${hint}（${parts.join("，")}）`;
 			warnEl.hidden = false;
 		} else {
@@ -196,7 +197,9 @@ export function renderMetricsPanel(summary, analysis) {
 	// ── Header label: overall speech duration ───────────────
 	const headerLabel = document.getElementById("mc-segment-label");
 	if (headerLabel) {
-		headerLabel.textContent = weighted ? `整段 · 语音 ${fmt(weighted.speechSec)}` : "整段";
+		headerLabel.textContent = weighted
+			? t("metrics.headerOverallSpeech", { dur: fmt(weighted.speechSec) })
+			: t("metrics.headerOverall");
 	}
 
 	// ── Certainty tag (reuses the segment-shaped util) ──────
@@ -212,7 +215,7 @@ export function clearMetricsPanel() {
 	const empty = document.getElementById("metrics-empty");
 	const content = document.getElementById("metrics-content");
 	if (empty) {
-		empty.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/><path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>上传并分析音频<br/>查看整段声学平均</span>`;
+		empty.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/><path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>${t("metrics.emptyUpload")}</span>`;
 		empty.hidden = false;
 	}
 	if (content) content.hidden = true;

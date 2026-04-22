@@ -1,6 +1,9 @@
 // POST /api/analyze-voice
 // Body: multipart/form-data — audio (file) + mode ("free" | "script") + script (optional string)
+//                              + language ("zh-CN" | "en-US")
 // Response: { status, filename, summary, analysis: [{label, start_time, end_time, duration}] }
+
+import { getLang, t } from "./i18n.js";
 
 const _controllers = new Set();
 
@@ -111,12 +114,27 @@ async function _readSSEStream(response, onProgress) {
 					const payload = JSON.parse(line.slice(6));
 
 					if (payload.type === "progress") {
-						onProgress(payload.pct, payload.msg);
+						// Backend sends an i18n key + optional params (JSON string,
+						// because Redis XADD rejects nested dicts) so the bar label
+						// follows the UI language; msg is the zh-CN fallback.
+						let params;
+						if (typeof payload.msg_params === "string") {
+							try {
+								params = JSON.parse(payload.msg_params);
+							} catch (_) {}
+						} else if (payload.msg_params) {
+							params = payload.msg_params;
+						}
+						const label = payload.msg_key ? t(payload.msg_key, params) : payload.msg;
+						onProgress(payload.pct, label);
+					} else if (payload.type === "queue") {
+						const label = payload.msg_key ? t(payload.msg_key) : payload.msg;
+						onProgress(0, label);
 					} else if (payload.type === "result") {
-						onProgress(100, "分析完成 🎉");
+						onProgress(100, t("duck.done"));
 						resultData = payload.data;
 					} else if (payload.type === "error") {
-						throw new Error(payload.msg || "后端分析出错");
+						throw new Error(payload.msg || t("analyzer.backendError"));
 					}
 				}
 			}
@@ -125,14 +143,14 @@ async function _readSSEStream(response, onProgress) {
 		reader.releaseLock();
 	}
 
-	if (!resultData) throw new Error("未收到分析结果");
-	if (resultData.status === "error") throw new Error(resultData.message || "后端分析出错");
+	if (!resultData) throw new Error(t("analyzer.noResult"));
+	if (resultData.status === "error") throw new Error(resultData.message || t("analyzer.backendError"));
 	return resultData;
 }
 
 // ─────────────────────────────────────────────────────────────
 
-export async function analyzeAudio(file, { onProgress, mode = "free", script = null } = {}) {
+export async function analyzeAudio(file, { onProgress, mode = "free", script = null, language = null } = {}) {
 	const controller = new AbortController();
 	_controllers.add(controller);
 
@@ -152,6 +170,9 @@ export async function analyzeAudio(file, { onProgress, mode = "free", script = n
 	fd.append("audio", strippedFile);
 	fd.append("mode", mode === "script" ? "script" : "free");
 	if (mode === "script" && script) fd.append("script", script);
+	// 后端 language 字段决定 sidecar 端的 MFA 词典 + 参考表。
+	// 未显式传入时跟随当前 UI 语言（也就是前端 i18n 的 getLang()）。
+	fd.append("language", language === "en-US" || language === "zh-CN" ? language : getLang());
 
 	try {
 		const submitResp = await fetch("/api/analyze-voice", {
@@ -162,7 +183,7 @@ export async function analyzeAudio(file, { onProgress, mode = "free", script = n
 		});
 
 		if (!submitResp.ok) {
-			let msg = `请求失败 (${submitResp.status})`;
+			let msg = t("analyzer.submitFailed", { status: submitResp.status });
 			try {
 				const err = await submitResp.json();
 				msg = err.detail || err.message || msg;
@@ -171,11 +192,11 @@ export async function analyzeAudio(file, { onProgress, mode = "free", script = n
 		}
 
 		const { task_id } = await submitResp.json();
-		if (!task_id) throw new Error("后端未返回 task_id");
+		if (!task_id) throw new Error(t("analyzer.noTaskId"));
 
 		// 有 onProgress 才走 SSE；否则降级轮询不在当前场景要求之内，抛错更明确
 		if (!onProgress) {
-			throw new Error("analyzeAudio 需要 onProgress 回调才能订阅进度流");
+			throw new Error(t("analyzer.needOnProgress"));
 		}
 
 		const streamResp = await fetch(`/api/status/${encodeURIComponent(task_id)}`, {
@@ -187,7 +208,7 @@ export async function analyzeAudio(file, { onProgress, mode = "free", script = n
 		clearTimeout(timeoutId);
 
 		if (!streamResp.ok) {
-			throw new Error(`订阅进度失败 (${streamResp.status})`);
+			throw new Error(t("analyzer.streamFailed", { status: streamResp.status }));
 		}
 
 		return await _readSSEStream(streamResp, onProgress);

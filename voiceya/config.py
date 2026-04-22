@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     # via X-Engine-C-Token; the sidecar (env ENGINE_C_TOKEN) requires a match.
     engine_c_sidecar_token: str = ""
 
+    # ─── Engine C / 英文 ASR (faster-whisper) ────────────────────
+    # 只有 free + en-US 模式会触达这些；script 模式或 zh 请求都不加载权重。
+    # 模型 ID 取自 HuggingFace：tiny.en / base.en / small.en / medium.en.
+    # device="auto" → 有 CUDA 用 CUDA，否则 CPU；compute_type int8 在 CPU 上平衡速度/体积。
+    engine_c_whisper_model: str = "base.en"
+    engine_c_whisper_device: str = "auto"
+    engine_c_whisper_compute_type: str = "int8"
+
 
 CFG: Settings = None  # type: ignore
 

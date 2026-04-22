@@ -3,6 +3,7 @@ import * as audioCache from "./modules/audio-cache.js";
 import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
+import { applyStaticDom, getLang, onLangChange, setLang, t } from "./modules/i18n.js";
 import { clearMetricsPanel, renderMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
@@ -16,7 +17,7 @@ import {
 	removeSession as scatterRemoveSession,
 	selectSession,
 } from "./modules/scatter.js";
-import { PRESET_SCRIPTS } from "./modules/scripts.js";
+import { scriptsForLang } from "./modules/scripts.js";
 import {
 	clearSessions,
 	loadSessions,
@@ -33,6 +34,10 @@ import {
 	updateWaveformTheme,
 } from "./modules/waveform.js";
 import { nextSessionColor } from "./utils.js";
+
+// Expose i18n utilities so inline scripts in index.html (feedback modal) and
+// other non-ESM consumers can reach t() / setLang without extra plumbing.
+window.__vgaI18n = { t, getLang, setLang, onLangChange };
 
 // ─── State ────────────────────────────────────────────────────
 // phases: idle | loaded | analyzing | results
@@ -60,8 +65,13 @@ function setAudioUnavailableHint(show) {
 let _recordMode = "script"; // 默认跟读；Engine C 关时强制 "free"
 let _scriptIdx = 0;
 
+function _getScriptList() {
+	return scriptsForLang(getLang());
+}
+
 function _getCurrentScript() {
-	return PRESET_SCRIPTS[_scriptIdx % PRESET_SCRIPTS.length];
+	const list = _getScriptList();
+	return list[_scriptIdx % list.length];
 }
 
 function _getRecordOptions() {
@@ -108,7 +118,8 @@ function _initRecordMode(engineCEnabled) {
 	if (savedMode === "free" || savedMode === "script") _recordMode = savedMode;
 
 	const savedIdx = parseInt(localStorage.getItem("record-script-idx") || "0", 10);
-	if (Number.isFinite(savedIdx) && savedIdx >= 0 && savedIdx < PRESET_SCRIPTS.length) {
+	const listLen = _getScriptList().length;
+	if (Number.isFinite(savedIdx) && savedIdx >= 0 && savedIdx < listLen) {
 		_scriptIdx = savedIdx;
 	}
 
@@ -124,8 +135,16 @@ function _initRecordMode(engineCEnabled) {
 	});
 
 	$("record-script-next")?.addEventListener("click", () => {
-		_scriptIdx = (_scriptIdx + 1) % PRESET_SCRIPTS.length;
+		const len = _getScriptList().length;
+		_scriptIdx = (_scriptIdx + 1) % len;
 		localStorage.setItem("record-script-idx", String(_scriptIdx));
+		_renderCurrentScript();
+	});
+
+	// 切语言时列表长度/内容都会变 — 把索引折进当前语言的范围，再重画标题+正文。
+	onLangChange(() => {
+		const len = _getScriptList().length;
+		_scriptIdx = _scriptIdx % len;
 		_renderCurrentScript();
 	});
 }
@@ -156,7 +175,7 @@ function _updateClassifyModeSwitcher() {
 		const needsEC = m === "pitch" || m === "resonance";
 		btn.disabled = needsEC && !ecAvailable;
 		btn.title = btn.disabled
-			? "该文件无 Engine C 音素数据（可能 Engine C 未启用或失败）"
+			? t("stats.lockedTip")
 			: btn.dataset.originalTitle || btn.title;
 	});
 }
@@ -210,15 +229,9 @@ $("theme-toggle")?.addEventListener("click", () => {
 });
 
 // ─── Duck progress bar ───────────────────────────────────────
-// Fake animation messages (batch mode only)
-const _DUCK_MESSAGES = [
-	"正在聆听声纹…",
-	"鸭鸭努力工作中…",
-	"鸭鸭竖起了耳朵…",
-	"鸭鸭在分析音高特征…",
-	"鸭鸭在计算共振峰…",
-	"鸭鸭快好了…",
-];
+// Fake animation messages (batch mode only). Resolved at render time via t(),
+// so flipping language mid-run updates the next tick.
+const _DUCK_MESSAGE_KEYS = ["duck.msg1", "duck.msg2", "duck.msg3", "duck.msg4", "duck.msg5", "duck.msg6"];
 let _duckRaf = null;
 let _duckMsgTimer = null;
 let _engineAInterp = null;
@@ -313,7 +326,7 @@ function _finishDuck() {
 
 	fill.style.width = "100%";
 	emoji.style.left = "100%";
-	if (label) label.textContent = "分析完成 🎉";
+	if (label) label.textContent = t("duck.done");
 	setTimeout(() => {
 		if (bar) bar.hidden = true;
 		fill.style.width = "0%";
@@ -372,10 +385,10 @@ function _startDuckFake() {
 	_duckRaf = requestAnimationFrame(tick);
 
 	let msgIdx = 0;
-	label.textContent = _DUCK_MESSAGES[0];
+	label.textContent = t(_DUCK_MESSAGE_KEYS[0]);
 	_duckMsgTimer = setInterval(() => {
-		msgIdx = (msgIdx + 1) % _DUCK_MESSAGES.length;
-		label.textContent = _DUCK_MESSAGES[msgIdx];
+		msgIdx = (msgIdx + 1) % _DUCK_MESSAGE_KEYS.length;
+		label.textContent = t(_DUCK_MESSAGE_KEYS[msgIdx]);
 	}, 4000);
 }
 
@@ -406,7 +419,13 @@ function setPhase(next) {
 
 	const analyzing = next === "analyzing";
 	const done = next === "results";
-	if ($("analyze-text")) $("analyze-text").textContent = analyzing ? "分析中…" : done ? "已分析" : "开始分析";
+	if ($("analyze-text")) {
+		$("analyze-text").textContent = analyzing
+			? t("action.analyzing")
+			: done
+				? t("action.analyzed")
+				: t("action.analyze");
+	}
 	if ($("analyze-spinner")) $("analyze-spinner").hidden = !analyzing;
 	if ($("analyze-btn")) {
 		$("analyze-btn").disabled = analyzing || done;
@@ -483,7 +502,9 @@ async function _silentAnalyzeAndSave(file) {
 		}
 		return data;
 	} catch (err) {
-		if (err.name !== "AbortError") showToast(`${file.name} 失败：${err.message}`, "error");
+		if (err.name !== "AbortError") {
+			showToast(t("toast.batchItemFmt", { name: file.name, msg: err.message }), "error");
+		}
 		return null;
 	}
 }
@@ -493,7 +514,7 @@ async function onMultipleFilesSelected(files) {
 	onFileSelected(files[0]); // 加载第一个文件的波形，setPhase('loaded') 但不会停鸭鸭
 
 	// 手动触发处理中状态
-	if ($("analyze-text")) $("analyze-text").textContent = "处理中…";
+	if ($("analyze-text")) $("analyze-text").textContent = t("toast.processing");
 	if ($("analyze-spinner")) $("analyze-spinner").hidden = false;
 	if ($("analyze-btn")) {
 		$("analyze-btn").disabled = true;
@@ -517,7 +538,7 @@ async function onMultipleFilesSelected(files) {
 	// 批量完成后标记为 results 状态，防止用户重复分析第一个文件
 	setPhase("results");
 
-	showToast(`批量分析完成：${ok} / ${files.length} 个成功`);
+	showToast(t("toast.batchFmt", { ok, total: files.length }));
 }
 
 // ─── Uploaders ────────────────────────────────────────────────
@@ -538,10 +559,13 @@ async function initUploaders() {
 
 	const maxBytes = maxFileSizeMb * 1024 * 1024;
 
-	// 更新上传区提示文字
+	// 更新上传区提示文字（绑定到 data-i18n 参数，便于语言切换时自动刷新）
 	const hint = document.querySelector(".upload-hint");
 	if (hint) {
-		hint.textContent = `支持 MP3 · WAV · OGG · M4A · FLAC · 最大 ${maxFileSizeMb} MB / ${Math.floor(maxDurationSec / 60)} 分钟`;
+		const params = { mb: maxFileSizeMb, min: Math.floor(maxDurationSec / 60) };
+		hint.setAttribute("data-i18n", "upload.hint");
+		hint.setAttribute("data-i18n-params", JSON.stringify(params));
+		hint.textContent = t("upload.hint", params);
 	}
 
 	setupUploader({
@@ -678,10 +702,10 @@ $("analyze-btn")?.addEventListener("click", async () => {
 	} catch (err) {
 		if (err.name === "AbortError") {
 			if (phase === "analyzing") setPhase("loaded");
-			showToast("分析超时，请尝试较短的音频文件", "error");
+			showToast(t("toast.cancelled"), "error");
 			return;
 		}
-		showToast(`分析失败：${err.message}`, "error");
+		showToast(t("toast.failedFmt", { msg: err.message }), "error");
 		setPhase("loaded");
 	}
 });
@@ -714,7 +738,7 @@ async function onScatterDotClick(session) {
 
 	// 历史是查看态：强制锁 analyze-btn 防 setPhase 残留把它解锁
 	if ($("analyze-btn")) $("analyze-btn").disabled = true;
-	if ($("analyze-text")) $("analyze-text").textContent = "已分析";
+	if ($("analyze-text")) $("analyze-text").textContent = t("action.analyzed");
 
 	_updateClassifyModeSwitcher();
 	const _segs = classifyForMode(session, getMode());
@@ -778,7 +802,7 @@ $("delete-session-btn")?.addEventListener("click", () => {
 
 // ─── Clear sessions ───────────────────────────────────────────
 $("clear-sessions-btn")?.addEventListener("click", () => {
-	if (!confirm("清空所有历史分析记录？")) return;
+	if (!confirm(t("toast.confirmClear"))) return;
 	clearSessions();
 	audioCache.clear();
 	clearAllSessions();
@@ -884,8 +908,38 @@ async function initScatterFromStorage() {
 	});
 })();
 
+// ─── Language toggle ──────────────────────────────────────────
+// 顶部按钮既切 UI 又切管线：同一语言决定 DICT、示例稿件库以及 POST
+// /api/analyze-voice 的 `language` 字段（见 analyzer.js）。
+function _updateLangToggleLabel() {
+	const lbl = $("lang-toggle-label");
+	if (!lbl) return;
+	// 显示"去切到的语言"的首字——EN 按钮在中文态显示，中 按钮在英文态显示。
+	lbl.textContent = getLang() === "zh-CN" ? t("header.langShort.en") : t("header.langShort.zh");
+}
+
+$("lang-toggle")?.addEventListener("click", () => {
+	setLang(getLang() === "zh-CN" ? "en-US" : "zh-CN");
+});
+
+onLangChange(() => {
+	_updateLangToggleLabel();
+	_updateClassifyModeSwitcher();
+	// 切语言后重刷依赖 t() 的动态区块：分段置信度、整段卡片、占比条。
+	// analysisData 非空说明已经跑过一次（或从历史还原）——都可以安全重绘。
+	if (analysisData) {
+		const segs = classifyForMode(analysisData, getMode());
+		renderStats(segs);
+		renderSegments(analysisData.analysis);
+		renderMetricsPanel(analysisData.summary, analysisData.analysis);
+	}
+	scatterRedraw();
+});
+
 // ─── Boot ─────────────────────────────────────────────────────
 initTheme();
+applyStaticDom();
+_updateLangToggleLabel();
 setPhase("idle");
 _initClassifyModeSwitcher();
 _updateClassifyModeSwitcher();

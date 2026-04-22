@@ -1,4 +1,5 @@
 import { fmt, LABEL_META } from "../utils.js";
+import { t } from "./i18n.js";
 import { seekToTime } from "./waveform.js";
 
 // ─── Animated counter ────────────────────────────────────────
@@ -79,7 +80,7 @@ export function renderSegments(analysis) {
 	if (!list || !section) return;
 
 	section.hidden = false;
-	if (count) count.textContent = `${analysis.length} 段`;
+	if (count) count.textContent = `${analysis.length} ${t("segments.countSuffix")}`;
 
 	list.innerHTML = "";
 
@@ -118,7 +119,7 @@ export function renderSegments(analysis) {
 		if (hasAcoustics) {
 			const dot = document.createElement("span");
 			dot.className = "segment-acoustic-dot";
-			dot.title = "含声学分析";
+			dot.title = t("segments.acousticDot");
 			item.appendChild(dot);
 		}
 
@@ -128,7 +129,7 @@ export function renderSegments(analysis) {
 			const bar = document.createElement("div");
 			bar.className = "segment-conf-bar";
 			bar.style.setProperty("--conf", seg.confidence);
-			bar.title = `置信度 ${Math.round(seg.confidence * 100)}%`;
+			bar.title = t("segments.confTitle", { pct: Math.round(seg.confidence * 100) });
 			item.appendChild(bar);
 		}
 

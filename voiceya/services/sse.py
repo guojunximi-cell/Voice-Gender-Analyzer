@@ -24,7 +24,18 @@ class SSE(PayloadT):
     type: Literal["queue", "progress", "error", "result"]
 
     def to_dict(self) -> PayloadDictT:
-        return asdict(self)  # type: ignore
+        # Redis XADD can't serialize None or nested dicts, so drop Nones and
+        # JSON-encode the `msg_params` dict (decoded client-side).
+        d = asdict(self)  # type: ignore
+        out: PayloadDictT = {}
+        for k, v in d.items():
+            if v is None:
+                continue
+            if k == "msg_params" and isinstance(v, dict):
+                out[k] = json.dumps(v)
+            else:
+                out[k] = v
+        return out
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -32,6 +43,7 @@ class QueueSSE(SSE):
     type: Literal["queue"] = "queue"
     num_to_wait: int
     msg: str
+    msg_key: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -39,6 +51,10 @@ class ProgressSSE(SSE):
     type: Literal["progress"] = "progress"
     pct: int
     msg: str
+    # Optional i18n key + params so the frontend can render the progress label
+    # in the current UI language instead of showing the Chinese fallback.
+    msg_key: str | None = None
+    msg_params: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -59,7 +75,7 @@ TICK_STEP_MS = 15_000
 
 async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgress[Any]):
     while progress.state == TaskStage.PENDING:
-        yield f"data: {json.dumps(QueueSSE(num_to_wait=-1, msg='排队等候中').to_dict())}\n\n"
+        yield f"data: {json.dumps(QueueSSE(num_to_wait=-1, msg='排队等候中', msg_key='progress.queued').to_dict())}\n\n"
 
         await asyncio.sleep(TICK_STEP_MS / 5 / 1000)
 

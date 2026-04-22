@@ -1,6 +1,7 @@
 import WaveSurfer from "wavesurfer.js";
 
 import { certaintTag, LABEL_META, resolveCSSVar } from "../utils.js";
+import { t } from "./i18n.js";
 
 // ─── Color map ────────────────────────────────────────────────
 const LABEL_VARS = {
@@ -221,7 +222,7 @@ function _setPlayState(playing) {
 	playSvg?.removeAttribute("hidden");
 	pauseSvg?.removeAttribute("hidden");
 	btn.classList.toggle("is-playing", !!playing);
-	btn.setAttribute("aria-label", playing ? "暂停" : "播放");
+	btn.setAttribute("aria-label", playing ? t("action.pause") : t("action.play"));
 	btn.setAttribute("aria-pressed", playing ? "true" : "false");
 }
 

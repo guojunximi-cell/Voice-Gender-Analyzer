@@ -575,7 +575,7 @@ body {
 
 .stat-card {
 	display: grid;
-	grid-template-columns: 10px 44px 56px 1fr 36px;
+	grid-template-columns: 10px minmax(60px, auto) 56px 1fr 36px;
 	align-items: center;
 	gap: 10px;
 	padding: 8px 8px;
@@ -616,6 +616,7 @@ body {
 .stat-label {
 	color: var(--text-primary);
 	font-weight: 500;
+	white-space: nowrap;
 }
 
 .stat-pct {
@@ -748,7 +749,7 @@ body {
 
 .segment-item {
 	display: grid;
-	grid-template-columns: 10px 44px 96px 1fr 6px 28px;
+	grid-template-columns: 10px minmax(60px, auto) 96px 1fr 6px 28px;
 	align-items: center;
 	gap: 10px;
 	padding: 8px 8px;
@@ -778,8 +779,9 @@ body {
 
 .segment-label {
 	font-weight: 500;
-	min-width: 44px;
+	min-width: 60px;
 	color: var(--text-primary);
+	white-space: nowrap;
 }
 
 .segment-time {

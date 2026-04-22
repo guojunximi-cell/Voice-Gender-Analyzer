@@ -11,14 +11,21 @@
 |------|------|------|------|
 | Engine A | `voiceya/services/audio_analyser/engine_a.py` | VAD + 性别分段（inaSpeechSegmenter） | Keras/TF |
 | Engine B | `voiceya/services/audio_analyser/acoustic_analyzer.py` | LPC 共振峰 + 合成性别评分（仓内自研） | librosa/scipy |
-| Engine C | `voiceya/services/audio_analyser/engine_c.py` + sidecar | FunASR ASR → MFA 对齐 → Praat 共振峰 → 音素级 z-score（**feature-flagged**） | funasr + visualizer-backend sidecar |
+| Engine C | `voiceya/services/audio_analyser/engine_c.py` + sidecar | ASR → MFA 对齐 → Praat 共振峰 → 音素级 z-score（**feature-flagged**，支持 zh-CN / en-US） | funasr + faster-whisper + visualizer-backend sidecar |
 
 Engine C 默认关闭（`ENGINE_C_ENABLED=false`）；开启需同时起 sidecar：
 `docker compose --profile engine-c up -d --build`。失败/不可达时 `summary.engine_c = null`，不影响 A/B 结果。
 
+**双语支持**：请求在 `POST /analyze-voice` 带 `language` 字段（`zh-CN` | `en-US`，默认 `zh-CN`）。
+- `zh-CN`：free mode 走 FunASR Paraformer-zh；sidecar 用 `mandarin_mfa` + `stats_zh.json`。
+- `en-US`：free mode 走 faster-whisper（默认 `base.en`，env `ENGINE_C_WHISPER_MODEL` 可切 tiny/small/medium）；
+  sidecar 用 `english_mfa` + `stats.json`。
+- script mode 两种语言通用：绕开 ASR，直接用前端稿子；language 仅决定 sidecar 端的 MFA/参考表路由。
+
 Sidecar 源码 vendor 自 [guojunximi-cell/gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization.git)
 （working-chinese-version，同步 2026-04-16 @ 446f124），放在 `voiceya/sidecars/visualizer-backend/`，
-FastAPI 薄壳在 `voiceya/sidecars/wrapper/main.py`。
+FastAPI 薄壳在 `voiceya/sidecars/wrapper/main.py`。英文资源 `cmudict.txt` 从 upstream master 分支单独
+补入 vendor 目录（详见 `voiceya/sidecars/README.md`）。
 
 # 协作约束（自我框架）
 

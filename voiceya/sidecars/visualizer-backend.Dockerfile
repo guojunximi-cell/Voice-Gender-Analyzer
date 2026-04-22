@@ -7,7 +7,8 @@
 #   docker build -f voiceya/sidecars/visualizer-backend.Dockerfile -t voiceya-engine-c:dev .
 #
 # Adapted from the upstream Dockerfile in the vendored project.  Differences:
-#   - skips english_mfa model download (Mandarin-only deployment)
+#   - downloads both mandarin_mfa and english_mfa so a single deployment can
+#     service zh-CN and en-US (picked per request via the `language` form field)
 #   - installs fastapi/uvicorn/python-multipart into the mfa conda env
 #   - replaces CGIHTTPServer (serve.py) with uvicorn + wrapper.main:app
 #   - sidecar-friendly: no /tmp/gender-voice-rec leak, settings.recordings
@@ -31,11 +32,19 @@ ENV PATH=/opt/conda/envs/mfa/bin:$PATH
 ENV MFA_ROOT_DIR=/opt/mfa_root
 RUN mkdir -p /opt/mfa_root && chmod -R 777 /opt/mfa_root
 
-# Pre-download only the Mandarin acoustic model + dictionary.  Pinned to v2.0.0
-# because v3 has an incompatible phoneme set (per upstream README).
+# Pre-download Mandarin + English acoustic models + dictionaries.  Pinned to
+# v2.0.0 because v3 has an incompatible phoneme set (per upstream README).
+# English uses `english_us_arpa` (ARPABET output) rather than `english_mfa`
+# (IPA) because the vendored cmudict.txt and stats.json are ARPABET-keyed —
+# the wrapper's subprocess shim rewrites the literal `english_mfa` emitted by
+# preprocessing.py into `english_us_arpa` so the vendored source stays
+# untouched (see wrapper/main.py _tune_mfa_args).
 RUN micromamba run -n mfa mfa model download acoustic mandarin_mfa \
  && micromamba run -n mfa mfa model download dictionary mandarin_mfa \
- && micromamba run -n mfa mfa model inspect acoustic mandarin_mfa
+ && micromamba run -n mfa mfa model download acoustic english_us_arpa \
+ && micromamba run -n mfa mfa model download dictionary english_us_arpa \
+ && micromamba run -n mfa mfa model inspect acoustic mandarin_mfa \
+ && micromamba run -n mfa mfa model inspect acoustic english_us_arpa
 
 # mandarin_mfa G2P/alignment implicit deps.
 # Versions pinned from the known-good build (2026-04-17).
@@ -47,8 +56,8 @@ RUN micromamba run -n mfa pip install --no-cache-dir \
 WORKDIR /app
 
 # Vendored gender-voice-visualization tree → /app (so that relative paths
-# like `stats_zh.json` / `mandarin_dict.txt` resolve at import time just like
-# upstream backend.cgi expects).
+# like `stats_zh.json` / `mandarin_dict.txt` / `stats.json` / `cmudict.txt`
+# resolve at import time just like upstream backend.cgi expects).
 COPY voiceya/sidecars/visualizer-backend/ /app/
 
 # FastAPI wrapper (voiceya-owned, not vendored).

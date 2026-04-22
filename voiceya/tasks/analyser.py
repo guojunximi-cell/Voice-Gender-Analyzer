@@ -22,19 +22,21 @@ async def analyse_voice(
     progress_tacker: Annotated[ProgressTracker, TaskiqDepends()],
     mode: Literal["free", "script"] = "free",
     script: str | None = None,
+    language: Literal["zh-CN", "en-US"] = "zh-CN",
 ):
     await progress_tacker.set_progress(TaskStage.STARTED)
     logger.info(
-        "worker 收到 %d 字节，mode=%s，头 16: %r",
+        "worker 收到 %d 字节，mode=%s，language=%s，头 16: %r",
         len(content),
         mode,
+        language,
         content[:16],
     )
 
     buf = io.BytesIO(content)
     publish = get_event_publister(context.message.task_id)
     try:
-        result = await do_analyse(buf, publish, mode=mode, script=script)
+        result = await do_analyse(buf, publish, mode=mode, script=script, language=language)
 
     except Exception:
         await progress_tacker.set_progress(TaskStage.FAILURE)

@@ -300,9 +300,10 @@
 	/* Absolute positioning + inline left/width set by transcript-row.js — these
 	   anchor each char to its phone span in the heatmap above.  No min-width:
 	   the cell's pixel width must equal exactly its time-allocated %, so dense
-	   passages don't push neighbouring buttons into geometric overlap.  The
-	   char glyph's font-size is set inline by transcript-row.js to fit the
-	   allocated width, so the glyph itself never spills past its cell. */
+	   passages don't push neighbouring buttons into geometric overlap.  Glyphs
+	   wider than their slot (e.g. long English words) are shrunk via scaleX
+	   in `_fitGlyphsToSlots`, not truncated, so no letter fragments leak into
+	   the neighbour. */
 	position: absolute;
 	top: 0;
 	bottom: 0;

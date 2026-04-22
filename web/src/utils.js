@@ -1,3 +1,5 @@
+import { t } from "./modules/i18n.js";
+
 // ─── Time formatting ─────────────────────────────────────────
 export function fmt(sec) {
 	if (sec == null || isNaN(sec)) return "—";
@@ -22,13 +24,43 @@ export function nextSessionColor() {
 }
 
 // ─── Label meta ──────────────────────────────────────────────
-export const LABEL_META = {
-	male: { zh: "男声", cssVar: "var(--male)" },
-	female: { zh: "女声", cssVar: "var(--female)" },
-	music: { zh: "音乐", cssVar: "var(--music)" },
-	noise: { zh: "噪音", cssVar: "var(--noise)" },
-	noEnergy: { zh: "静音", cssVar: "var(--noenergy)" },
+// `zh` 字段保留作兼容名，但实际返回当前语言下的显示文本（i18n 动态化）。
+// 旧调用点直接读 `meta.zh` 也能拿到切换后的值。
+const _LABEL_KEYS = {
+	male: "label.male",
+	female: "label.female",
+	music: "label.music",
+	noise: "label.noise",
+	noEnergy: "label.silence",
 };
+const _LABEL_VARS = {
+	male: "var(--male)",
+	female: "var(--female)",
+	music: "var(--music)",
+	noise: "var(--noise)",
+	noEnergy: "var(--noenergy)",
+};
+export const LABEL_META = new Proxy(_LABEL_KEYS, {
+	get(_tgt, key) {
+		if (!(key in _LABEL_KEYS)) return undefined;
+		return {
+			get zh() {
+				return t(_LABEL_KEYS[key]);
+			},
+			cssVar: _LABEL_VARS[key],
+		};
+	},
+	has(_tgt, key) {
+		return key in _LABEL_KEYS;
+	},
+	ownKeys() {
+		return Object.keys(_LABEL_KEYS);
+	},
+	getOwnPropertyDescriptor(_tgt, key) {
+		if (!(key in _LABEL_KEYS)) return undefined;
+		return { enumerable: true, configurable: true, value: this.get(null, key) };
+	},
+});
 
 // ─── Resolve CSS custom property to hex/rgb string ───────────
 export function resolveCSSVar(varName) {
@@ -60,19 +92,20 @@ export function scoreToColor(score) {
 	return `rgba(${Math.round(139 + s * 105)},${Math.round(92 - s * 29)},${Math.round(246 - s * 152)},0.85)`;
 }
 
-// ─── Certainty tag (Chinese) for a voiced segment ────────────
+// ─── Certainty tag for a voiced segment ──────────────────────
 // Uses only Engine A (inaSpeechSegmenter) confidence + label.
+// Returns i18n-resolved text in the current UI language.
 export function certaintTag(seg) {
 	if (!seg || (seg.label !== "female" && seg.label !== "male")) return "";
 	const c = seg.confidence ?? 0.5;
 	const composite = seg.label === "female" ? 50 + c * 50 : 50 - c * 50;
 
-	if (c < 0.4) return "低置信度";
-	if (composite >= 42 && composite <= 58) return "临界区间";
+	if (c < 0.4) return t("certainty.low");
+	if (composite >= 42 && composite <= 58) return t("certainty.boundary");
 	if (c > 0.8) {
-		if (seg.label === "female") return composite > 82 ? "明确女声" : "较明显女声";
-		return composite < 18 ? "明确男声" : "较明显男声";
+		if (seg.label === "female") return t(composite > 82 ? "certainty.femaleStrong" : "certainty.femaleClear");
+		return t(composite < 18 ? "certainty.maleStrong" : "certainty.maleClear");
 	}
-	if (seg.label === "female") return composite > 70 ? "偏女性化" : "女性化";
-	return composite < 30 ? "偏男性化" : "男性化";
+	if (seg.label === "female") return t(composite > 70 ? "certainty.femaleLean" : "certainty.female");
+	return t(composite < 30 ? "certainty.maleLean" : "certainty.male");
 }

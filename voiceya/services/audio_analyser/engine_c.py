@@ -1,14 +1,16 @@
 """Engine C orchestrator — 进阶声学分析.
 
 工作流：
-    1. FunASR Paraformer-zh 把音频转成中文 transcript
-    2. 把 {audio, transcript} POST 给 visualizer-backend sidecar
-    3. sidecar 跑 ffmpeg → SoX 降噪 → MFA 对齐 → Praat 共振峰 → 音素级 z-score
+    1. 按 language 选 ASR：zh-CN 走 FunASR Paraformer-zh，en-US 走 faster-whisper；
+       script 模式跳过 ASR，直接用前端传来的稿子。
+    2. 把 {audio, transcript, language} POST 给 visualizer-backend sidecar
+    3. sidecar 跑 ffmpeg → SoX 降噪 → MFA 对齐（mandarin_mfa 或 english_mfa）
+       → Praat 共振峰 → 音素级 z-score
     4. 返回段聚合后的 pitch/resonance 数据，合入 summary.engine_c
 
 设计边界：
     * 永不抛异常——任何失败都落到 summary.engine_c = None，主响应正常返回。
-    * feature flag ENGINE_C_ENABLED=False 时连 FunASR 都不 import。
+    * feature flag ENGINE_C_ENABLED=False 时连 ASR 都不 import。
     * Engine C 在 Engine B 之后跑，等 seg 结果就位；整段音频上跑一次
       （不按 VAD 段切），避免短段对齐失败。
 """
@@ -26,13 +28,27 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Mandarin 每个汉字≈2 音素（声母+韵母）；phone_ratio 远低于 1 表示 MFA 只对齐到零星
-# 几个音素，很可能是用户漏读/跑题。用 0.8 留点余地（尾声母有时被合并）。
-_LOW_PHONE_RATIO_THRESHOLD = 0.8
+# Mandarin 每个汉字≈2 音素（声母+韵母），英文每个词≈3-4 个 ARPABET 音素。
+# phone_ratio 低于阈值表示 MFA 只对齐到零星几个音素，多半是用户漏读/跑题。
+_LOW_PHONE_RATIO_ZH = 0.8  # phones / hanzi
+_LOW_PHONE_RATIO_EN = 1.5  # phones / word token
 # 对齐的音素区间 / 音频总时长；低于 30% 一般意味着用户只读了开头几秒就停了。
 _LOW_COVERAGE_THRESHOLD = 0.3
 # 匹配单个汉字（BMP 范围够用；扩展 A/B 区等生僻字几乎不会进日常脚本）。
 _HAN_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
+
+# language 归一化：前端/上游传 BCP-47 形式（zh-CN、en-US），sidecar / 调度用短码。
+_LANG_SHORT: dict[str, str] = {
+    "zh-CN": "zh",
+    "zh": "zh",
+    "en-US": "en",
+    "en": "en",
+}
+
+
+def _normalize_lang(language: str) -> str:
+    """BCP-47 → short ("zh"/"en"); unknown → "zh" (fail-safe to current default)."""
+    return _LANG_SHORT.get(language, "zh")
 
 
 def _should_skip(analyse_results: "list[AnalyseResultItem]") -> str | None:
@@ -54,19 +70,25 @@ async def run_engine_c(
     *,
     mode: Literal["free", "script"] = "free",
     script: str | None = None,
+    language: str = "zh-CN",
 ) -> dict[str, Any] | None:
     """Run Engine C on the full audio buffer.
 
     Returns the engine_c summary dict, or None on skip / failure.
 
-    ``mode="script"`` bypasses the FunASR pass and feeds ``script`` straight
-    to MFA — saves 2-5 s + the Paraformer RAM footprint, and gives MFA a
-    clean ground-truth transcript instead of whatever ASR guessed.
+    ``mode="script"`` bypasses the ASR pass and feeds ``script`` straight to
+    MFA — saves 2-5 s + the ASR model RAM footprint, and gives MFA a clean
+    ground-truth transcript instead of whatever ASR guessed.
+
+    ``language`` (BCP-47: ``zh-CN`` / ``en-US``) picks which ASR backend to
+    invoke in free mode and which asset set the sidecar loads.
     """
     skip_reason = _should_skip(analyse_results)
     if skip_reason:
         logger.info("Engine C skipped: %s", skip_reason)
         return None
+
+    lang_short = _normalize_lang(language)
 
     if mode == "script":
         transcript = (script or "").strip()
@@ -79,14 +101,21 @@ async def run_engine_c(
         try:
             import httpx  # noqa: PLC0415
 
-            from voiceya.services.audio_analyser.engine_c_asr import transcribe_zh  # noqa: PLC0415
+            if lang_short == "en":
+                from voiceya.services.audio_analyser.engine_c_asr_en import (  # noqa: PLC0415
+                    transcribe_en as _transcribe,
+                )
+            else:
+                from voiceya.services.audio_analyser.engine_c_asr import (  # noqa: PLC0415
+                    transcribe_zh as _transcribe,
+                )
         except ImportError as exc:
             logger.warning("Engine C dependencies missing (install `engine-c` group): %s", exc)
             return None
 
         try:
-            transcript = await transcribe_zh(audio_bytes)
-        except Exception as exc:  # defensive — transcribe_zh itself swallows errors
+            transcript = await _transcribe(audio_bytes)
+        except Exception as exc:  # defensive — _transcribe itself swallows errors
             logger.warning("Engine C ASR raised unexpectedly: %s", exc)
             return None
 
@@ -110,7 +139,7 @@ async def run_engine_c(
             resp = await client.post(
                 f"{CFG.engine_c_sidecar_url}/engine_c/analyze",
                 files={"audio": ("audio.wav", audio_bytes, "audio/wav")},
-                data={"transcript": transcript},
+                data={"transcript": transcript, "language": language},
                 headers=headers,
             )
         if resp.status_code != 200:
@@ -146,7 +175,7 @@ async def run_engine_c(
     ]
 
     total_audio_sec = sum(r.duration for r in analyse_results)
-    alignment_confidence = _alignment_confidence(phones, transcript, total_audio_sec)
+    alignment_confidence = _alignment_confidence(phones, transcript, total_audio_sec, lang_short)
 
     summary = {
         "mean_pitch_hz": _safe_float(data.get("meanPitch")),
@@ -162,11 +191,13 @@ async def run_engine_c(
         "silence_ranges": silence_ranges,
         "mode": mode,
         "script": script if mode == "script" else None,
+        "language": language,
         "alignment_confidence": alignment_confidence,
     }
 
     logger.info(
-        "Engine C done — mode=%s, %d phones, mean_pitch=%s Hz, mean_resonance=%s, align=%s",
+        "Engine C done — lang=%s mode=%s, %d phones, mean_pitch=%s Hz, mean_resonance=%s, align=%s",
+        language,
         mode,
         summary["phone_count"],
         summary["mean_pitch_hz"],
@@ -180,13 +211,15 @@ def _alignment_confidence(
     phones: list[dict[str, Any]],
     transcript: str,
     total_audio_sec: float,
+    lang_short: str,
 ) -> dict[str, Any]:
     """Compute soft quality signals for the MFA alignment.
 
-    ``phone_ratio``: aligned phones / hanzi in transcript — Mandarin typically
-    runs 1.5-2.5 phones per hanzi, so < ~0.8 suggests MFA only picked up
-    fragments (user skipped words / misread in script mode, or ASR hallucinated
-    characters that had no audio in free mode).
+    ``phone_ratio``: aligned phones per transcript token.  Mandarin counts
+    hanzi (~1.5-2.5 phones each, threshold 0.8); English counts whitespace-
+    split words (~3-4 ARPABET phones each, threshold 1.5).  Low ratios mean
+    MFA only picked up fragments — user skipped words, misread in script
+    mode, or ASR hallucinated text that had no audio backing.
 
     ``coverage``: aligned phone span / total audio duration — low coverage
     means most of the audio is silence or un-aligned.
@@ -194,10 +227,15 @@ def _alignment_confidence(
     ``low_quality``: boolean hint for the UI banner.  Kept loose — this is a
     "heads up" signal, not a hard error.
     """
-    han_count = len(_HAN_CHAR_RE.findall(transcript))
+    if lang_short == "en":
+        token_count = len(transcript.split())
+        low_ratio_threshold = _LOW_PHONE_RATIO_EN
+    else:
+        token_count = len(_HAN_CHAR_RE.findall(transcript))
+        low_ratio_threshold = _LOW_PHONE_RATIO_ZH
     phone_ratio: float | None = None
-    if han_count > 0:
-        phone_ratio = len(phones) / han_count
+    if token_count > 0:
+        phone_ratio = len(phones) / token_count
 
     coverage: float | None = None
     if phones and total_audio_sec > 0:
@@ -207,7 +245,7 @@ def _alignment_confidence(
         coverage = min(1.0, span / total_audio_sec)
 
     low_quality = False
-    if phone_ratio is not None and phone_ratio < _LOW_PHONE_RATIO_THRESHOLD:
+    if phone_ratio is not None and phone_ratio < low_ratio_threshold:
         low_quality = True
     if coverage is not None and coverage < _LOW_COVERAGE_THRESHOLD:
         low_quality = True

@@ -6,11 +6,20 @@
 			(function () {
 				var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
 				document.documentElement.setAttribute("data-theme", t);
+				var SUPPORTED = ["zh-CN", "en-US"];
+				var storedLang = localStorage.getItem("vga.lang");
+				var lang =
+					storedLang && SUPPORTED.indexOf(storedLang) !== -1
+						? storedLang
+						: (navigator.language || "").toLowerCase().indexOf("zh") === 0
+							? "zh-CN"
+							: "en-US";
+				document.documentElement.setAttribute("lang", lang);
 			})();
 		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="color-scheme" content="light dark" />
-		<title>声音分析鸭 — 声音性别分析</title>
+		<title data-i18n="app.title">声音分析鸭 — 声音性别分析</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -26,6 +35,7 @@
 					href="https://github.com/guojunximi-cell/Voice-Gender-Analyzer"
 					target="_blank"
 					rel="noopener noreferrer"
+					data-i18n-aria-label="app.logoAria"
 					aria-label="声音分析鸭 GitHub 仓库"
 				>
 					<svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden="true">
@@ -38,10 +48,20 @@
 							stroke-linecap="round"
 						/>
 					</svg>
-					<span>声音分析鸭</span>
+					<span data-i18n="app.name">声音分析鸭</span>
 				</a>
 				<div class="header-actions">
-					<button id="help-toggle" class="icon-btn" aria-label="使用帮助">
+					<button
+						id="lang-toggle"
+						class="icon-btn lang-toggle-btn"
+						data-i18n-aria-label="header.lang"
+						data-i18n-title="header.lang"
+						aria-label="切换语言"
+						title="切换语言"
+					>
+						<span id="lang-toggle-label">EN</span>
+					</button>
+					<button id="help-toggle" class="icon-btn" data-i18n-aria-label="header.help" aria-label="使用帮助">
 						<svg
 							width="16"
 							height="16"
@@ -56,7 +76,7 @@
 							<line x1="12" y1="17" x2="12.01" y2="17" />
 						</svg>
 					</button>
-					<button id="theme-toggle" class="icon-btn" aria-label="切换主题">
+					<button id="theme-toggle" class="icon-btn" data-i18n-aria-label="header.theme" aria-label="切换主题">
 						<svg
 							class="icon-sun"
 							width="16"
@@ -99,11 +119,11 @@
 			<!-- ══ LEFT PANEL: Scatter plot ════════════════════════════════════════ -->
 			<aside class="panel panel-left">
 				<div class="panel-header">
-					<span class="panel-title">历史分析</span>
+					<span class="panel-title" data-i18n="panel.history">历史分析</span>
 					<span class="panel-collapse-chevron" aria-hidden="true"></span>
 					<div class="panel-header-actions">
 						<!-- Upload new file (available at all times) -->
-						<label class="icon-btn" title="上传新文件" id="scatter-upload-label">
+						<label class="icon-btn" data-i18n-title="action.upload" title="上传新文件" id="scatter-upload-label">
 							<input
 								type="file"
 								id="scatter-file-input"
@@ -123,7 +143,7 @@
 								<path d="M2 13h12" />
 							</svg>
 						</label>
-						<button id="delete-session-btn" class="icon-btn" title="删除此记录" hidden>
+						<button id="delete-session-btn" class="icon-btn" data-i18n-title="action.delete" title="删除此记录" hidden>
 							<svg
 								width="14"
 								height="14"
@@ -136,7 +156,7 @@
 								<path d="M3 3l10 10M13 3L3 13" />
 							</svg>
 						</button>
-						<button id="clear-sessions-btn" class="icon-btn" title="清空历史">
+						<button id="clear-sessions-btn" class="icon-btn" data-i18n-title="action.clear" title="清空历史">
 							<svg
 								width="14"
 								height="14"
@@ -180,50 +200,73 @@
 							<path d="M13 29h14" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" />
 						</svg>
 					</div>
-					<p class="upload-title">拖拽音频文件到此处</p>
-					<p class="upload-subtitle">或 <button class="link-btn" id="browse-btn">点击选择文件</button></p>
-					<p class="upload-hint">支持 MP3 · WAV · OGG · M4A · FLAC · 最大 5 MB / 3 分钟</p>
+					<p class="upload-title" data-i18n="upload.title">拖拽音频文件到此处</p>
+					<p class="upload-subtitle">
+						<span data-i18n="upload.or">或</span>
+						<button class="link-btn" id="browse-btn" data-i18n="action.browse">点击选择文件</button>
+					</p>
+					<p class="upload-hint" data-i18n="upload.hint" data-i18n-params='{"mb":5,"min":3}'>
+						支持 MP3 · WAV · OGG · M4A · FLAC · 最大 5 MB / 3 分钟
+					</p>
 
 					<!-- 录音模式切换 + 跟读稿件（仅 Engine C 开启时可见） -->
 					<div id="record-mode-panel" class="record-mode-panel" hidden>
 						<div class="record-mode-header">
-							<span class="record-mode-label">录音模式</span>
-							<div id="record-mode-switcher" class="classify-mode-switcher" role="radiogroup" aria-label="录音模式">
+							<span class="record-mode-label" data-i18n="record.modeLabel">录音模式</span>
+							<div
+								id="record-mode-switcher"
+								class="classify-mode-switcher"
+								role="radiogroup"
+								data-i18n-aria-label="record.modeAria"
+								aria-label="录音模式"
+							>
 								<button
 									class="classify-mode-btn is-active"
 									data-mode="script"
 									role="radio"
 									aria-checked="true"
+									data-i18n-title="record.scriptTip"
 									title="跟读下方稿件——跳过语音识别，分析更快更稳"
 								>
-									跟读稿件
+									<span data-i18n="record.modeScript">跟读稿件</span>
 								</button>
 								<button
 									class="classify-mode-btn"
 									data-mode="free"
 									role="radio"
 									aria-checked="false"
+									data-i18n-title="record.freeTip"
 									title="自由朗读，由 AI 自动转写（较慢，占用更多资源）"
 								>
-									自由说话
+									<span data-i18n="record.modeFree">自由说话</span>
 								</button>
 							</div>
 						</div>
 						<div id="record-script-panel" class="record-script-panel">
 							<div class="record-script-header">
 								<span id="record-script-title" class="record-script-title">—</span>
-								<button type="button" class="link-btn small" id="record-script-next">换一段</button>
+								<button type="button" class="link-btn small" id="record-script-next" data-i18n="action.next">
+									换一段
+								</button>
 							</div>
 							<p id="record-script-text" class="record-script-text">—</p>
-							<p class="record-script-hint">朗读上方文字；鸭鸭会直接按这段稿子对齐，不再跑语音识别。</p>
+							<p class="record-script-hint" data-i18n="record.hint">
+								朗读上方文字；鸭鸭会直接按这段稿子对齐，不再跑语音识别。
+							</p>
 						</div>
 					</div>
 
 					<!-- 录音 -->
-					<div class="upload-divider"><span>或</span></div>
+					<div class="upload-divider"><span data-i18n="upload.orRecord">或</span></div>
 
 					<div class="recorder-idle-ui" id="recorder-idle-ui">
-						<button class="recorder-mic-btn" id="recorder-mic-btn" type="button" aria-label="开始录制">
+						<button
+							class="recorder-mic-btn"
+							id="recorder-mic-btn"
+							type="button"
+							data-i18n-aria-label="action.recordStart"
+							aria-label="开始录制"
+						>
 							<svg
 								width="14"
 								height="14"
@@ -239,18 +282,24 @@
 								<line x1="12" y1="19" x2="12" y2="23" />
 								<line x1="8" y1="23" x2="16" y2="23" />
 							</svg>
-							<span>录制声音</span>
+							<span data-i18n="action.record">录制声音</span>
 						</button>
 					</div>
 
 					<div class="recorder-active-ui" id="recorder-active-ui" hidden>
 						<span class="recorder-dot" aria-hidden="true"></span>
 						<span class="recorder-timer" id="recorder-timer">0:00</span>
-						<button class="recorder-stop-btn" id="recorder-stop-btn" type="button" aria-label="停止录制">
+						<button
+							class="recorder-stop-btn"
+							id="recorder-stop-btn"
+							type="button"
+							data-i18n-aria-label="action.recordStop"
+							aria-label="停止录制"
+						>
 							<svg width="9" height="9" viewBox="0 0 10 10">
 								<rect width="10" height="10" rx="2" fill="currentColor" />
 							</svg>
-							<span>停止</span>
+							<span data-i18n="action.stop">停止</span>
 						</button>
 					</div>
 
@@ -269,7 +318,9 @@
 							<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
 							<path d="M7 11V7a5 5 0 0 1 10 0v4" />
 						</svg>
-						<span>服务器不留存音频与分析结果；历史记录保存在您本地浏览器，可随时清空</span>
+						<span data-i18n="upload.privacy">
+							服务器不留存音频与分析结果；历史记录保存在您本地浏览器，可随时清空
+						</span>
 					</p>
 				</section>
 
@@ -290,8 +341,10 @@
 							<path d="M9 2v4h3" />
 						</svg>
 						<span id="file-name" class="file-name">—</span>
-						<span id="audio-unavailable-hint" class="hint-muted" hidden>原音频不可用（页面刷新后丢失）</span>
-						<button id="change-file-btn" class="link-btn small">更换文件</button>
+						<span id="audio-unavailable-hint" class="hint-muted" data-i18n="upload.audioUnavailable" hidden>
+							原音频不可用（页面刷新后丢失）
+						</span>
+						<button id="change-file-btn" class="link-btn small" data-i18n="action.changeFile">更换文件</button>
 					</div>
 					<div id="waveform-container" class="waveform-container">
 						<div id="waveform"></div>
@@ -302,7 +355,7 @@
 						</div>
 					</div>
 					<div class="controls">
-						<button id="play-btn" class="play-btn" disabled aria-label="播放">
+						<button id="play-btn" class="play-btn" disabled data-i18n-aria-label="action.play" aria-label="播放">
 							<svg class="icon-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
 								<path d="M4 2.5l9 5.5-9 5.5V2.5z" />
 							</svg>
@@ -312,7 +365,7 @@
 							</svg>
 						</button>
 						<span id="current-time" class="time-label">0:00</span>
-						<div id="seek-bar" class="seek-bar" role="slider" aria-label="播放进度">
+						<div id="seek-bar" class="seek-bar" role="slider" data-i18n-aria-label="action.seekAria" aria-label="播放进度">
 							<div class="seek-track">
 								<div id="seek-progress" class="seek-progress"></div>
 								<div id="seek-thumb" class="seek-thumb"></div>
@@ -332,7 +385,7 @@
 								<circle cx="7" cy="7" r="5.5" />
 								<path d="M5 7l1.5 1.5L9 5" />
 							</svg>
-							<span id="analyze-text">开始分析</span>
+							<span id="analyze-text" data-i18n="action.analyze">开始分析</span>
 							<span id="analyze-spinner" class="spinner" hidden></span>
 						</button>
 					</div>
@@ -343,7 +396,7 @@
 							<div id="duck-fill" class="duck-fill"></div>
 							<span id="duck-emoji" class="duck-emoji">🦆</span>
 						</div>
-						<span id="duck-label" class="duck-label">正在分析…</span>
+						<span id="duck-label" class="duck-label" data-i18n="duck.running">正在分析…</span>
 					</div>
 				</section>
 
@@ -352,8 +405,8 @@
 
 				<!-- Mobile tabs (visible only on narrow screens) -->
 				<div class="mobile-tabs" id="mobile-tabs" hidden>
-					<button class="mobile-tab active" data-tab="segments">分段详情</button>
-					<button class="mobile-tab" data-tab="metrics">声学特征</button>
+					<button class="mobile-tab active" data-tab="segments" data-i18n="mobile.tabSegments">分段详情</button>
+					<button class="mobile-tab" data-tab="metrics" data-i18n="mobile.tabMetrics">声学特征</button>
 				</div>
 
 				<!-- Stats cards — macro conclusion, sits directly above segment list so
@@ -361,55 +414,64 @@
 				     are visually grouped at the bottom of the center column. -->
 				<section id="stats-section" class="card stats-section" hidden>
 					<div class="section-header">
-						<h2 class="section-title">声音占比</h2>
-						<div id="classify-mode-switcher" class="classify-mode-switcher" role="radiogroup" aria-label="占比依据">
+						<h2 class="section-title" data-i18n="stats.title">声音占比</h2>
+						<div
+							id="classify-mode-switcher"
+							class="classify-mode-switcher"
+							role="radiogroup"
+							data-i18n-aria-label="stats.modeAria"
+							aria-label="占比依据"
+						>
 							<button
 								class="classify-mode-btn is-active"
 								data-mode="engineA"
 								role="radio"
 								aria-checked="true"
+								data-i18n-title="stats.modeATip"
 								title="依 inaSpeechSegmenter 神经网络标签"
 							>
-								神经网络
+								<span data-i18n="stats.modeA">神经网络</span>
 							</button>
 							<button
 								class="classify-mode-btn"
 								data-mode="pitch"
 								role="radio"
 								aria-checked="false"
+								data-i18n-title="stats.modePitchTip"
 								title="依每个音素的基频（165 Hz 为中性线）"
 							>
-								音高
+								<span data-i18n="stats.modePitch">音高</span>
 							</button>
 							<button
 								class="classify-mode-btn"
 								data-mode="resonance"
 								role="radio"
 								aria-checked="false"
+								data-i18n-title="stats.modeResonanceTip"
 								title="依每个音素的共鸣值（0.5 为中性线）"
 							>
-								共鸣
+								<span data-i18n="stats.modeResonance">共鸣</span>
 							</button>
 						</div>
 					</div>
 					<div class="stats-grid">
 						<div class="stat-card stat-male">
 							<div class="stat-dot"></div>
-							<div class="stat-label">男声</div>
+							<div class="stat-label" data-i18n="label.male">男声</div>
 							<div class="stat-pct" id="male-pct">—</div>
 							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="male-bar" style="width: 0%"></div></div>
 							<div class="stat-duration" id="male-duration">—</div>
 						</div>
 						<div class="stat-card stat-female">
 							<div class="stat-dot"></div>
-							<div class="stat-label">女声</div>
+							<div class="stat-label" data-i18n="label.female">女声</div>
 							<div class="stat-pct" id="female-pct">—</div>
 							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="female-bar" style="width: 0%"></div></div>
 							<div class="stat-duration" id="female-duration">—</div>
 						</div>
 						<div class="stat-card stat-other">
 							<div class="stat-dot"></div>
-							<div class="stat-label">其他</div>
+							<div class="stat-label" data-i18n="label.other">其他</div>
 							<div class="stat-pct" id="other-pct">—</div>
 							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="other-bar" style="width: 0%"></div></div>
 							<div class="stat-duration" id="other-duration">—</div>
@@ -420,7 +482,7 @@
 				<!-- Segment list -->
 				<section id="segments-section" class="card" hidden>
 					<div class="section-header">
-						<h2 class="section-title">分段详情</h2>
+						<h2 class="section-title" data-i18n="segments.title">分段详情</h2>
 						<span id="segment-count" class="badge">—</span>
 					</div>
 					<div id="segments-list" class="segments-list"></div>
@@ -430,7 +492,7 @@
 			<!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
 			<aside class="panel panel-right">
 				<div class="panel-header">
-					<span class="panel-title">综合声学特征</span>
+					<span class="panel-title" data-i18n="panel.metrics">综合声学特征</span>
 					<span id="mc-segment-label" class="mc-segment-label"></span>
 				</div>
 
@@ -445,7 +507,7 @@
 							stroke-linecap="round"
 						/>
 					</svg>
-					<span>点击音段<br />查看声学特征</span>
+					<span data-i18n-html="metrics.emptyClick" data-i18n-multiline="1">点击音段<br />查看声学特征</span>
 				</div>
 
 				<div id="metrics-content" hidden>
@@ -466,17 +528,17 @@
 							<line x1="12" y1="9" x2="12" y2="13" />
 							<line x1="12" y1="17" x2="12.01" y2="17" />
 						</svg>
-						<span id="mc-align-warning-text">对齐质量偏低，结果仅供参考。</span>
+						<span id="mc-align-warning-text">—</span>
 					</div>
 					<!-- F0 + Resonance cards side by side -->
 					<div class="mc-cards-row">
 						<div class="mc-card">
-							<div class="mc-card-title">基频 PITCH</div>
+							<div class="mc-card-title" data-i18n="metrics.cardPitch">基频 PITCH</div>
 							<div class="mc-card-big" id="mc-f0-median">— Hz</div>
 							<div class="mc-card-sub" id="mc-f0-std">±— Hz</div>
 						</div>
 						<div class="mc-card">
-							<div class="mc-card-title">共鸣 RESONANCE</div>
+							<div class="mc-card-title" data-i18n="metrics.cardResonance">共鸣 RESONANCE</div>
 							<div class="mc-card-big" id="mc-res-val">—%</div>
 							<div class="mc-res-bar-wrap">
 								<div class="mc-res-bar-fill" id="mc-res-bar" style="width: 0%"></div>
@@ -486,12 +548,16 @@
 
 					<!-- Collapsible: Pitch range -->
 					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header">音高范围 (80~320 Hz)</summary>
+						<summary class="mc-collapsible-header" data-i18n="metrics.pitchRangeTitle">音高范围 (80~320 Hz)</summary>
 						<div class="mc-collapsible-body">
 							<div class="pitch-range-bar">
-								<div class="pitch-zone pitch-zone-male" title="男性 85~155 Hz"></div>
-								<div class="pitch-zone pitch-zone-overlap" title="中间 145~185 Hz"></div>
-								<div class="pitch-zone pitch-zone-female" title="女性 175~255 Hz"></div>
+								<div class="pitch-zone pitch-zone-male" data-i18n-title="metrics.zoneMale" title="男性 85~155 Hz"></div>
+								<div
+									class="pitch-zone pitch-zone-overlap"
+									data-i18n-title="metrics.zoneOverlap"
+									title="中间 145~185 Hz"
+								></div>
+								<div class="pitch-zone pitch-zone-female" data-i18n-title="metrics.zoneFemale" title="女性 175~255 Hz"></div>
 								<div class="pitch-range-span" id="mc-pitch-range"></div>
 								<div class="pitch-indicator" id="mc-pitch-indicator"></div>
 							</div>
@@ -500,16 +566,16 @@
 								><span>320</span>
 							</div>
 							<div class="pitch-legend">
-								<span class="legend-male">♂ 85~155 Hz</span>
-								<span class="legend-neutral">♂♀ 145~185 Hz</span>
-								<span class="legend-female">♀ 175~255 Hz</span>
+								<span class="legend-male" data-i18n="metrics.legendMale">♂ 85~155 Hz</span>
+								<span class="legend-neutral" data-i18n="metrics.legendNeutral">♂♀ 145~185 Hz</span>
+								<span class="legend-female" data-i18n="metrics.legendFemale">♀ 175~255 Hz</span>
 							</div>
 						</div>
 					</details>
 
 					<!-- Collapsible: Formants -->
 					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header">共振峰</summary>
+						<summary class="mc-collapsible-header" data-i18n="metrics.formantsTitle">共振峰</summary>
 						<div class="mc-collapsible-body">
 							<div class="formants-grid">
 								<div class="formant-row"><span class="fn-label">F1</span><span class="fn-val" id="mc-f1">—</span></div>
@@ -521,9 +587,9 @@
 
 					<!-- Engine A: Neural network estimate (reference only) -->
 					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header">神经网络估计</summary>
+						<summary class="mc-collapsible-header" data-i18n="metrics.nnTitle">神经网络估计</summary>
 						<div class="mc-collapsible-body">
-							<p class="mc-nn-disclaimer">
+							<p class="mc-nn-disclaimer" data-i18n="metrics.nnDisclaimer">
 								此估计来自一个在大规模语音数据上训练的分类器。它反映的是「典型听者可能如何感知你的声音」，不代表你的身份。
 							</p>
 							<div class="gender-spectrum">
@@ -531,13 +597,13 @@
 									<div class="gender-thumb" id="mc-gender-thumb" style="left: 50%"></div>
 								</div>
 								<div class="gender-labels">
-									<span>♂ 男性化</span>
-									<span>中性</span>
-									<span>♀ 女性化</span>
+									<span data-i18n="metrics.spectrumMale">♂ 男性化</span>
+									<span data-i18n="metrics.spectrumNeutral">中性</span>
+									<span data-i18n="metrics.spectrumFemale">♀ 女性化</span>
 								</div>
 							</div>
 							<div id="mc-certainty-tag" class="certainty-tag" hidden></div>
-							<p class="mc-nn-segment-note">
+							<p class="mc-nn-segment-note" data-i18n="metrics.nnSegmentNote">
 								↑ 整段加权均值。分段详情里偏男/偏女交替是 AI 对中性区边界敏感的正常现象——不代表多说话者。
 							</p>
 						</div>
@@ -545,10 +611,10 @@
 
 					<!-- Disclaimer -->
 					<p class="mc-disclaimer">
-						真挚感谢两个开源项目：神经网络分类器来自
+						<span data-i18n="metrics.disclaimer.prefix">真挚感谢两个开源项目：神经网络分类器来自</span>
 						<a href="https://github.com/ina-foss/inaSpeechSegmenter" target="_blank" rel="noopener"
 							>inaSpeechSegmenter</a
-						> 音素级共振峰 z-score 链路来自
+						><span data-i18n="metrics.disclaimer.mid"> 音素级共振峰 z-score 链路来自 </span>
 						<a href="https://github.com/lmcnulty/gender-voice-visualization" target="_blank" rel="noopener"
 							>gender-voice-visualization</a
 						>
@@ -556,6 +622,7 @@
 							href="https://github.com/guojunximi-cell/gender-voice-visualization"
 							target="_blank"
 							rel="noopener"
+							data-i18n="metrics.disclaimer.forkLabel"
 							>fork</a
 						>
 					</p>
@@ -571,50 +638,58 @@
 		<!-- 帮助说明浮层 -->
 		<div id="help-modal" class="vga-help-modal card">
 			<div class="vga-help-header">
-				<span>🦆 声音分析鸭 · 使用说明</span>
-				<button id="help-close" class="icon-btn" aria-label="关闭">✕</button>
+				<span data-i18n="help.title">🦆 声音分析鸭 · 使用说明</span>
+				<button id="help-close" class="icon-btn" data-i18n-aria-label="feedback.close" aria-label="关闭">✕</button>
 			</div>
 			<section class="vga-help-section">
-				<h4>这是什么？</h4>
-				<p>上传或录制一段中文音频，分析声音的性别声学特征。输出整段均值 + 逐字音高/共鸣色彩，可用作声音训练参考。</p>
+				<h4 data-i18n="help.what.h">这是什么？</h4>
+				<p data-i18n="help.what.p">
+					上传或录制一段中文音频，分析声音的性别声学特征。输出整段均值 + 逐字音高/共鸣色彩，可用作声音训练参考。
+				</p>
 			</section>
 			<section class="vga-help-section">
-				<h4>如何使用？</h4>
+				<h4 data-i18n="help.how.h">如何使用？</h4>
 				<ol>
-					<li>拖拽音频 / 点击上传 / 录音（≤ 5 MB，&lt; 3 分钟）</li>
-					<li>点击「开始分析」，等待鸭子跑完进度条</li>
-					<li>三块面板自动填充，无需额外点击</li>
+					<li data-i18n="help.how.1" data-i18n-params='{"mb":5,"min":3}'>
+						拖拽音频 / 点击上传 / 录音（≤ 5 MB，&lt; 3 分钟）
+					</li>
+					<li data-i18n="help.how.2">点击「开始分析」，等待鸭子跑完进度条</li>
+					<li data-i18n="help.how.3">三块面板自动填充，无需额外点击</li>
 				</ol>
 			</section>
 			<section class="vga-help-section">
-				<h4>界面导览</h4>
+				<h4 data-i18n="help.tour.h">界面导览</h4>
 				<dl>
-					<dt>上方波形</dt>
-					<dd>时间轴；拖动跳转播放，分段着色代表 AI 识别的语音 / 音乐 / 静音。</dd>
-					<dt>中央时间轴</dt>
-					<dd>
+					<dt data-i18n="help.tour.waveDT">上方波形</dt>
+					<dd data-i18n="help.tour.waveDD">
+						时间轴；拖动跳转播放，分段着色代表 AI 识别的语音 / 音乐 / 静音。
+					</dd>
+					<dt data-i18n="help.tour.timelineDT">中央时间轴</dt>
+					<dd data-i18n="help.tour.timelineDD">
 						音高色带 → 汉字 →
 						共鸣色带的三明治：三行按字严格同轴，每字一格槽位；字内多个音素按时长细分。点击色块或汉字跳转播放；← N/M →
 						翻页浏览全文。
 					</dd>
-					<dt>右侧面板</dt>
-					<dd>整段音频的均值：基频、共鸣、F1/F2/F3 与音高范围参考条，底部为 AI 分类器的加权置信度。</dd>
+					<dt data-i18n="help.tour.rightDT">右侧面板</dt>
+					<dd data-i18n="help.tour.rightDD">
+						整段音频的均值：基频、共鸣、F1/F2/F3 与音高范围参考条，底部为 AI 分类器的加权置信度。
+					</dd>
 				</dl>
 			</section>
 			<section class="vga-help-section">
-				<h4>色彩与区间</h4>
+				<h4 data-i18n="help.color.h">色彩与区间</h4>
 				<dl>
-					<dt>色彩方向</dt>
-					<dd>
+					<dt data-i18n="help.color.dirDT">色彩方向</dt>
+					<dd data-i18n-html="help.color.dirDD">
 						<strong>蓝色</strong> = 男声方向（低音高 / 宽声道共鸣）；<strong>粉色</strong> = 女声方向（高音高 /
 						窄声道共鸣）。
 					</dd>
-					<dt>基频 F0</dt>
-					<dd>&lt; 155 Hz 典型男声，155~185 Hz 中性区，&gt; 185 Hz 偏女声。</dd>
-					<dt>共振峰 F2</dt>
-					<dd>&lt; 1400 Hz 偏男，1600~1900 Hz 中性，&gt; 2200 Hz 偏女。</dd>
-					<dt>共鸣（0~100%）</dt>
-					<dd>基于 F1/F2/F3 z-score 的合成分，越高越偏女声方向。</dd>
+					<dt data-i18n="help.color.f0DT">基频 F0</dt>
+					<dd data-i18n="help.color.f0DD">&lt; 155 Hz 典型男声，155~185 Hz 中性区，&gt; 185 Hz 偏女声。</dd>
+					<dt data-i18n="help.color.f2DT">共振峰 F2</dt>
+					<dd data-i18n="help.color.f2DD">&lt; 1400 Hz 偏男，1600~1900 Hz 中性，&gt; 2200 Hz 偏女。</dd>
+					<dt data-i18n="help.color.resDT">共鸣（0~100%）</dt>
+					<dd data-i18n="help.color.resDD">基于 F1/F2/F3 z-score 的合成分，越高越偏女声方向。</dd>
 				</dl>
 			</section>
 		</div>
@@ -897,6 +972,8 @@
 			id="vgaFeedbackBtn"
 			class="vga-feedback-btn"
 			onclick="toggleVgaFeedback()"
+			data-i18n-aria-label="feedback.btnAria"
+			data-i18n-title="feedback.btnTitle"
 			aria-label="意见反馈（长按隐藏）"
 			title="长按隐藏此按钮"
 		>
@@ -931,8 +1008,8 @@
 		</button>
 		<div class="vga-feedback-modal card" id="vgaFeedbackModal">
 			<div class="vga-feedback-header">
-				<span>意见反馈</span>
-				<button class="icon-btn" onclick="toggleVgaFeedback()" aria-label="关闭">
+				<span data-i18n="feedback.title">意见反馈</span>
+				<button class="icon-btn" onclick="toggleVgaFeedback()" data-i18n-aria-label="feedback.close" aria-label="关闭">
 					<svg
 						width="14"
 						height="14"
@@ -947,18 +1024,25 @@
 				</button>
 			</div>
 			<form id="vgaFeedbackForm" action="https://formspree.io/f/xreolvln" method="POST">
-				<input type="email" name="email" class="vga-feedback-input" placeholder="您的邮箱（选填）" />
+				<input
+					type="email"
+					name="email"
+					class="vga-feedback-input"
+					data-i18n-placeholder="feedback.email"
+					placeholder="您的邮箱（选填）"
+				/>
 				<textarea
 					id="vgaFeedbackMsg"
 					name="message"
 					class="vga-feedback-input"
+					data-i18n-placeholder="feedback.placeholder"
 					placeholder="输入您的反馈或建议…"
 					maxlength="500"
 					required
 				></textarea>
 				<div class="vga-feedback-footer">
 					<span class="vga-char-count" id="vgaCharCount">0 / 500</span>
-					<button type="submit" class="btn-primary" id="vgaSubmitBtn" disabled>发送</button>
+					<button type="submit" class="btn-primary" id="vgaSubmitBtn" data-i18n="action.send" disabled>发送</button>
 				</div>
 			</form>
 		</div>
@@ -1046,7 +1130,14 @@
 			document.getElementById("vgaFeedbackForm").addEventListener("submit", async function (e) {
 				e.preventDefault(); // 阻止默认的表单跳转
 				const form = e.target;
-				submitBtn.textContent = "发送中…";
+				const _fbT = (k) => {
+					try {
+						return window.__vgaI18n.t(k);
+					} catch (_) {
+						return k;
+					}
+				};
+				submitBtn.textContent = _fbT("action.sending");
 				submitBtn.disabled = true;
 
 				try {
@@ -1056,22 +1147,21 @@
 						headers: { Accept: "application/json" },
 					});
 					if (response.ok) {
-						submitBtn.textContent = "发送成功";
+						submitBtn.textContent = _fbT("action.sendOK");
 						form.reset();
 						charCount.textContent = "0 / 500";
 						setTimeout(() => {
 							toggleVgaFeedback();
-							submitBtn.textContent = "发送";
+							submitBtn.textContent = _fbT("action.send");
 							submitBtn.disabled = true;
 						}, 2000);
 					} else {
 						throw new Error("Network response was not ok");
 					}
 				} catch (error) {
-					submitBtn.textContent = "发送失败";
-					// 如果失败，恢复按钮状态（取决于文本框是否有值）
+					submitBtn.textContent = _fbT("action.sendFail");
 					setTimeout(() => {
-						submitBtn.textContent = "发送";
+						submitBtn.textContent = _fbT("action.send");
 						submitBtn.disabled = msgInput.value.trim().length === 0;
 					}, 3000);
 				}

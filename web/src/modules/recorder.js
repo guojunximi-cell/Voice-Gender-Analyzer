@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+
 export function setupRecorder({ onFile, onError }) {
 	if (!navigator.mediaDevices?.getUserMedia) {
 		document.getElementById("recorder-idle-ui")?.remove();
@@ -33,10 +35,10 @@ export function setupRecorder({ onFile, onError }) {
 		} catch (err) {
 			const msg =
 				err.name === "NotAllowedError"
-					? "请允许麦克风权限后重试"
+					? t("recorder.noPermission")
 					: err.name === "NotFoundError"
-						? "未找到麦克风设备"
-						: "无法访问麦克风";
+						? t("recorder.noDevice")
+						: t("recorder.noAccess");
 			onError(msg);
 			return;
 		}
@@ -52,7 +54,7 @@ export function setupRecorder({ onFile, onError }) {
 			if (e.data.size > 0) _chunks.push(e.data);
 		});
 		_mr.addEventListener("stop", _finish);
-		_mr.addEventListener("error", (e) => _cleanup("录制出错：" + (e.error?.message ?? "")));
+		_mr.addEventListener("error", (e) => _cleanup(t("recorder.recordError", { msg: e.error?.message ?? "" })));
 		_mr.start(200);
 
 		idleUI.hidden = true;
@@ -82,11 +84,11 @@ export function setupRecorder({ onFile, onError }) {
 		const mime = _mr?.mimeType || "audio/webm";
 		const ext = mime.includes("ogg") ? ".ogg" : ".webm";
 		const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-		const file = new File(_chunks, `录音-${ts}${ext}`, { type: mime });
+		const file = new File(_chunks, `${t("recorder.filenamePrefix")}-${ts}${ext}`, { type: mime });
 		_mr = null;
 		_chunks = [];
 		if (file.size === 0) {
-			onError("录音内容为空，请重新录制");
+			onError(t("recorder.empty"));
 			return;
 		}
 		onFile(file);

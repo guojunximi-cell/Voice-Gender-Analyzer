@@ -49,6 +49,7 @@ __RATE_LIMITER = pl.Limiter(
 
 
 Mode = Literal["free", "script"]
+Language = Literal["zh-CN", "en-US"]
 
 
 @router.post(
@@ -61,6 +62,7 @@ async def new_analyse(
     audio: UploadFile,
     mode: Mode = Form("free"),
     script: str | None = Form(None),
+    language: Language = Form("zh-CN"),
 ):
     # ── 3. 队列控制：超出最大等待数时拒绝，否则排队 ───────────
     # TODO: await NotifyingQueue.enqueue()
@@ -79,7 +81,7 @@ async def new_analyse(
     buf.seek(0)
     is_valid_audio_file(buf.read(12))
 
-    logger.info("收到文件 (%d B, mode=%s)", buf.tell(), mode)
+    logger.info("收到文件 (%d B, mode=%s, language=%s)", buf.tell(), mode, language)
     buf.seek(0)
 
     # ── 时长限制 ───────────────────────────────────────────
@@ -111,6 +113,7 @@ async def new_analyse(
         content=buf.read(),
         mode=mode,
         script=script_clean,
+        language=language,
     )
 
     # POST→303→GET 这条链在 fetch / vite 代理 / curl 下各有坑（body 处理、Accept 是否传递、SSE
