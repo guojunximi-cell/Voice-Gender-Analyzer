@@ -379,8 +379,11 @@ const DICT = {
 		"metrics.disclaimer.mid": ". The phone-level formant z-score pipeline is a ",
 		"metrics.disclaimer.forkLabel": "fork",
 
-		"timeline.pitch": "Pitch",
-		"timeline.resonance": "Resonance",
+		// Abbreviated as band-side column headers so the label gutter stays
+		// narrow and the heatmap content keeps its honest width; the readout
+		// row above spells out "Pitch" / "Resonance" in full for clarity.
+		"timeline.pitch": "P.",
+		"timeline.resonance": "R.",
 		"timeline.prevAria": "Previous line",
 		"timeline.nextAria": "Next line",
 		"timeline.pagerAria": "Line pagination",

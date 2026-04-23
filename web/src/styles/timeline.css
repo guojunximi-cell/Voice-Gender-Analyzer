@@ -105,13 +105,19 @@
 	/* Fixed width so the three content slots (pitch / hanzi / resonance)
 	   start at the same x — that's the whole alignment contract.
 	   `min-width: 0` is essential: flex items default to `min-width: auto`,
-	   which expands the slot to the content's min-content size.  Without
-	   this, "Resonance" (en-US, ~60px) stretches the resonance row's label
-	   past 36px while "Pitch" (~30px) stays put, visibly desyncing the two
-	   bands.  72px comfortably fits "Resonance" at 0.72rem with margin. */
-	flex: 0 0 72px;
+	   which otherwise expands the slot to the content's min-content size
+	   (bug: a longer locale-specific label would desync the bands).
+	   Content stays abbreviated — "音高"/"共鸣" (CJK), "P."/"R." (en-US) —
+	   so 36px is ample.
+	   `text-align: left` lets the label's left edge sit at the timeline's
+	   left edge, forming one vertical line with the readout pill and the
+	   gender-legend strip above/below (both zero-gutter rows). */
+	flex: 0 0 36px;
 	min-width: 0;
-	text-align: right;
+	text-align: left;
+	/* Nudge ~½ glyph right of the timeline's left edge — hairline breathing
+	   room so the label doesn't visually fuse with the readout pill above. */
+	padding-left: 4px;
 	font-size: 0.72rem;
 	color: var(--text-secondary);
 	user-select: none;
@@ -567,7 +573,7 @@
 	}
 
 	.vga-timeline__label {
-		flex: 0 0 64px;
+		flex: 0 0 28px;
 		min-width: 0;
 		font-size: 0.68rem;
 	}
