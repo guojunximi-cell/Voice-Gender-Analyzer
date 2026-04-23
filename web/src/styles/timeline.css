@@ -102,7 +102,15 @@
 }
 
 .vga-timeline__label {
-	flex: 0 0 36px;
+	/* Fixed width so the three content slots (pitch / hanzi / resonance)
+	   start at the same x — that's the whole alignment contract.
+	   `min-width: 0` is essential: flex items default to `min-width: auto`,
+	   which expands the slot to the content's min-content size.  Without
+	   this, "Resonance" (en-US, ~60px) stretches the resonance row's label
+	   past 36px while "Pitch" (~30px) stays put, visibly desyncing the two
+	   bands.  72px comfortably fits "Resonance" at 0.72rem with margin. */
+	flex: 0 0 72px;
+	min-width: 0;
 	text-align: right;
 	font-size: 0.72rem;
 	color: var(--text-secondary);
@@ -327,10 +335,13 @@
 .phone__char {
 	display: block;
 	font-weight: 500;
-	line-height: 1;
+	/* line-height 1 was too tight for Latin descenders (p/g/j/y/q) — their
+	   glyphs extend below the em-box and got clipped by overflow:hidden.
+	   1.25 gives descenders vertical headroom; the button's own
+	   overflow:hidden still contains horizontal bleed. */
+	line-height: 1.25;
 	text-align: center;
 	white-space: nowrap;
-	overflow: hidden;
 }
 
 .phone[aria-current="true"] {
@@ -556,7 +567,8 @@
 	}
 
 	.vga-timeline__label {
-		flex: 0 0 28px;
+		flex: 0 0 64px;
+		min-width: 0;
 		font-size: 0.68rem;
 	}
 

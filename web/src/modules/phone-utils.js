@@ -29,6 +29,12 @@ export function groupPhonesByChar(phones) {
 				end: p.end,
 				char: p.char || "",
 				phones: [p],
+				// Visual slot weight: 1 for a single CJK ideograph (unchanged
+				// layout vs. the pre-weight era), clamp(letter_count, 2, 10)
+				// for an English word.  Consumed by groupCharsByWeight (for
+				// pagination) and by HeatmapBand / TranscriptRow (for per-slot
+				// x / width derivation).  See _cellWeight below.
+				weight: _cellWeight(p.char || ""),
 				// Aggregates computed below
 				pitch: null,
 				resonance: null,
@@ -145,43 +151,75 @@ function _mean(arr) {
 	return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
+// CJK ideograph (BMP Unified + Extension A).  A "char" that is a single CJK
+// codepoint is a hanzi → weight 1 (one visual square, same as pre-weight
+// behaviour).  Anything else is treated as an English word → its letter count
+// clamped to [2, 10]: floor of 2 so "a"/"I" don't collapse to invisible, ceiling
+// of 10 so "antidisestablishmentarianism" can't consume half a page.
+function _cellWeight(ch) {
+	if (!ch) return 0;
+	// Spread to iterate code points (handles surrogate pairs even though CJK
+	// BMP doesn't need it — future-proof for extension ranges).
+	const cps = [...ch];
+	if (cps.length === 1) {
+		const cp = cps[0].codePointAt(0);
+		if ((cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0x3400 && cp <= 0x4dbf)) return 1;
+	}
+	const letters = ch.match(/[A-Za-z]/g);
+	const n = letters ? letters.length : cps.length;
+	return Math.max(2, Math.min(10, n));
+}
+
 /**
- * Slice chars into fixed-size pages of `charCount` real hanzi each.
+ * Slice chars into pages whose members' `weight` sum fits within `weightBudget`.
  *
- * Pure width-driven: ignores acoustic signals (silence, phone gaps) entirely.
- * Caller picks `charCount` from `⌊containerPx / readablePxPerChar⌋`, so the
- * resulting pagination tracks the viewport.  Spacer cells (empty `char`) are
- * never counted toward the page size and never kept in the page's `chars`
- * array — they live only in the original `chars[]` for time-continuity.
+ * Rationale: equal-width slots (old behaviour) made "by"/"sit" float in the
+ * same slot size as "possibility", and clipped "morning" when squeezed.
+ * Weight-based packing gives each slot a width proportional to its visual
+ * size so short + long words coexist honestly on one page.
  *
- * Each page has the same shape as the previous acoustic-sentence output, so
- * HeatmapBand and TranscriptRow consume it unchanged:
- *   { start, end, startIdx, endIdx, chars: [realCharRefs] }
- * `startIdx` / `endIdx` point into the ORIGINAL chars[] (inclusive, both
- * pointing at real chars) — PlaybackSync uses these to map activeCharIdx → pageIdx.
+ * For CJK each cell has weight 1, so `weightBudget = N` reproduces the old
+ * "N hanzi per page" behaviour exactly — this is not a separate code path,
+ * it's the same algorithm with a language-specific weight function.
+ *
+ * Spacer cells (empty `char`) don't count toward the budget and aren't kept
+ * in the page's `chars` array — they live only in the original `chars[]`
+ * for time-continuity.
+ *
+ * Page shape (HeatmapBand / TranscriptRow consumers):
+ *   { start, end, startIdx, endIdx, chars: [realCharRefs], totalWeight }
+ * `startIdx` / `endIdx` point into the ORIGINAL chars[] (inclusive, real
+ * chars) — PlaybackSync uses them to map activeCharIdx → pageIdx.
+ * `totalWeight` is Σ(chars[i].weight), used by renderers to derive each
+ * cell's [cumWeight, cumWeight+weight] sub-range within the page.
  */
-export function groupCharsByWidth(chars, { charCount } = {}) {
+export function groupCharsByWeight(chars, { weightBudget } = {}) {
 	if (!chars?.length) return [];
-	const N = Math.max(1, Math.floor(charCount || 1));
+	const budget = Math.max(1, weightBudget || 1);
 
 	const pages = [];
-	let cur = { chars: [], startIdx: -1, endIdx: -1 };
+	let cur = { chars: [], startIdx: -1, endIdx: -1, totalWeight: 0 };
 
 	const closePage = () => {
 		if (!cur.chars.length) return;
 		cur.start = cur.chars[0].start;
 		cur.end = cur.chars[cur.chars.length - 1].end;
 		pages.push(cur);
-		cur = { chars: [], startIdx: -1, endIdx: -1 };
+		cur = { chars: [], startIdx: -1, endIdx: -1, totalWeight: 0 };
 	};
 
 	for (let i = 0; i < chars.length; i++) {
 		const c = chars[i];
 		if (!c.char) continue; // spacer cells don't count toward page capacity
+		// Close the current page *before* adding this word if doing so would
+		// overflow the budget — unless the page is empty (always fit ≥1 word
+		// per page, even if a single clamp-max word technically exceeds the
+		// narrow-container budget; pagination alone can't split a word).
+		if (cur.chars.length && cur.totalWeight + c.weight > budget) closePage();
 		if (cur.startIdx === -1) cur.startIdx = i;
 		cur.endIdx = i;
 		cur.chars.push(c);
-		if (cur.chars.length >= N) closePage();
+		cur.totalWeight += c.weight;
 	}
 	closePage();
 	return pages;

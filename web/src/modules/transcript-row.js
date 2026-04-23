@@ -189,28 +189,35 @@ export class TranscriptRow {
 			this._btnByCharIdx = new Map();
 			this._activeBtn = null;
 
-			// Equal-width slot layout: each char gets exactly 1/N of the row
-			// width, mirroring HeatmapBand's `viewBox="0 0 N 1"`.  Column i in
-			// all three rows (pitch band / hanzi / resonance band) occupies
-			// the same pixel range at any viewport width, and glyphs never
-			// overlap because the slot is always ≥ PX_PER_CHAR (32 px).
+			// Weight-driven slot layout: each char owns a slot proportional to
+			// its `weight` (1 per hanzi, clamp(letter_count, 2, 10) per English
+			// word — see phone-utils._cellWeight).  HeatmapBand renders rects
+			// against the same per-char weight span, so column i here aligns
+			// pixel-for-pixel with column i in the pitch / resonance rows at
+			// any viewport width.  CJK pages (weight=1 uniform) reproduce the
+			// previous 1/N equal-slot behaviour exactly.
 			const N = s.chars.length;
 			if (!N) {
 				this._updateNav();
 				return;
 			}
 			const GLYPH_PX = 28;
-			const slotPct = 100 / N;
+			const W = s.totalWeight ?? N;
 
+			let cum = 0;
 			for (let i = 0; i < N; i++) {
 				const c = s.chars[i];
+				const cw = c.weight ?? 1;
+				const leftPct = (cum / W) * 100;
+				const widthPct = (cw / W) * 100;
+				cum += cw;
 				const btn = document.createElement("button");
 				btn.type = "button";
 				btn.className = "phone";
 				btn.tabIndex = i === 0 ? 0 : -1;
 				btn.setAttribute("aria-current", "false");
-				btn.style.left = `${i * slotPct}%`;
-				btn.style.width = `${slotPct}%`;
+				btn.style.left = `${leftPct}%`;
+				btn.style.width = `${widthPct}%`;
 				btn.innerHTML = `<span class="phone__char" style="font-size:${GLYPH_PX}px">${_esc(c.char)}</span>`;
 				btn._charData = c;
 				btn.addEventListener("click", () => {

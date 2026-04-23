@@ -16,22 +16,25 @@ import { renderFallback, renderLowPhoneBanner, renderNoSpeech } from "./engine-c
 import { GenderLegend } from "./gender-legend.js";
 import { HeatmapBand } from "./heatmap-band.js";
 import { getLang, t } from "./i18n.js";
-import { findSentenceIdx, groupCharsByWidth, groupPhonesByChar } from "./phone-utils.js";
+import { findSentenceIdx, groupCharsByWeight, groupPhonesByChar } from "./phone-utils.js";
 import { PlaybackSync } from "./playback-sync.js";
 import { TranscriptRow } from "./transcript-row.js";
 
 const LOW_PHONE_THRESHOLD = 8;
 
-// Width-based pagination: one page per ⌊contentWidth / PX_PER_CHAR⌋ real "char".
-// For CJK each "char" is one hanzi (~28 px glyph + padding); for English each
-// "char" is a whole word whose mean rendered width is much larger, so the
-// per-char budget roughly doubles to keep words legible without needing
-// aggressive scaleX squashing.  MIN_CHARS_PER_PAGE keeps extremely narrow
-// containers (<200 px) from producing single-char pages that nav-spam the user.
-const PX_PER_CHAR_CJK = 32;
-const PX_PER_CHAR_EN = 80;
-const MIN_CHARS_PER_PAGE_CJK = 6;
-const MIN_CHARS_PER_PAGE_EN = 3;
+// Weight-based pagination: each page's Σ weight must fit `weightBudget`.
+// weightBudget ≈ contentWidth / PX_PER_UNIT.  Per cell, weight is 1 for a
+// single CJK hanzi and clamp(letter_count, 2, 10) for an English word (see
+// _cellWeight in phone-utils.js) — so one unit ≈ the width a single hanzi
+// or a single English letter should occupy on screen.  PX_PER_UNIT is chosen
+// per-language: CJK renders at 28 px glyph so 32 px/unit leaves breathing
+// room; English at ~18 px/letter packs 4-5 avg words into ~500 px.
+// MIN_UNITS_PER_PAGE guards extremely narrow containers from producing
+// nav-spamming single-word pages.
+const PX_PER_UNIT_CJK = 32;
+const PX_PER_UNIT_EN = 18;
+const MIN_UNITS_PER_PAGE_CJK = 6;
+const MIN_UNITS_PER_PAGE_EN = 6;
 
 const pitchTitleFn = (p) => {
 	const charLabel = p.char || "\u2205";
@@ -71,7 +74,7 @@ export class PhoneTimeline {
 		this._cursorRowsEl = null;
 		this._resizeObs = null;
 		this._state = null;
-		this._charsPerPage = 0;
+		this._weightBudget = 0;
 	}
 
 	/** Show the loading skeleton. */
@@ -195,12 +198,12 @@ export class PhoneTimeline {
 			renderLowPhoneBanner(timeline, engineC.phone_count);
 		}
 
-		// Measure real content width now that the layout DOM exists, slice
-		// chars into width-sized pages, log dev diagnostics, then mount the
-		// interactive children.  _mountInteractive is reused by _maybeReslice
-		// on resize.
-		this._charsPerPage = this._computeCharsPerPage();
-		this._sentences = groupCharsByWidth(this._chars, { charCount: this._charsPerPage });
+		// Measure real content width now that the layout DOM exists, pack
+		// chars into weight-budgeted pages, log dev diagnostics, then mount
+		// the interactive children.  _mountInteractive is reused by
+		// _maybeReslice on resize.
+		this._weightBudget = this._computeWeightBudget();
+		this._sentences = groupCharsByWeight(this._chars, { weightBudget: this._weightBudget });
 		this._logDevDiagnostic();
 		this._mountInteractive({ initialSentenceIdx: 0 });
 
@@ -213,30 +216,30 @@ export class PhoneTimeline {
 	}
 
 	/**
-	 * Measure content-slot width and derive `⌊w / PX_PER_CHAR⌋` page size.
+	 * Measure content-slot width and derive `⌊w / PX_PER_UNIT⌋` weight budget.
 	 * Falls back through rows → root when an inner slot hasn't laid out yet.
 	 */
-	_computeCharsPerPage() {
+	_computeWeightBudget() {
 		const pitchBand = this.root.querySelector(".vga-timeline__band--pitch");
 		const rowsEl = this.root.querySelector(".vga-timeline__rows");
 		const w = pitchBand?.clientWidth || rowsEl?.clientWidth || this.root.clientWidth || 320;
 		const isEn = getLang() === "en-US";
-		const pxPer = isEn ? PX_PER_CHAR_EN : PX_PER_CHAR_CJK;
-		const minChars = isEn ? MIN_CHARS_PER_PAGE_EN : MIN_CHARS_PER_PAGE_CJK;
-		return Math.max(minChars, Math.floor(w / pxPer));
+		const pxPer = isEn ? PX_PER_UNIT_EN : PX_PER_UNIT_CJK;
+		const minUnits = isEn ? MIN_UNITS_PER_PAGE_EN : MIN_UNITS_PER_PAGE_CJK;
+		return Math.max(minUnits, Math.floor(w / pxPer));
 	}
 
 	/**
-	 * Re-slice chars when N changes on resize.  Destroys + re-mounts the
-	 * interactive children so their internal sentence caches stay in sync;
+	 * Re-pack chars when the budget changes on resize.  Destroys + re-mounts
+	 * the interactive children so their internal sentence caches stay in sync;
 	 * the ResizeObserver's `next === current` early-return keeps this from
 	 * running on every px of resize drag.
 	 */
 	_maybeReslice() {
-		const next = this._computeCharsPerPage();
-		if (next === this._charsPerPage || !this._chars?.length) return;
-		this._charsPerPage = next;
-		this._sentences = groupCharsByWidth(this._chars, { charCount: next });
+		const next = this._computeWeightBudget();
+		if (next === this._weightBudget || !this._chars?.length) return;
+		this._weightBudget = next;
+		this._sentences = groupCharsByWeight(this._chars, { weightBudget: next });
 
 		// Preserve visual continuity: land on the page containing the currently
 		// active char.  -1 or not-found → first page.
@@ -383,13 +386,14 @@ export class PhoneTimeline {
 			i,
 			start: +s.start.toFixed(3),
 			end: +s.end.toFixed(3),
-			text: s.chars.map((c) => c.char).join(""),
+			text: s.chars.map((c) => c.char).join(" "),
 			len: s.chars.length,
+			totalWeight: s.totalWeight,
 		}));
 		window._vgaSilenceRanges = this._engineC?.silence_ranges || [];
 		// biome-ignore lint/suspicious/noConsole: dev-only diagnostic
 		console.log(
-			`[Engine C] ${window._vgaSentences.length} pages × ${this._charsPerPage} chars (width-sliced, silence_ranges unused)`,
+			`[Engine C] ${window._vgaSentences.length} pages, weight budget ${this._weightBudget} (weight-packed, silence_ranges unused)`,
 		);
 		// biome-ignore lint/suspicious/noConsole: dev-only diagnostic
 		console.table(window._vgaSentences);
