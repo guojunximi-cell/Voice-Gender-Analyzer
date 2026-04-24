@@ -45,7 +45,8 @@ ina-ss = [
     "tensorflow-cpu>=2.21.0",
 ]
 # Engine C 进阶分析：worker 端 ASR + sidecar HTTP client.
-# funasr 会拉入 torch（~700 MB），在 1–2 GB Docker 预算内；
+# funasr 中文 ASR 需要 torch（其 METADATA 没声明，必须显式声明），
+# 走 PyTorch 官方 CPU index 装 ~200 MB 的 cpu wheel；
 # 关闭 ENGINE_C_ENABLED 时运行时不会 import，不产生加载开销。
 # faster-whisper 走 CTranslate2（~80 MB），英文自由语音模式用；
 # 模型权重 (base.en ~150 MB) 首次调用时从 HuggingFace 拉取。
@@ -53,6 +54,8 @@ engine-c = [
     "funasr>=1.2.0",
     "httpx>=0.28.0",
     "faster-whisper>=1.0.0",
+    "torch>=2.5.0",
+    "torchaudio>=2.5.0",
 ]
 
 [build-system]
@@ -63,6 +66,17 @@ build-backend = "hatchling.build"
 # no-editable = true
 default-groups = ["ina-ss", "engine-c"]
 # no-binary-package = ["av"]
+
+# torch 走 PyTorch 官方 CPU index — 默认 PyPI 上是 GPU build (~700 MB+)，
+# CPU-only wheel 只有 ~200 MB，省镜像空间。
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchaudio = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["voiceya"]

@@ -51,15 +51,10 @@ RUN test -f voiceya/inaSpeechSegmenter/setup.py \
         && git -C voiceya/inaSpeechSegmenter checkout ${INA_SS_COMMIT})
 
 # 安装依赖到 /build/.venv（--no-editable 让项目以 wheel 形式装进 site-packages）
+# torch / torchaudio 是 funasr AutoModel 的隐式必需项（funasr METADATA 没声明，
+# 但 auto_model.py 顶层无条件 import）；pyproject.toml 里显式声明并 pin 到
+# PyTorch 官方 CPU index，避免引入 CUDA 轮子。
 RUN uv sync --locked --no-dev --no-editable
-
-# torch (CPU-only) 是 funasr AutoModel 的隐式必需项——funasr 不在 PyPI 元数据里声明它，
-# 但 auto_model.py 在顶层无条件 import torch。
-# 用 PyTorch CPU 专用 index 而非 uv.lock，避免引入 CUDA 轮子并保持 lockfile 跨平台。
-RUN uv pip install --no-cache-dir \
-        --python /build/.venv/bin/python \
-        "torch==2.11.0+cpu" "torchaudio==2.11.0+cpu" \
-        --index-url https://download.pytorch.org/whl/cpu
 
 # 下载 inaSpeechSegmenter 模型到 /root/.keras/inaSpeechSegmenter/（remote_utils 运行时会优先查这里）
 RUN /build/.venv/bin/python scripts/init_iss_model.py
