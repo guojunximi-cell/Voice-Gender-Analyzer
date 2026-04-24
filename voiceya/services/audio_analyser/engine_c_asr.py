@@ -103,10 +103,20 @@ def _transcribe_sync(audio_bytes: bytes) -> str:
         return ""
 
     # FunASR returns [{'key': ..., 'text': ...}, ...].
-    text = (results[0].get("text") or "").strip()
+    raw = (results[0].get("text") or "").strip()
     # Paraformer sometimes emits spaces between characters — strip them so
     # MFA sees natural Chinese runs.
-    return text.replace(" ", "")
+    cleaned = raw.replace(" ", "")
+    # Paraformer emits literal "<unk>" markers for tokens it can't decode
+    # (rare hanzi, accented speech, names, low-SNR segments).  Strip them
+    # so the transcript sent to MFA / surfaced in the UI is clean
+    # recognised hanzi only — the regex preprocessing in the sidecar
+    # would drop them anyway, but cleaning at source keeps logs honest.
+    if "<unk>" in cleaned:
+        before_count = cleaned.count("<unk>")
+        cleaned = cleaned.replace("<unk>", "")
+        logger.info("FunASR: stripped %d <unk> tokens", before_count)
+    return cleaned
 
 
 async def transcribe_zh(audio_bytes: bytes) -> str:
@@ -125,6 +135,11 @@ async def transcribe_zh(audio_bytes: bytes) -> str:
         return cached
 
     try:
+        if _MODEL_CACHE is None:
+            # Pre-import in the main thread to avoid C++ extension deadlocks
+            # when loaded inside the asyncio.to_thread worker.
+            import funasr  # noqa: F401
+
         text = await asyncio.to_thread(_transcribe_sync, audio_bytes)
     except Exception as exc:
         logger.warning("FunASR transcribe failed: %s", exc)

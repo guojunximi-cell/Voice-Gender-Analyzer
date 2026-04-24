@@ -165,9 +165,21 @@ _PRELOAD_ENABLED = os.environ.get(
     "ENGINE_C_PRELOAD_ALIGNER", "1",
 ).lower() in ("1", "true", "yes", "on")
 
-_MODEL_NAME_BY_LANG: dict[str, str] = {
+# Acoustic and dictionary names diverge for zh: the v3 mandarin_mfa
+# acoustic model was published with simplified tone marks (e.g. ``i˥``
+# instead of ``i˥˥``), but the legacy ``mandarin_mfa`` dictionary still
+# uses the old double-tone phones — pairing them strips ~80 k entries
+# in the phone-inventory filter and leaves common hanzi (春/风/花/光/霜)
+# with no valid pronunciation, surfacing as ``<unk>`` in MFA's output.
+# ``mandarin_china_mfa`` is the v3-aligned dictionary (per the model's
+# own meta.json: ``dictionaries.names = ["mandarin_china_mfa", ...]``).
+_ACOUSTIC_NAME_BY_LANG: dict[str, str] = {
     "en": "english_us_arpa",
     "zh": "mandarin_mfa",
+}
+_DICT_NAME_BY_LANG: dict[str, str] = {
+    "en": "english_us_arpa",
+    "zh": "mandarin_china_mfa",
 }
 
 _PRELOADED_ALIGNERS: dict[str, PreloadedAligner] = {}
@@ -177,12 +189,13 @@ if _PRELOAD_ENABLED:
             MODEL_TYPES as _MFA_MODEL_TYPES,
         )
         for _lang in _SUPPORTED_LANGS:
-            _model_name = _MODEL_NAME_BY_LANG.get(_lang)
-            if not _model_name:
+            _acoustic_name = _ACOUSTIC_NAME_BY_LANG.get(_lang)
+            _dict_name = _DICT_NAME_BY_LANG.get(_lang)
+            if not (_acoustic_name and _dict_name):
                 continue
             try:
-                _acoustic_path = _MFA_MODEL_TYPES["acoustic"].get_pretrained_path(_model_name)
-                _dict_path = _MFA_MODEL_TYPES["dictionary"].get_pretrained_path(_model_name)
+                _acoustic_path = _MFA_MODEL_TYPES["acoustic"].get_pretrained_path(_acoustic_name)
+                _dict_path = _MFA_MODEL_TYPES["dictionary"].get_pretrained_path(_dict_name)
             except Exception as _exc:
                 logger.warning(
                     "preload skipped for %s: can't resolve model path (%s)",
@@ -343,8 +356,25 @@ _ENGLISH_MODEL_MAP: dict[str, str] = {"english_mfa": "english_us_arpa"}
 
 
 def _tune_mfa_args(args: list) -> list:
+    """Rewrite vendored preprocessing.py's mfa-align argv before launch.
+
+    Three rewrites: (a) en model name → ``english_us_arpa`` so phones
+    output match the ARPABET cmudict.txt/stats.json this sidecar ships;
+    (b) beam / retry_beam to tighter values for fast-mode (speed); and
+    (c) zh **dict** positional → ``mandarin_china_mfa`` so it matches
+    the v3 acoustic model's phone set (the legacy ``mandarin_mfa`` dict
+    pairs with the v3 acoustic model only after our inventory filter
+    drops ~80 k common entries — leaving common hanzi as ``<unk>``).
+    The acoustic model name stays ``mandarin_mfa`` because that's what
+    upstream MFA's pretrained registry exposes for v3 zh.
+    """
     out: list = []
     i = 0
+    # ``mfa align CORPUS DICT ACOUSTIC OUTPUT [opts...]`` — track the
+    # positional slot relative to ``align`` so we can target the DICT
+    # arg (slot 2) without disturbing ACOUSTIC (slot 3).
+    align_seen = False
+    positional_after_align = 0
     while i < len(args):
         tok = args[i]
         if tok == "--beam" and i + 1 < len(args) and _MFA_BEAM:
@@ -355,6 +385,17 @@ def _tune_mfa_args(args: list) -> list:
             out.extend(["--retry_beam", _MFA_RETRY_BEAM])
             i += 2
             continue
+        # Positional tracking: anything starting with ``-`` is an option
+        # (consume it without bumping the positional counter).
+        if align_seen and not str(tok).startswith("-"):
+            positional_after_align += 1
+            # slot 2 is DICT — rewrite legacy mandarin_mfa to china variant.
+            if positional_after_align == 2 and tok == "mandarin_mfa":
+                out.append("mandarin_china_mfa")
+                i += 1
+                continue
+        if tok == "align":
+            align_seen = True
         out.append(_ENGLISH_MODEL_MAP.get(tok, tok))
         i += 1
     return out

@@ -394,9 +394,16 @@ class PreloadedAligner:
         from pathlib import Path  # noqa: PLC0415
 
         # 10+ tokens to push through a broad slice of the phone inventory.
+        # zh: kept short — historically used for the mandarin_mfa phone-ID
+        # collision check, but that's now resolved by routing zh dict to
+        # ``mandarin_china_mfa`` (matches the v3 acoustic model's phone
+        # set).  A long zh transcript on silent audio now exhausts beam=50
+        # because the richer FST has too many candidate paths to explore
+        # without acoustic anchors; a 2-hanzi warmup still pays the JIT
+        # cost without that risk.
         warmup_transcript = {
             "en": "the quick brown fox jumps over a lazy dog again",
-            "zh": "今天天气不错适合出去散步看风景",
+            "zh": "你好",
         }.get(self.lang, "the")
         try:
             with tempfile.TemporaryDirectory() as tmp:

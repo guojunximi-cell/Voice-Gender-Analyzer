@@ -163,15 +163,21 @@ def run_mfa(
     ``./output/`` — matches the vendored convention.  Caller is responsible
     for restoring cwd in a finally.
 
-    ``lang``: "zh" → mandarin_mfa.  "en" → english_us_arpa (NOT
-    english_mfa — that one emits IPA, incompatible with the ARPABET
-    stats.json/cmudict.txt this sidecar ships; same mapping the wrapper's
-    fast-mode shim applies for the single-block path).
+    ``lang``: "zh" → mandarin_mfa acoustic + mandarin_china_mfa dict.
+    "en" → english_us_arpa for both (NOT english_mfa — that one emits IPA,
+    incompatible with the ARPABET stats.json/cmudict.txt this sidecar
+    ships; same mapping the wrapper's fast-mode shim applies for the
+    single-block path).  See visualizer-backend.Dockerfile for why zh's
+    acoustic and dict names diverge — pairing the legacy mandarin_mfa
+    dict with the v3 acoustic model leaves common hanzi as ``<unk>``.
     """
-    mfa_model = "mandarin_mfa" if lang == "zh" else "english_us_arpa"
+    if lang == "zh":
+        mfa_acoustic, mfa_dict = "mandarin_mfa", "mandarin_china_mfa"
+    else:
+        mfa_acoustic = mfa_dict = "english_us_arpa"
     args = mfa_cmd + [
         "align",
-        "./corpus/", mfa_model, mfa_model, "./output/",
+        "./corpus/", mfa_dict, mfa_acoustic, "./output/",
         "--clean",
         "--num_jobs", str(num_jobs),
     ]
