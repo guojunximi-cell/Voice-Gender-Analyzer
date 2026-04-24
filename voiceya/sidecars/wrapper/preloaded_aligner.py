@@ -219,6 +219,7 @@ class PreloadedAligner:
         the caller can fall back to subprocess MFA for that one chunk.
         """
         # Deferred imports — same reason as load().
+        import re  # noqa: PLC0415
         import tempfile  # noqa: PLC0415
 
         from kalpy.fstext.lexicon import HierarchicalCtm  # noqa: PLC0415
@@ -229,9 +230,18 @@ class PreloadedAligner:
             Utterance as KalpyUtterance,
         )
         from montreal_forced_aligner.corpus.classes import FileData  # noqa: PLC0415
+        from montreal_forced_aligner.data import Language  # noqa: PLC0415
         from montreal_forced_aligner.online.alignment import (  # noqa: PLC0415
             tokenize_utterance_text,
         )
+
+        # zh: match the vendored preprocessing.process convention of
+        # turning each hanzi into its own whitespace-separated token so
+        # the ``mandarin_mfa`` dictionary's per-character entries resolve.
+        # Without this the whole transcript looks like one giant OOV word.
+        # en: pass through — SimpleTokenizer handles whitespace splitting.
+        if self.lang == "zh":
+            transcript = " ".join(re.findall(r"[一-鿿]", transcript))
 
         # MFA's FileData wants a text file on disk.  Use a tempfile in a
         # sibling dir so we don't clobber a ``<stem>.txt`` the caller may
@@ -250,9 +260,17 @@ class PreloadedAligner:
                 seg = Segment(
                     str(wav_path), utt_meta.begin, utt_meta.end, utt_meta.channel,
                 )
+                # Force Language.unknown so tokenize_utterance_text takes the
+                # 3-tuple SimpleTokenizer branch (``normalized, _, oovs``).
+                # The "known language" branch expects a
+                # ``generate_language_tokenizer`` instance that returns
+                # 2-tuples — we intentionally use SimpleTokenizer everywhere
+                # because zh is pre-segmented per hanzi above (matching the
+                # vendored preprocessing.process convention) and en needs
+                # nothing more than whitespace tokenisation.
                 normalized = tokenize_utterance_text(
                     utt_meta.text, self._lexicon_compiler, self._tokenizer, None,
-                    language=self._acoustic_model.language,
+                    language=Language.unknown,
                 )
                 utt = KalpyUtterance(seg, normalized)
                 utt.generate_mfccs(self._acoustic_model.mfcc_computer)
@@ -284,24 +302,35 @@ class PreloadedAligner:
             except FileNotFoundError:
                 pass
 
-    def warmup(self) -> None:
-        """Run one tiny alignment to pay the first-call JIT/init cost upfront.
+    def warmup(self) -> bool:
+        """Align a realistic-ish transcript on silent audio to:
+          1. Pay the kalpy/Kaldi first-call JIT tax so the user's first
+             real request doesn't.
+          2. **Detect per-language kalpy/FST incompatibilities** (e.g.
+             mandarin_mfa's phone-ID space collides with disambig symbols
+             in kalpy's ``CompileGraphFromText``, observed as
+             ``ContextFst: invalid ilabel`` on real Chinese transcripts —
+             MFA's own ``align_one`` CLI hits the same wall).
 
-        On a fresh container the first ``align_utterance`` call takes
-        several seconds even though subsequent calls are < 100 ms — Kaldi
-        binds pay a one-time initialisation cost on the first invocation.
-        Running this synchronously at module load moves that tax off the
-        user's first request.
+        Returns True on success, False on failure.  A False result signals
+        the caller to skip registration for this language; requests will
+        then use the subprocess MFA fallback instead of attempting kalpy
+        and incurring a per-request failure round-trip.
 
-        Best-effort: any error is swallowed.  A silent warmup wav matches
-        the aligner's SR expectations; a single "the" utterance gives the
-        aligner something real to bind against (pure silence skips the
-        expensive retry_beam path that production audio can hit).
+        A ~10-token transcript is enough to exercise FST compilation across
+        enough phone pairs to catch the mandarin_mfa issue.  Single-hanzi
+        warmups are NOT sufficient — they hit a subset of phones too
+        narrow to trigger the ID collision.
         """
         import tempfile  # noqa: PLC0415
         import wave  # noqa: PLC0415
         from pathlib import Path  # noqa: PLC0415
 
+        # 10+ tokens to push through a broad slice of the phone inventory.
+        warmup_transcript = {
+            "en": "the quick brown fox jumps over a lazy dog again",
+            "zh": "今天天气不错适合出去散步看风景",
+        }.get(self.lang, "the")
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 wav_path = Path(tmp) / "warmup.wav"
@@ -309,17 +338,18 @@ class PreloadedAligner:
                     w.setnchannels(1)
                     w.setsampwidth(2)  # 16-bit
                     w.setframerate(16000)
-                    # 1 s of near-silence — a single zero sample repeated
-                    # is fine; we're exercising code paths, not measuring
-                    # alignment quality.
-                    w.writeframes(b"\x00\x00" * 16000)
+                    # 3 s of silence — long enough that alignment has room
+                    # to place every transcript token without retry_beam
+                    # exhausting on the first call.
+                    w.writeframes(b"\x00\x00" * 16000 * 3)
                 grid_path = Path(tmp) / "warmup.TextGrid"
-                # Use a single OOV-safe word; dictionary always has "the".
-                self.align_one(wav_path, "the", grid_path)
+                self.align_one(wav_path, warmup_transcript, grid_path)
             logger.info("preloaded aligner [%s] warmup ok", self.lang)
+            return True
         except Exception as exc:  # pragma: no cover — best-effort
-            logger.info(
-                "preloaded aligner [%s] warmup skipped (%s) — "
-                "first real request will pay the init cost instead",
+            logger.warning(
+                "preloaded aligner [%s] warmup FAILED: %s — lang will fall "
+                "back to subprocess MFA for every request",
                 self.lang, exc,
             )
+            return False

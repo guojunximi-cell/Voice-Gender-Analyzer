@@ -167,7 +167,7 @@ _PRELOAD_ENABLED = os.environ.get(
 
 _MODEL_NAME_BY_LANG: dict[str, str] = {
     "en": "english_us_arpa",
-    # zh deliberately left out — needs validation before enabling.
+    "zh": "mandarin_mfa",
 }
 
 _PRELOADED_ALIGNERS: dict[str, PreloadedAligner] = {}
@@ -190,11 +190,15 @@ if _PRELOAD_ENABLED:
                 )
                 continue
             _aligner = PreloadedAligner.load(_lang, _acoustic_path, _dict_path)
-            if _aligner is not None:
-                # Pay kalpy's first-call JIT cost here (a few seconds the
-                # first time after install) so the user's first real
-                # request doesn't.
-                _aligner.warmup()
+            if _aligner is None:
+                continue
+            # Warmup both pays the kalpy first-call JIT tax AND probes for
+            # language-specific kalpy incompatibilities (notably
+            # mandarin_mfa hits a phone-ID collision in CompileGraphFromText
+            # on non-trivial transcripts — MFA's own align_one CLI has the
+            # same bug).  Don't register aligners that fail warmup; they'll
+            # only cost a per-request round-trip to the fallback path.
+            if _aligner.warmup():
                 _PRELOADED_ALIGNERS[_lang] = _aligner
     except ImportError as _exc:
         logger.warning(
