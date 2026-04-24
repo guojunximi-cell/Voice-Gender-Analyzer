@@ -45,6 +45,72 @@ _DEFAULT_MIN_SILENCE_SEC = _env_float("ENGINE_C_CHUNK_MIN_SILENCE_SEC", 0.5)
 _DEFAULT_MAX_CHUNKS = _env_int("ENGINE_C_CHUNK_MAX_COUNT", 8)
 
 
+def _select_balanced_chunks(
+    candidates: list[float],
+    audio_duration_sec: float,
+    desired_n: int,
+    min_chunk: float,
+    max_chunk: float,
+) -> list[tuple[float, float]] | None:
+    """Pick ``desired_n - 1`` cuts from ``candidates`` to minimise max chunk.
+
+    Parallel-MFA wall time is bounded by ``max(chunk_durations)`` — the
+    longest chunk serialises against all others — so we exhaustively
+    search all ``C(k, desired_n-1)`` subsets and pick the one whose
+    longest chunk is shortest (ties broken by smallest stdev, i.e.
+    preferring uniform chunks).  Subsets that produce any chunk outside
+    ``[min_chunk, max_chunk]`` are rejected.
+
+    With ``max_chunks = 8`` and typical ``|candidates| ≤ ~20``, the worst
+    case is ``C(20, 7) = 77 520`` — a few milliseconds of pure-Python
+    enumeration, trivial next to the chunker's overall budget.  Falls
+    back to ``desired_n - 1`` (and so on) when no valid subset exists.
+    """
+    import itertools
+
+    if desired_n < 2 or not candidates:
+        return None
+    if len(candidates) < desired_n - 1:
+        return None
+
+    best_plan: list[tuple[float, float]] | None = None
+    best_max = float("inf")
+    best_spread = float("inf")
+
+    for combo in itertools.combinations(candidates, desired_n - 1):
+        chunks: list[tuple[float, float]] = []
+        prev = 0.0
+        for t in combo:
+            chunks.append((prev, t))
+            prev = t
+        chunks.append((prev, audio_duration_sec))
+
+        durs = [e - s for s, e in chunks]
+        # Reject if any chunk violates bounds — too small confuses MFA's
+        # speaker adaptation, too large wastes the parallelism premise.
+        if min(durs) < min_chunk or max(durs) > max_chunk:
+            continue
+
+        longest = max(durs)
+        spread = max(durs) - min(durs)  # proxy for stdev without sqrt
+        if longest < best_max - 1e-6 or (
+            longest < best_max + 1e-6 and spread < best_spread
+        ):
+            best_plan = chunks
+            best_max = longest
+            best_spread = spread
+
+    if best_plan is not None:
+        return best_plan
+
+    # No valid subset at this N; try one fewer.
+    if desired_n > 2:
+        return _select_balanced_chunks(
+            candidates, audio_duration_sec, desired_n - 1, min_chunk, max_chunk,
+        )
+    return None
+
+
 def plan_chunks(
     audio_duration_sec: float,
     word_timestamps: list[dict],
@@ -78,9 +144,12 @@ def plan_chunks(
 
     # 1. Preconditions.
     if not word_timestamps or len(word_timestamps) < 2:
+        logger.info("chunker: skip — word_timestamps insufficient (%d)", len(word_timestamps or []))
         return None
     if audio_duration_sec < min_chunk * 2:
-        return None  # too short — no parallelism win.
+        logger.info("chunker: skip — audio %.2fs < 2*min_chunk (%.2f)",
+                    audio_duration_sec, min_chunk * 2)
+        return None
 
     # 2. Sanity-check word timestamp quality.  If every word shares the same
     #    (start, end) with its neighbor (the hallucination signal we saw in
@@ -114,40 +183,35 @@ def plan_chunks(
             continue
         candidates.append(mid)
     candidates.sort()
+    logger.info(
+        "chunker: audio=%.2fs  words=%d  silences=%d  candidates=%s  "
+        "(knobs: min=%.1f max=%.1f target=%.1f min_sil=%.2f max_n=%d)",
+        audio_duration_sec, len(word_timestamps), len(silence_ranges),
+        [round(c, 2) for c in candidates], min_chunk, max_chunk, target_chunk,
+        min_silence, max_n,
+    )
 
     if not candidates:
-        logger.info("chunker: no usable silence cuts, skipping")
+        logger.info("chunker: skip — no usable silence cuts after word-straddle filter")
         return None
 
-    # 4. Greedy selection — cut when we've accumulated >= target OR when
-    #    skipping this candidate would push the next chunk past max.
-    chunks: list[tuple[float, float]] = []
-    cur_start = 0.0
-    for i, cand in enumerate(candidates):
-        dur_here = cand - cur_start
-        if dur_here < min_chunk:
-            continue  # can't cut yet — next candidate.
+    # 4. Balanced cut selection.
+    #
+    # MFA wall time for N chunks in parallel scales with max(chunk_durations),
+    # not sum, so unbalanced chunks defeat the point.  For 15 s audio with
+    # candidates at [7.5, 12.6] and target=10, the old "first candidate ≥
+    # target" greedy picked 12.6 → (0-12.6, 12.6-15.7), completely serial.
+    # We now pick the desired number of cuts by finding the candidate
+    # closest to each evenly-spaced ideal boundary.
+    desired_n = min(max_n, max(2, int(audio_duration_sec // max(target_chunk, min_chunk))))
+    # Shrink if we don't have enough candidates to produce desired_n chunks.
+    desired_n = min(desired_n, len(candidates) + 1)
 
-        # Peek the next candidate (or end-of-audio as sentinel).
-        next_cand = candidates[i + 1] if i + 1 < len(candidates) else audio_duration_sec
-        dur_if_skip = next_cand - cur_start
-
-        if dur_here >= target_chunk or dur_if_skip > max_chunk:
-            chunks.append((cur_start, cand))
-            cur_start = cand
-
-    # Final tail.  If the tail is shorter than min_chunk, extend the last
-    # chunk to the end of audio (absorb rather than split off a tiny chunk
-    # with too few phones for MFA to align reliably).
-    tail = audio_duration_sec - cur_start
-    if tail >= min_chunk:
-        chunks.append((cur_start, audio_duration_sec))
-    elif chunks:
-        prev_start, _ = chunks[-1]
-        chunks[-1] = (prev_start, audio_duration_sec)
-    # else: no chunks at all — falls through to the <2 check below.
-
-    if len(chunks) < 2:
+    chunks = _select_balanced_chunks(
+        candidates, audio_duration_sec, desired_n, min_chunk, max_chunk,
+    )
+    if chunks is None or len(chunks) < 2:
+        logger.info("chunker: skip — balanced selection couldn't produce >=2 valid chunks")
         return None
 
     # 5. Cap chunk count.  With max_chunks=8 this rarely triggers, but long

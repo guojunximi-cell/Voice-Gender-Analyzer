@@ -27,12 +27,13 @@ def _silences(pairs: list[tuple[float, float]]) -> list[dict]:
 # ── Tests ────────────────────────────────────────────────────────────
 
 def test_happy_path_two_chunks():
-    """20 s audio, one long silence at 10 s → 2 balanced chunks.
+    """20 s audio, candidates at 7.5 and 16.0 → balanced picks 7.5.
 
-    Knobs picked so neither force-cut nor tail-absorb triggers: candidate
-    at 7.5 is below target (10), skipping lands at 16.0 still under max (20),
-    so the first cut is at 16.0.  Tail (16.0-20.0 = 4.0s) exceeds min (3.0),
-    so we get 2 chunks split right at the long silence between sentences.
+    With target=10 → desired_n = max(2, 20 // 10) = 2.  Ideal single cut
+    is at audio/2 = 10.0.  Nearest candidate: 7.5 (dist 2.5) beats 16.0
+    (dist 6.0).  Resulting chunks: (0-7.5, 7.5-20.0), both within
+    [min=3.0, max=20.0].  This is what we *want* — balanced chunks for
+    MFA parallelism, even though 7.5 s isn't "full-target" sized.
     """
     words = _words([
         ("hello", 0.5, 1.0), ("world", 1.2, 1.8), ("this", 2.0, 2.3),
@@ -46,9 +47,11 @@ def test_happy_path_two_chunks():
     assert chunks is not None, "expected chunks"
     assert len(chunks) == 2, f"expected 2 chunks, got {len(chunks)}"
     assert chunks[0]["start_sec"] == 0.0
+    assert chunks[0]["end_sec"] == 7.5, chunks[0]
     assert chunks[1]["end_sec"] == 20.0
-    assert chunks[0]["word_count"] == 10, chunks[0]
-    assert chunks[1]["word_count"] == 2, chunks[1]
+    # Words 0-5 have mid < 7.5 ("hello" 0.75 ... "one" 3.85); rest go to chunk 1.
+    assert chunks[0]["word_count"] == 6, chunks[0]
+    assert chunks[1]["word_count"] == 6, chunks[1]
 
 
 def test_reject_too_short():
@@ -99,20 +102,18 @@ def test_reject_silence_straddling_word():
     assert result is None, f"expected None, got {result}"
 
 
-def test_force_cut_near_max():
-    """If next candidate would overshoot max_chunk_sec, cut at current."""
-    words = _words([("w1", 0.5, 1.0), ("w2", 3.5, 4.0), ("w3", 9.5, 10.0), ("w4", 14.0, 14.5)])
-    # Candidate cuts at midpoints of silences: 3.1 and 9.0.
-    # With target=10s, min=3s, max=8s:
-    #   - cand 3.1: dur=3.1 < target → look ahead
-    #   - next cand 9.0: dur_if_skip=9.0 > max=8 → FORCE CUT at 3.1
-    silences = _silences([(2.5, 3.7), (8.5, 9.5)])
-    chunks = chunker.plan_chunks(18.0, words, silences,
-        min_chunk_sec=3.0, target_chunk_sec=10.0, max_chunk_sec=8.0)
-    assert chunks is not None, "expected chunks"
-    assert len(chunks) >= 2
-    assert chunks[0]["start_sec"] == 0.0
-    assert chunks[0]["end_sec"] == 3.1, chunks[0]
+def test_bails_when_no_candidate_keeps_all_chunks_under_max():
+    """If no combination of available cuts produces chunks <= max_chunk_sec,
+    return None rather than force a bad split.  Balanced selection won't
+    emit a chunk that violates max — falling back to single-block is the
+    honest answer."""
+    words = _words([("a", 0.5, 1.0), ("b", 4.0, 4.5), ("c", 15.0, 15.5)])
+    # Only candidate is at 3.1 → splits would be (0-3.1, 3.1-18) or no
+    # split.  The 14.9 s right chunk exceeds max=8 in either case.
+    silences = _silences([(2.5, 3.7)])
+    result = chunker.plan_chunks(18.0, words, silences,
+        min_chunk_sec=3.0, target_chunk_sec=8.0, max_chunk_sec=8.0)
+    assert result is None, f"expected None (no valid split), got {result}"
 
 
 def test_tail_absorbed_when_too_short():

@@ -48,6 +48,21 @@ from . import chunker, multichunk
 
 logger = logging.getLogger("engine_c.sidecar")
 
+# Uvicorn installs handlers for its own loggers but leaves root unconfigured.
+# Our engine_c.* loggers need an explicit StreamHandler or they fall through
+# to root's "last resort" handler (WARNING+ only, hiding INFO traces).
+# Attach once at module load.  Idempotent — guard against reload doubling.
+_engine_c_handler = logging.StreamHandler()
+_engine_c_handler.setFormatter(logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+))
+for _name in ("engine_c.sidecar", "engine_c.chunker", "engine_c.multichunk"):
+    _lg = logging.getLogger(_name)
+    _lg.setLevel(logging.INFO)
+    # Replace any prior handler from a module reload so logs don't double.
+    _lg.handlers = [_engine_c_handler]
+    _lg.propagate = False
+
 app = FastAPI(title="voiceya Engine C sidecar", version="0.1.0")
 
 # ── Security knobs (env-driven so the vendored library stays untouched) ──

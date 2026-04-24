@@ -71,21 +71,30 @@ def decode_to_wav(audio_bytes: bytes, dst_wav: str, ffmpeg: str) -> float:
 def slice_chunks(
     src_wav: str,
     chunks: list[dict],
-    corpus_spk_dir: str,
+    corpus_root: str,
     ffmpeg: str,
 ) -> list[tuple[dict, str]]:
     """ffmpeg -ss/-t slice the decoded WAV into per-chunk WAV files.
 
-    Writes ``chunk_{NNN}.wav`` + ``chunk_{NNN}.txt`` under ``corpus_spk_dir``
-    (``spk`` = single-speaker folder convention so MFA groups them).
+    Layout: ``corpus_root/spk_{NNN}/chunk_{NNN}.{wav,txt}`` — **one speaker
+    folder per chunk**.  MFA's ``--num_jobs N`` parallelises across
+    speakers, not across files within a speaker (observed via its own
+    warning: "Number of jobs was specified as N, but due to only having
+    1 speakers, ..." when we grouped all chunks under one speaker).  The
+    tradeoff is losing cross-chunk speaker adaptation, but each chunk is
+    still >= MIN_CHUNK_SEC (default 3 s), which is enough for MFA's
+    per-speaker GMM adaptation to behave reasonably.
+
     Returns [(chunk_dict, wav_path)] in chunk order.
     """
-    os.makedirs(corpus_spk_dir, exist_ok=True)
+    os.makedirs(corpus_root, exist_ok=True)
     out: list[tuple[dict, str]] = []
     for c in chunks:
         stem = f"chunk_{c['index']:03d}"
-        wav_path = os.path.join(corpus_spk_dir, stem + ".wav")
-        txt_path = os.path.join(corpus_spk_dir, stem + ".txt")
+        spk_dir = os.path.join(corpus_root, f"spk_{c['index']:03d}")
+        os.makedirs(spk_dir, exist_ok=True)
+        wav_path = os.path.join(spk_dir, stem + ".wav")
+        txt_path = os.path.join(spk_dir, stem + ".txt")
         dur = c["end_sec"] - c["start_sec"]
         # -ss BEFORE -i seeks the container (fast); -t bounds the output.
         # Re-encode to the same pcm_s16le 16k mono so MFA doesn't complain
@@ -170,14 +179,29 @@ def run_mfa(
         args += ["--beam", beam]
     if retry_beam:
         args += ["--retry_beam", retry_beam]
+    if os.environ.get("ENGINE_C_MFA_SINGLE_SPEAKER", "0").lower() in ("1", "true", "yes", "on"):
+        # MFA's warning mentions --single_speaker as the way to split
+        # utterances across jobs regardless of their speaker folder.  Also
+        # skips fMLLR speaker adaptation (a sizable chunk of total MFA
+        # wall time on short clips).  Off by default so we can A/B it.
+        args.append("--single_speaker")
 
     cwd = os.getcwd()
     os.chdir(tmp_dir)
     try:
         logger.info("multichunk MFA cmd: %s", args)
         out = subprocess.check_output(args, stderr=subprocess.STDOUT, env=mfa_env)
-        logger.info("multichunk MFA ok, stdout tail: %s",
-                    out.decode("utf-8", errors="replace")[-400:])
+        decoded = out.decode("utf-8", errors="replace")
+        # Surface a tiny subset of MFA's stdout so we can still verify
+        # parallelism took effect without flooding the container log.
+        for line in decoded.splitlines():
+            s = line.strip()
+            if (
+                ("Found" in s and "speaker" in s)
+                or "Everything took" in s
+                or ("WARNING" in s and "Number of jobs" in s)
+            ):
+                logger.info("MFA: %s", s.replace("INFO", "", 1).strip()[:180])
     except subprocess.CalledProcessError as e:
         tail = e.output.decode("utf-8", errors="replace")[-800:]
         raise RuntimeError(f"multichunk MFA align failed: {tail}") from e
@@ -200,16 +224,15 @@ def run_praat_per_chunk(
     TSV — ``phones.parse`` on an empty TSV returns zero phones which the
     merge step surfaces as a fallback signal.
     """
-    # MFA outputs TextGrids preserving the input corpus tree:
-    #   corpus/spk/chunk_000.wav → output/spk/chunk_000.TextGrid
-    corpus_spk = os.path.join(tmp_dir, "corpus", "spk")
-    output_spk = os.path.join(tmp_dir, "output", "spk")
+    # MFA mirrors the input corpus tree in the output dir:
+    #   corpus/spk_NNN/chunk_NNN.wav → output/spk_NNN/chunk_NNN.TextGrid
     results: dict[int, str] = {}
 
     for c in chunks:
         stem = f"chunk_{c['index']:03d}"
-        wav = os.path.join(corpus_spk, stem + ".wav")
-        grid = os.path.join(output_spk, stem + ".TextGrid")
+        spk = f"spk_{c['index']:03d}"
+        wav = os.path.join(tmp_dir, "corpus", spk, stem + ".wav")
+        grid = os.path.join(tmp_dir, "output", spk, stem + ".TextGrid")
         if not os.path.exists(grid):
             logger.warning("multichunk: missing TextGrid for %s", stem)
             results[c["index"]] = ""
@@ -316,8 +339,8 @@ def process_from_wav(
       - Passing ``praat_script_path`` — textgrid-formants.praat lives in
         the sidecar's WORKDIR, and this module doesn't assume cwd.
     """
-    corpus_spk = os.path.join(tmp_dir, "corpus", "spk")
-    slice_chunks(full_wav, chunks, corpus_spk, settings_dict["ffmpeg"])
+    corpus_root = os.path.join(tmp_dir, "corpus")
+    slice_chunks(full_wav, chunks, corpus_root, settings_dict["ffmpeg"])
     os.makedirs(os.path.join(tmp_dir, "output"), exist_ok=True)
 
     mfa_cmd, mfa_env = build_mfa_cmd(settings_dict)
@@ -328,8 +351,9 @@ def process_from_wav(
     )
 
     # Confirm MFA produced something before Praat — fast-fail with a
-    # clearer message than "empty TSV" further down.
-    grids = glob.glob(os.path.join(tmp_dir, "output", "spk", "*.TextGrid"))
+    # clearer message than "empty TSV" further down.  Glob across all
+    # spk_NNN/ output subdirs (one per chunk).
+    grids = glob.glob(os.path.join(tmp_dir, "output", "spk_*", "*.TextGrid"))
     if len(grids) == 0:
         logger.warning("multichunk: MFA produced 0 TextGrids")
         return None
