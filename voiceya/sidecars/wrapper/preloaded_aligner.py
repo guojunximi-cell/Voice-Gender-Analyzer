@@ -143,31 +143,98 @@ class PreloadedAligner:
                 ignore_case=True,
             )
 
-            # Re-use MFA's on-disk L.fst cache — same directory convention
-            # the align_one CLI uses, so any prior `mfa align_one` run gave
-            # us a warm cache.  Cold start (fresh image) compiles + writes.
+            # MFA's pretrained dictionaries can contain phones that the
+            # shipped acoustic model doesn't know — mandarin_mfa's dict
+            # uses tone variants like ``i˥˥`` / ``a˨`` / ``aj˦`` that
+            # never appear in the model's phones.txt (which stops at
+            # ``i˥``, ``a˥``, ``aj˥``, etc.).  MFA's full ``align`` CLI
+            # handles this via PretrainedAligner's excluded_phones logic
+            # — it drops pronunciations whose phones aren't in the model.
+            # ``align_one`` doesn't filter, which is why it dies with
+            # ``ContextFst: invalid ilabel supplied: 161`` on any real
+            # Chinese transcript.  We replicate the filter here.
+            model_phones_path = acoustic_model.phone_symbol_path
+            model_phone_table = pywrapfst.SymbolTable.read_text(str(model_phones_path))
+            valid_phones: set[str] = set()
+            for i in range(model_phone_table.num_symbols()):
+                sym = model_phone_table.find(i)
+                name = sym.decode() if isinstance(sym, bytes) else sym
+                if name:
+                    valid_phones.add(name)
+            # pronunciation dictionary helpers (optional silence phone, oov
+            # phone, disambig syms, etc.) — keep <eps> ids reachable too.
+            valid_phones.add(p["optional_silence_phone"])
+            valid_phones.add(p["oov_phone"])
+
+            # Cache dir keyed by dict stem + model-phones fingerprint so a
+            # refresh of either side invalidates the compiled L.fst.
+            cache_key = f"{Path(dictionary_path).stem}-{model_phones_path.stat().st_size}"
             cache_dir = config.TEMPORARY_DIRECTORY.joinpath(
-                "extracted_models", "dictionary", Path(dictionary_path).stem,
+                "extracted_models", "dictionary", cache_key,
             )
             cache_dir.mkdir(parents=True, exist_ok=True)
             l_fst = cache_dir / "L.fst"
             l_align = cache_dir / "L_align.fst"
             words_txt = cache_dir / "words.txt"
             phones_txt = cache_dir / "phones.txt"
+            filtered_dict = cache_dir / "filtered.dict"
+
+            # Pre-filter the dict (write once, reuse across container
+            # restarts).  Format preserved line-for-line so MFA's own
+            # parse_dictionary_file keeps working.
+            if not filtered_dict.exists():
+                import tempfile  # noqa: PLC0415
+                kept = 0
+                skipped = 0
+                with (
+                    open(dictionary_path, encoding="utf-8") as src,
+                    tempfile.NamedTemporaryFile(
+                        "w", encoding="utf-8", delete=False,
+                        dir=cache_dir, suffix=".dict.tmp",
+                    ) as tmp,
+                ):
+                    for line in src:
+                        cols = line.rstrip("\n").split("\t")
+                        if len(cols) < 2:
+                            tmp.write(line)
+                            kept += 1
+                            continue
+                        # mandarin_mfa dict: word<tab>p1<tab>p2<tab>p3<tab>p4<tab>phones
+                        # english_us_arpa dict: word<tab>phones (2 cols)
+                        pron = cols[-1].split()
+                        if set(pron) - valid_phones:
+                            skipped += 1
+                            continue
+                        tmp.write(line)
+                        kept += 1
+                    tmp_path = Path(tmp.name)
+                tmp_path.rename(filtered_dict)
+                logger.info(
+                    "preloaded aligner [%s] filtered dict: kept %d, skipped %d "
+                    "(phones not in acoustic model)",
+                    lang, kept, skipped,
+                )
+
+            # Critical: pre-populate phone_table from the model so
+            # load_pronunciations' add_symbol calls for known phones
+            # return existing IDs (idempotent) rather than appending.
+            lexicon_compiler.phone_table = pywrapfst.SymbolTable.read_text(
+                str(model_phones_path),
+            )
 
             cache_hit = l_fst.exists() and not config.CLEAN
             if cache_hit:
                 lexicon_compiler.load_l_from_file(l_fst)
                 lexicon_compiler.load_l_align_from_file(l_align)
-                lexicon_compiler.word_table = pywrapfst.SymbolTable.read_text(words_txt)
-                lexicon_compiler.phone_table = pywrapfst.SymbolTable.read_text(phones_txt)
+                lexicon_compiler.word_table = pywrapfst.SymbolTable.read_text(str(words_txt))
+                # phone_table already set above from the model.
             else:
-                lexicon_compiler.load_pronunciations(dictionary_path)
+                lexicon_compiler.load_pronunciations(filtered_dict)
                 lexicon_compiler.create_fsts()
                 lexicon_compiler.fst.write(str(l_fst))
                 lexicon_compiler.align_fst.write(str(l_align))
-                lexicon_compiler.word_table.write_text(words_txt)
-                lexicon_compiler.phone_table.write_text(phones_txt)
+                lexicon_compiler.word_table.write_text(str(words_txt))
+                lexicon_compiler.phone_table.write_text(str(phones_txt))
                 lexicon_compiler.clear()
             t_l = time.perf_counter()
 
