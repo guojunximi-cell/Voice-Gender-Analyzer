@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any, Literal
@@ -90,6 +91,10 @@ async def run_engine_c(
 
     lang_short = _normalize_lang(language)
 
+    # word_timestamps feeds the sidecar's parallel-chunking path (en free mode
+    # only for now).  None → sidecar falls back to its single-block MFA pipeline.
+    word_timestamps: list[dict] | None = None
+
     if mode == "script":
         transcript = (script or "").strip()
         if not transcript:
@@ -103,18 +108,21 @@ async def run_engine_c(
 
             if lang_short == "en":
                 from voiceya.services.audio_analyser.engine_c_asr_en import (  # noqa: PLC0415
-                    transcribe_en as _transcribe,
+                    transcribe_en,
                 )
             else:
                 from voiceya.services.audio_analyser.engine_c_asr import (  # noqa: PLC0415
-                    transcribe_zh as _transcribe,
+                    transcribe_zh,
                 )
         except ImportError as exc:
             logger.warning("Engine C dependencies missing (install `engine-c` group): %s", exc)
             return None
 
         try:
-            transcript = await _transcribe(audio_bytes)
+            if lang_short == "en":
+                transcript, word_timestamps = await transcribe_en(audio_bytes)
+            else:
+                transcript = await transcribe_zh(audio_bytes)
         except Exception as exc:  # defensive — _transcribe itself swallows errors
             logger.warning("Engine C ASR raised unexpectedly: %s", exc)
             return None
@@ -134,12 +142,18 @@ async def run_engine_c(
     if CFG.engine_c_sidecar_token:
         headers["X-Engine-C-Token"] = CFG.engine_c_sidecar_token
 
+    post_data: dict[str, str] = {"transcript": transcript, "language": language}
+    if word_timestamps:
+        # JSON-encode so multipart/form-data stays flat.  Sidecar parses back
+        # to list[dict]; malformed payloads are ignored on that side.
+        post_data["word_timestamps_json"] = json.dumps(word_timestamps)
+
     try:
         async with httpx.AsyncClient(timeout=CFG.engine_c_sidecar_timeout_sec) as client:
             resp = await client.post(
                 f"{CFG.engine_c_sidecar_url}/engine_c/analyze",
                 files={"audio": ("audio.wav", audio_bytes, "audio/wav")},
-                data={"transcript": transcript, "language": language},
+                data=post_data,
                 headers=headers,
             )
         if resp.status_code != 200:

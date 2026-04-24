@@ -319,6 +319,7 @@ async def analyze(
     audio: UploadFile = File(...),
     transcript: str = Form(...),
     language: str = Form("zh-CN"),
+    word_timestamps_json: str | None = Form(default=None),
     x_engine_c_token: str | None = Header(default=None, alias="X-Engine-C-Token"),
 ) -> dict:
     """Run the upstream pipeline on a single audio clip + transcript.
@@ -329,8 +330,25 @@ async def analyze(
       - meanPitch / medianPitch / stdevPitch
       - meanResonance / medianResonance / stdevResonance
       - mean / stdev (F-vectors)
+
+    ``word_timestamps_json``: optional JSON-encoded list of
+    ``{word, start, end}`` from the worker's ASR.  When present and the chunk
+    path is enabled, the sidecar splits audio + transcript at silence
+    boundaries and runs MFA alignment in parallel across chunks.  Absent or
+    malformed → fall back to the single-block pipeline (current behaviour).
     """
     _check_auth(x_engine_c_token)
+
+    word_timestamps: list[dict] | None = None
+    if word_timestamps_json:
+        try:
+            parsed = json.loads(word_timestamps_json)
+            if isinstance(parsed, list) and all(isinstance(w, dict) for w in parsed):
+                word_timestamps = parsed
+        except json.JSONDecodeError as exc:
+            logger.warning("word_timestamps_json ignored (parse error: %s)", exc)
+    if word_timestamps is not None:
+        logger.info("Engine C: received %d word timestamps", len(word_timestamps))
 
     lang = _normalize_lang(language)
     if not lang:
