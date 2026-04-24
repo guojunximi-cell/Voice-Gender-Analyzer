@@ -45,6 +45,7 @@ from acousticgender.library.settings import settings
 # ``wrapper.multichunk`` are the right absolute names, but ``from .`` is
 # shorter and refactor-safe.
 from . import chunker, multichunk
+from .preloaded_aligner import PreloadedAligner
 
 logger = logging.getLogger("engine_c.sidecar")
 
@@ -56,7 +57,12 @@ _engine_c_handler = logging.StreamHandler()
 _engine_c_handler.setFormatter(logging.Formatter(
     "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 ))
-for _name in ("engine_c.sidecar", "engine_c.chunker", "engine_c.multichunk"):
+for _name in (
+    "engine_c.sidecar",
+    "engine_c.chunker",
+    "engine_c.multichunk",
+    "engine_c.preloaded_aligner",
+):
     _lg = logging.getLogger(_name)
     _lg.setLevel(logging.INFO)
     # Replace any prior handler from a module reload so logs don't double.
@@ -145,6 +151,56 @@ if not _SUPPORTED_LANGS:
         os.getcwd(),
     )
 
+
+# ── Preloaded kalpy aligners (one per supported lang) ───────────────
+# Built at module load so the expensive setup (acoustic model zip +
+# lexicon FST compilation) is amortised across the container's lifetime
+# instead of paid 27 s per request via the `mfa align` CLI subprocess.
+#
+# Scoped to English at first integration — the vendored single-block path
+# still handles zh requests, and we'll extend once zh is validated.
+# Set ENGINE_C_PRELOAD_ALIGNER=0 to force the old subprocess path
+# everywhere (safety knob for regressions).
+_PRELOAD_ENABLED = os.environ.get(
+    "ENGINE_C_PRELOAD_ALIGNER", "1",
+).lower() in ("1", "true", "yes", "on")
+
+_MODEL_NAME_BY_LANG: dict[str, str] = {
+    "en": "english_us_arpa",
+    # zh deliberately left out — needs validation before enabling.
+}
+
+_PRELOADED_ALIGNERS: dict[str, PreloadedAligner] = {}
+if _PRELOAD_ENABLED:
+    try:
+        from montreal_forced_aligner.models import (  # noqa: PLC0415
+            MODEL_TYPES as _MFA_MODEL_TYPES,
+        )
+        for _lang in _SUPPORTED_LANGS:
+            _model_name = _MODEL_NAME_BY_LANG.get(_lang)
+            if not _model_name:
+                continue
+            try:
+                _acoustic_path = _MFA_MODEL_TYPES["acoustic"].get_pretrained_path(_model_name)
+                _dict_path = _MFA_MODEL_TYPES["dictionary"].get_pretrained_path(_model_name)
+            except Exception as _exc:
+                logger.warning(
+                    "preload skipped for %s: can't resolve model path (%s)",
+                    _lang, _exc,
+                )
+                continue
+            _aligner = PreloadedAligner.load(_lang, _acoustic_path, _dict_path)
+            if _aligner is not None:
+                # Pay kalpy's first-call JIT cost here (a few seconds the
+                # first time after install) so the user's first real
+                # request doesn't.
+                _aligner.warmup()
+                _PRELOADED_ALIGNERS[_lang] = _aligner
+    except ImportError as _exc:
+        logger.warning(
+            "preload disabled — MFA/kalpy imports failed: %s", _exc,
+        )
+
 # ── MFA fast-mode patch ──────────────────────────────────────────────
 # Vendored preprocessing.py:119-125 calls MFA with `--clean --beam 100
 # --retry_beam 400`.  We rewrite this to narrow the beams for speed:
@@ -191,50 +247,76 @@ _CHUNK_ENABLED = os.environ.get("ENGINE_C_CHUNK_ENABLED", "1").lower() in ("1", 
 
 def _run_chunked_path(
     audio_bytes: bytes,
-    word_timestamps: list[dict],
+    transcript: str,
+    word_timestamps: list[dict] | None,
     silence_ranges: list[dict],
     tmp_dir: str,
     lang: str,
     saved_cwd: str,
 ) -> dict | None:
-    """Try the multichunk pipeline; return merged data or None on decline/failure.
+    """Align via preloaded kalpy (multi-chunk when we have word timestamps,
+    single-chunk otherwise); return merged data or None on decline/failure.
 
     Returning None is the documented fallback signal — the caller will run
-    the single-block pipeline on the same request.  Exceptions are caught
-    here (not re-raised) so a half-initialized chunked path never kills a
-    request that the single-block path could still satisfy.
+    the vendored single-block pipeline (preprocessing.process) on the same
+    request.  Exceptions are caught here (not re-raised) so a half-
+    initialised kalpy path never kills a request.
     """
     try:
         os.makedirs(tmp_dir, exist_ok=True)
         full_wav = os.path.join(tmp_dir, "full.wav")
         duration = multichunk.decode_to_wav(audio_bytes, full_wav, settings["ffmpeg"])
 
-        chunks = chunker.plan_chunks(duration, word_timestamps, silence_ranges)
-        if not chunks:
-            logger.info("chunker: declined (returned None) — single-block fallback")
-            return None
+        # Chunker only pays off when alignment startup cost dominates
+        # per-chunk wall time — i.e. with the subprocess MFA fallback.  When
+        # a preloaded kalpy aligner is available, each align_utterance call
+        # is sub-second already, so chunking just adds Praat + ffmpeg-slice
+        # overhead for no gain (measured: 33 s audio single-chunk 0.90 s
+        # vs. 3-chunk 1.31 s).  Only consult the chunker when we're on the
+        # subprocess path.
+        preloaded = _PRELOADED_ALIGNERS.get(lang)
+        chunks: list[dict] | None = None
+        if word_timestamps and preloaded is None:
+            chunks = chunker.plan_chunks(duration, word_timestamps, silence_ranges)
 
-        logger.info(
-            "multichunk: planned %d chunks over %.1fs  durs=%s",
-            len(chunks), duration,
-            [round(c["end_sec"] - c["start_sec"], 2) for c in chunks],
-        )
+        if not chunks:
+            chunks = [{
+                "index": 0,
+                "start_sec": 0.0,
+                "end_sec": duration,
+                "transcript": transcript,
+                "word_count": len(transcript.split()),
+            }]
+            logger.info(
+                "kalpy: single-chunk path (%s)  duration=%.1fs",
+                "preloaded aligner prefers it"
+                if preloaded is not None
+                else "no word_ts or chunker declined",
+                duration,
+            )
+        else:
+            logger.info(
+                "subprocess MFA: %d chunks over %.1fs  durs=%s",
+                len(chunks), duration,
+                [round(c["end_sec"] - c["start_sec"], 2) for c in chunks],
+            )
 
         # textgrid-formants.praat lives in the sidecar's startup cwd
-        # (WORKDIR=/app).  Resolve absolutely because run_mfa chdirs into
-        # tmp_dir and Praat's cwd inherits whatever the MFA subprocess left.
+        # (WORKDIR=/app).  Resolve absolutely because run_mfa (subprocess
+        # fallback) chdirs into tmp_dir.
         praat_script = os.path.join(saved_cwd, "textgrid-formants.praat")
         merged = multichunk.process_from_wav(
             full_wav, chunks, tmp_dir, lang, settings, praat_script,
             mfa_beam=_MFA_BEAM if _FAST_MFA else "",
             mfa_retry_beam=_MFA_RETRY_BEAM if _FAST_MFA else "",
+            preloaded_aligner=preloaded,
         )
         if merged is None:
-            logger.info("multichunk: merge returned None — single-block fallback")
+            logger.info("kalpy: merge returned None — vendored fallback")
         return merged
     except Exception as exc:
-        logger.warning("multichunk: unexpected failure, falling back: %s", exc)
-        logger.warning("multichunk trace:\n%s", traceback.format_exc())
+        logger.warning("kalpy path: unexpected failure, falling back: %s", exc)
+        logger.warning("kalpy trace:\n%s", traceback.format_exc())
         return None
 
 
@@ -494,14 +576,23 @@ async def analyze(
         # boundaries.  Cost is ~100-300 ms (one ffmpeg silencedetect pass).
         silence_ranges = await asyncio.to_thread(_detect_silence, audio_bytes)
 
-        # Try the multichunk path first when we have everything we need.
-        # Returns None on decline (too short, bad cuts, MFA failed, etc.);
-        # None triggers a fallback to the single-block pipeline below.
+        # Try the kalpy path first when a preloaded aligner is available for
+        # this language.  Covers both:
+        #   - word_timestamps + chunker → balanced multichunk kalpy path
+        #   - no word_timestamps (script mode, short audio) → single-chunk
+        #     kalpy path on the full clip
+        # Returns None on decline (aligner init failed, kalpy error, merge
+        # detected a broken chunk); None triggers the vendored single-block
+        # subprocess MFA fallback below.
         data: dict | None = None
-        if _CHUNK_ENABLED and word_timestamps and lang == "en":
+        use_kalpy = (
+            _CHUNK_ENABLED
+            and lang in _PRELOADED_ALIGNERS
+        )
+        if use_kalpy:
             data = await asyncio.to_thread(
                 _run_chunked_path,
-                audio_bytes, word_timestamps, silence_ranges,
+                audio_bytes, transcript, word_timestamps, silence_ranges,
                 chunk_tmp, lang, saved_cwd,
             )
 

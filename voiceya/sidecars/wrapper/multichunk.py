@@ -242,6 +242,13 @@ def run_praat_per_chunk(
                 [praat_bin, "--run", praat_script_path, wav, grid],
                 stderr=subprocess.STDOUT,
             ).decode("utf-8")
+            # kalpy's TextGrid labels silence intervals "<eps>"; MFA CLI
+            # writes "" (empty).  phones.parse would otherwise surface
+            # "<eps>" as a spoken word in the downstream response.  Match
+            # MFA's convention by stripping the placeholder; the Praat
+            # script already prints the label verbatim so this is the
+            # cheapest fix point.
+            out = out.replace("\t<eps>", "\t")
             results[c["index"]] = out
         except subprocess.CalledProcessError as e:
             logger.warning(
@@ -328,6 +335,7 @@ def process_from_wav(
     *,
     mfa_beam: str = "",
     mfa_retry_beam: str = "",
+    preloaded_aligner=None,
 ) -> dict | None:
     """Multi-chunk pipeline starting from an already-decoded 16 kHz mono WAV.
 
@@ -338,27 +346,68 @@ def process_from_wav(
       - Creating ``tmp_dir`` and cleaning it up in a finally.
       - Passing ``praat_script_path`` — textgrid-formants.praat lives in
         the sidecar's WORKDIR, and this module doesn't assume cwd.
+
+    If ``preloaded_aligner`` is provided, per-chunk alignment runs through
+    kalpy (no MFA CLI subprocess, no per-request acoustic-model reload —
+    the 27 s startup tax is amortised away).  Falls back to subprocess
+    MFA with ``--num_jobs N`` when the aligner is ``None``.
     """
     corpus_root = os.path.join(tmp_dir, "corpus")
     slice_chunks(full_wav, chunks, corpus_root, settings_dict["ffmpeg"])
     os.makedirs(os.path.join(tmp_dir, "output"), exist_ok=True)
 
-    mfa_cmd, mfa_env = build_mfa_cmd(settings_dict)
-    num_jobs = min(len(chunks), os.cpu_count() or 1)
-    run_mfa(
-        tmp_dir, lang, num_jobs, mfa_cmd, mfa_env,
-        beam=mfa_beam, retry_beam=mfa_retry_beam,
-    )
+    if preloaded_aligner is not None:
+        _align_with_kalpy(tmp_dir, chunks, preloaded_aligner)
+    else:
+        mfa_cmd, mfa_env = build_mfa_cmd(settings_dict)
+        num_jobs = min(len(chunks), os.cpu_count() or 1)
+        run_mfa(
+            tmp_dir, lang, num_jobs, mfa_cmd, mfa_env,
+            beam=mfa_beam, retry_beam=mfa_retry_beam,
+        )
 
-    # Confirm MFA produced something before Praat — fast-fail with a
-    # clearer message than "empty TSV" further down.  Glob across all
+    # Confirm alignment produced something before Praat — fast-fail with
+    # a clearer message than "empty TSV" further down.  Glob across all
     # spk_NNN/ output subdirs (one per chunk).
     grids = glob.glob(os.path.join(tmp_dir, "output", "spk_*", "*.TextGrid"))
     if len(grids) == 0:
-        logger.warning("multichunk: MFA produced 0 TextGrids")
+        logger.warning("multichunk: alignment produced 0 TextGrids")
         return None
 
     praat_tsvs = run_praat_per_chunk(
         tmp_dir, chunks, settings_dict["praat"], praat_script_path,
     )
     return merge_parses(chunks, praat_tsvs, lang)
+
+
+def _align_with_kalpy(
+    tmp_dir: str,
+    chunks: list[dict],
+    aligner,  # PreloadedAligner
+) -> None:
+    """Align each chunk via the preloaded kalpy aligner.
+
+    Writes ``output/spk_NNN/chunk_NNN.TextGrid`` for each chunk, mirroring
+    the directory layout MFA CLI would have produced so downstream
+    ``run_praat_per_chunk`` doesn't need to branch.
+
+    Any per-chunk alignment failure is logged and re-raised so the
+    caller can surface it as a multichunk-path failure and fall back to
+    the single-block path.  (Partial chunk results aren't safe — the
+    merge step would see an empty TextGrid and bail anyway.)
+    """
+    import time  # noqa: PLC0415 — only needed inside the kalpy path
+    from pathlib import Path  # noqa: PLC0415
+
+    t0 = time.perf_counter()
+    for c in chunks:
+        stem = f"chunk_{c['index']:03d}"
+        spk = f"spk_{c['index']:03d}"
+        wav = Path(tmp_dir) / "corpus" / spk / (stem + ".wav")
+        grid_dir = Path(tmp_dir) / "output" / spk
+        grid_dir.mkdir(parents=True, exist_ok=True)
+        grid = grid_dir / (stem + ".TextGrid")
+        aligner.align_one(wav, c["transcript"], grid)
+    logger.info(
+        "kalpy aligned %d chunks in %.2fs", len(chunks), time.perf_counter() - t0,
+    )
