@@ -40,6 +40,12 @@ import acousticgender.library.preprocessing as preprocessing
 import acousticgender.library.resonance as resonance
 from acousticgender.library.settings import settings
 
+# Wrapper-local helpers (siblings of main.py).  Relative imports because
+# uvicorn loads this module as ``wrapper.main`` so ``wrapper.chunker`` /
+# ``wrapper.multichunk`` are the right absolute names, but ``from .`` is
+# shorter and refactor-safe.
+from . import chunker, multichunk
+
 logger = logging.getLogger("engine_c.sidecar")
 
 app = FastAPI(title="voiceya Engine C sidecar", version="0.1.0")
@@ -154,6 +160,67 @@ if not _SUPPORTED_LANGS:
 _FAST_MFA = os.environ.get("ENGINE_C_FAST_MFA", "1").lower() in ("1", "true", "yes", "on")
 _MFA_BEAM = os.environ.get("ENGINE_C_MFA_BEAM", "50").strip()
 _MFA_RETRY_BEAM = os.environ.get("ENGINE_C_MFA_RETRY_BEAM", "200").strip()
+
+# ── Multi-chunk path (Engine-C en free mode) ────────────────────────
+# When the worker ships ASR word timestamps, the sidecar can decode+slice
+# the audio at silence boundaries and feed an N-file corpus to MFA with
+# ``--num_jobs N`` for parallel alignment.  Falls back to the single-block
+# path on any failure (no word timestamps, chunker declines, MFA errors,
+# merge detects a zero-phone chunk).
+#
+# Scoped to English because zh needs FunASR word timestamps which aren't
+# plumbed yet — ``lang == "en"`` guard in the endpoint keeps the zh path
+# on its current single-block code route.
+_CHUNK_ENABLED = os.environ.get("ENGINE_C_CHUNK_ENABLED", "1").lower() in ("1", "true", "yes", "on")
+
+
+def _run_chunked_path(
+    audio_bytes: bytes,
+    word_timestamps: list[dict],
+    silence_ranges: list[dict],
+    tmp_dir: str,
+    lang: str,
+    saved_cwd: str,
+) -> dict | None:
+    """Try the multichunk pipeline; return merged data or None on decline/failure.
+
+    Returning None is the documented fallback signal — the caller will run
+    the single-block pipeline on the same request.  Exceptions are caught
+    here (not re-raised) so a half-initialized chunked path never kills a
+    request that the single-block path could still satisfy.
+    """
+    try:
+        os.makedirs(tmp_dir, exist_ok=True)
+        full_wav = os.path.join(tmp_dir, "full.wav")
+        duration = multichunk.decode_to_wav(audio_bytes, full_wav, settings["ffmpeg"])
+
+        chunks = chunker.plan_chunks(duration, word_timestamps, silence_ranges)
+        if not chunks:
+            logger.info("chunker: declined (returned None) — single-block fallback")
+            return None
+
+        logger.info(
+            "multichunk: planned %d chunks over %.1fs  durs=%s",
+            len(chunks), duration,
+            [round(c["end_sec"] - c["start_sec"], 2) for c in chunks],
+        )
+
+        # textgrid-formants.praat lives in the sidecar's startup cwd
+        # (WORKDIR=/app).  Resolve absolutely because run_mfa chdirs into
+        # tmp_dir and Praat's cwd inherits whatever the MFA subprocess left.
+        praat_script = os.path.join(saved_cwd, "textgrid-formants.praat")
+        merged = multichunk.process_from_wav(
+            full_wav, chunks, tmp_dir, lang, settings, praat_script,
+            mfa_beam=_MFA_BEAM if _FAST_MFA else "",
+            mfa_retry_beam=_MFA_RETRY_BEAM if _FAST_MFA else "",
+        )
+        if merged is None:
+            logger.info("multichunk: merge returned None — single-block fallback")
+        return merged
+    except Exception as exc:
+        logger.warning("multichunk: unexpected failure, falling back: %s", exc)
+        logger.warning("multichunk trace:\n%s", traceback.format_exc())
+        return None
 
 
 def _looks_like_mfa_align(args: object) -> bool:
@@ -399,27 +466,40 @@ async def analyze(
         saved_cwd = "/app"
         os.chdir(saved_cwd)
 
-    try:
-        # Run silencedetect in parallel with the main MFA pipeline — they're
-        # independent (silencedetect forks its own ffmpeg; preprocessing.process
-        # chdir's into tmp_dir for MFA) and the silence path is typically
-        # 100-300 ms while MFA is 5-30 s, so the ffmpeg cost hides entirely
-        # behind MFA.  asyncio.to_thread bridges the blocking calls into the
-        # event loop; asyncio.gather waits for both.
-        #
-        # Safety note: preprocessing.process() does its own `os.chdir(tmp_dir)`,
-        # so running two `analyze()` requests truly in parallel within one
-        # worker would collide on cwd.  That's already an existing constraint
-        # (see engine-c-multithread.md) — concurrent requests still need to be
-        # serialized at the worker or uvicorn --workers level.  This change is
-        # purely *intra-request* parallelism, which is safe.
-        silence_task = asyncio.to_thread(_detect_silence, audio_bytes)
-        pipeline_task = asyncio.to_thread(
-            preprocessing.process, audio_bytes, transcript, tmp_dir, lang
-        )
-        silence_ranges, praat_output = await asyncio.gather(silence_task, pipeline_task)
+    # Chunked path needs its own tmp subtree because preprocessing.process
+    # (single-block fallback) expects to own ``tmp_dir`` entirely (it calls
+    # os.mkdir on it and rmtree at the end).  Keeping them separate also
+    # keeps the finally-block cleanup simple — both get rmtree'd
+    # unconditionally regardless of which path ran.
+    chunk_tmp = tmp_dir + ".chunk"
 
-        data = phones.parse(praat_output, lang)
+    try:
+        # Always compute silence ranges — needed by the chunker for cut-point
+        # selection and surfaced to the frontend as authoritative sentence
+        # boundaries.  Cost is ~100-300 ms (one ffmpeg silencedetect pass).
+        silence_ranges = await asyncio.to_thread(_detect_silence, audio_bytes)
+
+        # Try the multichunk path first when we have everything we need.
+        # Returns None on decline (too short, bad cuts, MFA failed, etc.);
+        # None triggers a fallback to the single-block pipeline below.
+        data: dict | None = None
+        if _CHUNK_ENABLED and word_timestamps and lang == "en":
+            data = await asyncio.to_thread(
+                _run_chunked_path,
+                audio_bytes, word_timestamps, silence_ranges,
+                chunk_tmp, lang, saved_cwd,
+            )
+
+        if data is None:
+            # Single-block path — vendored preprocessing.process owns
+            # ``tmp_dir`` (mkdir on entry, rmtree on success), and chdir's
+            # into it for MFA.  That chdir is why concurrent requests still
+            # need serialization at the worker / uvicorn-workers level.
+            praat_output = await asyncio.to_thread(
+                preprocessing.process, audio_bytes, transcript, tmp_dir, lang
+            )
+            data = phones.parse(praat_output, lang)
+
         if not data.get("phones"):
             raise RuntimeError("MFA produced no alignment output")
         resonance.compute_resonance(data, _WEIGHTS_BY_LANG[lang], lang)
@@ -438,11 +518,15 @@ async def analyze(
             detail="engine_c pipeline failed",
         ) from exc
     finally:
-        # ignore_errors=True handles the case where process() already ran its
-        # own rmtree on the happy path.
+        # ignore_errors=True handles the case where process() already ran
+        # its own rmtree on the happy path, and the common case where the
+        # chunked path was never taken (chunk_tmp never created).
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        # Restore cwd in case the vendored preprocessing.process chdir'd
-        # into tmp_dir and raised before restoring (see saved_cwd note above).
+        shutil.rmtree(chunk_tmp, ignore_errors=True)
+        # Restore cwd in case the vendored preprocessing.process or our
+        # multichunk.run_mfa chdir'd into a tmp dir and raised before
+        # restoring.  Both now call os.chdir back themselves, but this
+        # belt-and-braces guard remains cheap and has caught real bugs.
         try:
             if os.getcwd() != saved_cwd:
                 os.chdir(saved_cwd)
