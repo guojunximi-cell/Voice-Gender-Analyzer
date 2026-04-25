@@ -370,24 +370,22 @@ class PreloadedAligner:
                 pass
 
     def warmup(self) -> bool:
-        """Align a realistic-ish transcript on silent audio to:
-          1. Pay the kalpy/Kaldi first-call JIT tax so the user's first
-             real request doesn't.
-          2. **Detect per-language kalpy/FST incompatibilities** (e.g.
-             mandarin_mfa's phone-ID space collides with disambig symbols
-             in kalpy's ``CompileGraphFromText``, observed as
-             ``ContextFst: invalid ilabel`` on real Chinese transcripts —
-             MFA's own ``align_one`` CLI hits the same wall).
+        """Align a realistic-ish transcript on silent audio to pay the
+        kalpy/Kaldi first-call JIT tax so the user's first real request
+        doesn't.
 
-        Returns True on success, False on failure.  A False result signals
-        the caller to skip registration for this language; requests will
-        then use the subprocess MFA fallback instead of attempting kalpy
-        and incurring a per-request failure round-trip.
-
-        A ~10-token transcript is enough to exercise FST compilation across
-        enough phone pairs to catch the mandarin_mfa issue.  Single-hanzi
-        warmups are NOT sufficient — they hit a subset of phones too
-        narrow to trigger the ID collision.
+        Returns True on success, False on failure — informational only.
+        Caller registers the aligner regardless; runtime kalpy errors fall
+        back to subprocess MFA via ``_run_chunked_path``'s outer
+        try/except, so a failed warmup no longer needs to gate
+        registration.  Historical context: this used to gate registration
+        because mandarin_mfa's phone-ID space collided with kalpy's
+        ``CompileGraphFromText`` (``ContextFst: invalid ilabel``).  That
+        bug is now routed around at the dict layer (``mandarin_china_mfa``
+        + phone-inventory filter), so a silent-audio warmup failure is no
+        longer a reliable "language broken" signal — zh's silent warmup
+        in particular exhausts beam=50 without acoustic anchors despite
+        real audio aligning fine.
         """
         import tempfile  # noqa: PLC0415
         import wave  # noqa: PLC0415
@@ -422,8 +420,8 @@ class PreloadedAligner:
             return True
         except Exception as exc:  # pragma: no cover — best-effort
             logger.warning(
-                "preloaded aligner [%s] warmup FAILED: %s — lang will fall "
-                "back to subprocess MFA for every request",
+                "preloaded aligner [%s] warmup FAILED: %s — kalpy still "
+                "registered; first real request will pay the JIT tax instead",
                 self.lang, exc,
             )
             return False

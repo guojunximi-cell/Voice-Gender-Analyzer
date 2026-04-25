@@ -205,14 +205,16 @@ if _PRELOAD_ENABLED:
             _aligner = PreloadedAligner.load(_lang, _acoustic_path, _dict_path)
             if _aligner is None:
                 continue
-            # Warmup both pays the kalpy first-call JIT tax AND probes for
-            # language-specific kalpy incompatibilities (notably
-            # mandarin_mfa hits a phone-ID collision in CompileGraphFromText
-            # on non-trivial transcripts — MFA's own align_one CLI has the
-            # same bug).  Don't register aligners that fail warmup; they'll
-            # only cost a per-request round-trip to the fallback path.
-            if _aligner.warmup():
-                _PRELOADED_ALIGNERS[_lang] = _aligner
+            # Always register; warmup is now best-effort JIT prepay.  The
+            # original warmup-gate caught mandarin_mfa's CompileGraphFromText
+            # bug, but that's been routed around at the dict layer
+            # (mandarin_china_mfa, see _DICT_NAME_BY_LANG).  A silent-audio
+            # warmup failure (zh "你好" exhausts beam=50 without acoustic
+            # anchors) is no longer a reliable "lang broken" signal — real
+            # audio aligns fine.  Runtime kalpy errors are caught by
+            # _run_chunked_path's outer try/except below.
+            _PRELOADED_ALIGNERS[_lang] = _aligner
+            _aligner.warmup()
     except ImportError as _exc:
         logger.warning(
             "preload disabled — MFA/kalpy imports failed: %s", _exc,
