@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+
 const ACCEPTED_TYPES = [
 	"audio/mpeg",
 	"audio/wav",
@@ -14,17 +16,19 @@ export const DEFAULT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 export const RESTRICTED_MAX_BYTES = 5 * 1024 * 1024; // 5 MB（非并发模式）
 
 export function validateFile(file, maxBytes = DEFAULT_MAX_BYTES) {
-	if (!file) return "No file selected";
-	if (file.size === 0) return "文件内容为空，请重新选择。";
+	if (!file) return t("upload.errNoFile");
+	if (file.size === 0) return t("upload.errEmpty");
 
 	const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
 	const isAudio = file.type.startsWith("audio/") || ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTS.includes(ext);
-	if (!isAudio) return `不支持的格式：${file.type || ext || "未知"}。请上传音频文件。`;
+	if (!isAudio) {
+		return t("upload.errUnsupported", { fmt: file.type || ext || t("upload.errUnknown") });
+	}
 
 	if (file.size > maxBytes) {
 		const mb = (file.size / 1024 / 1024).toFixed(1);
 		const limitMb = (maxBytes / 1024 / 1024).toFixed(0);
-		return `文件过大（${mb} MB），当前模式最大支持 ${limitMb} MB。`;
+		return t("upload.errTooLarge", { mb, limit: limitMb });
 	}
 
 	return null; // valid

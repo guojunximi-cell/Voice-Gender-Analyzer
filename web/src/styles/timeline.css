@@ -102,8 +102,22 @@
 }
 
 .vga-timeline__label {
+	/* Fixed width so the three content slots (pitch / hanzi / resonance)
+	   start at the same x — that's the whole alignment contract.
+	   `min-width: 0` is essential: flex items default to `min-width: auto`,
+	   which otherwise expands the slot to the content's min-content size
+	   (bug: a longer locale-specific label would desync the bands).
+	   Content stays abbreviated — "音高"/"共鸣" (CJK), "P."/"R." (en-US) —
+	   so 36px is ample.
+	   `text-align: left` lets the label's left edge sit at the timeline's
+	   left edge, forming one vertical line with the readout pill and the
+	   gender-legend strip above/below (both zero-gutter rows). */
 	flex: 0 0 36px;
-	text-align: right;
+	min-width: 0;
+	text-align: left;
+	/* Nudge ~½ glyph right of the timeline's left edge — hairline breathing
+	   room so the label doesn't visually fuse with the readout pill above. */
+	padding-left: 4px;
 	font-size: 0.72rem;
 	color: var(--text-secondary);
 	user-select: none;
@@ -300,9 +314,10 @@
 	/* Absolute positioning + inline left/width set by transcript-row.js — these
 	   anchor each char to its phone span in the heatmap above.  No min-width:
 	   the cell's pixel width must equal exactly its time-allocated %, so dense
-	   passages don't push neighbouring buttons into geometric overlap.  The
-	   char glyph's font-size is set inline by transcript-row.js to fit the
-	   allocated width, so the glyph itself never spills past its cell. */
+	   passages don't push neighbouring buttons into geometric overlap.  Glyphs
+	   wider than their slot (e.g. long English words) are shrunk via scaleX
+	   in `_fitGlyphsToSlots`, not truncated, so no letter fragments leak into
+	   the neighbour. */
 	position: absolute;
 	top: 0;
 	bottom: 0;
@@ -326,10 +341,13 @@
 .phone__char {
 	display: block;
 	font-weight: 500;
-	line-height: 1;
+	/* line-height 1 was too tight for Latin descenders (p/g/j/y/q) — their
+	   glyphs extend below the em-box and got clipped by overflow:hidden.
+	   1.25 gives descenders vertical headroom; the button's own
+	   overflow:hidden still contains horizontal bleed. */
+	line-height: 1.25;
 	text-align: center;
 	white-space: nowrap;
-	overflow: hidden;
 }
 
 .phone[aria-current="true"] {
@@ -556,6 +574,7 @@
 
 	.vga-timeline__label {
 		flex: 0 0 28px;
+		min-width: 0;
 		font-size: 0.68rem;
 	}
 

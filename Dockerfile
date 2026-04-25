@@ -31,6 +31,7 @@ RUN apt-get update \
         ffmpeg \
         ca-certificates \
         build-essential \
+        curl \
         git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -51,22 +52,31 @@ RUN test -f voiceya/inaSpeechSegmenter/setup.py \
         && git -C voiceya/inaSpeechSegmenter checkout ${INA_SS_COMMIT})
 
 # 安装依赖到 /build/.venv（--no-editable 让项目以 wheel 形式装进 site-packages）
+# torch / torchaudio 是 funasr AutoModel 的隐式必需项（funasr METADATA 没声明，
+# 但 auto_model.py 顶层无条件 import）；pyproject.toml 里显式声明并 pin 到
+# PyTorch 官方 CPU index，避免引入 CUDA 轮子。
 RUN uv sync --locked --no-dev --no-editable
-
-# torch (CPU-only) 是 funasr AutoModel 的隐式必需项——funasr 不在 PyPI 元数据里声明它，
-# 但 auto_model.py 在顶层无条件 import torch。
-# 用 PyTorch CPU 专用 index 而非 uv.lock，避免引入 CUDA 轮子并保持 lockfile 跨平台。
-RUN uv pip install --no-cache-dir \
-        --python /build/.venv/bin/python \
-        "torch==2.11.0+cpu" "torchaudio==2.11.0+cpu" \
-        --index-url https://download.pytorch.org/whl/cpu
 
 # 下载 inaSpeechSegmenter 模型到 /root/.keras/inaSpeechSegmenter/（remote_utils 运行时会优先查这里）
 RUN /build/.venv/bin/python scripts/init_iss_model.py
 
-# Engine C: 预下载 FunASR Paraformer-zh ONNX 模型到 $MODELSCOPE_CACHE，
+# Engine C: 预下载 FunASR Paraformer-zh 模型到 $MODELSCOPE_CACHE，
 # 避免首请求在线下载。Engine C 关闭时运行时也不会加载该模型。
-RUN /build/.venv/bin/python -c "from funasr import AutoModel; AutoModel(model='paraformer-zh', disable_update=True, disable_log=True)"
+#
+# 走自家 GitHub Release(Apache 2.0 license, mirrored from ModelScope)
+# 而非直连 ModelScope——后者在 Railway 境外 build 节点上 ~200 kB/s，944 MB
+# 要 ~50 min 才能拉完，撞 daemon ~40 min timeout 一定 fail。GitHub
+# Releases CDN 在大多数 build region 都 30-100 MB/s，秒级完成。
+#
+# fail-open: 网络/校验失败时清空残留缓存并继续构建；engine_c_asr._load_model
+# 自带 lazy fallback，首次 Engine C 请求会在线下载（慢，但不阻塞部署）。
+ARG PARAFORMER_ZH_URL=https://github.com/guojunximi-cell/Voice-Gender-Analyzer/releases/download/models-v1/paraformer-zh.tar.gz
+# tarball top-level dir 是 ``modelscope/``，所以解到 /opt（不是 /opt/modelscope），
+# 最终得到 /opt/modelscope/models/iic/... ——FunASR 的 MODELSCOPE_CACHE 期待的布局。
+RUN curl -fsSL "$PARAFORMER_ZH_URL" | tar -xzf - -C /opt \
+    || (echo "WARNING: FunASR Paraformer-zh preload skipped (download failed) — runtime will lazy-download on first Engine C request" \
+        && rm -rf /opt/modelscope \
+        && mkdir -p /opt/modelscope)
 
 
 # ── Stage 3: 运行时镜像 ─────────────────────────────────────────
@@ -91,7 +101,10 @@ ENV PATH="/opt/venv/bin:${PATH}" \
     MODELSCOPE_CACHE=/opt/modelscope \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8080
+    PORT=8080 \
+    TF_CPP_MIN_LOG_LEVEL=3 \
+    CUDA_VISIBLE_DEVICES="" \
+    TF_FORCE_GPU_ALLOW_GROWTH=false
 
 WORKDIR /app
 EXPOSE 8080

@@ -24,7 +24,18 @@ class SSE(PayloadT):
     type: Literal["queue", "progress", "error", "result"]
 
     def to_dict(self) -> PayloadDictT:
-        return asdict(self)  # type: ignore
+        # Redis XADD can't serialize None or nested dicts, so drop Nones and
+        # JSON-encode the `msg_params` dict (decoded client-side).
+        d = asdict(self)  # type: ignore
+        out: PayloadDictT = {}
+        for k, v in d.items():
+            if v is None:
+                continue
+            if k == "msg_params" and isinstance(v, dict):
+                out[k] = json.dumps(v)
+            else:
+                out[k] = v
+        return out
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -32,6 +43,7 @@ class QueueSSE(SSE):
     type: Literal["queue"] = "queue"
     num_to_wait: int
     msg: str
+    msg_key: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -39,6 +51,10 @@ class ProgressSSE(SSE):
     type: Literal["progress"] = "progress"
     pct: int
     msg: str
+    # Optional i18n key + params so the frontend can render the progress label
+    # in the current UI language instead of showing the Chinese fallback.
+    msg_key: str | None = None
+    msg_params: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -55,11 +71,16 @@ class ResultSSE(SSE):
 
 
 TICK_STEP_MS = 15_000
+# STARTED 阶段：worker 发完最后一个 progress 事件（如 pct=98）就 return，之后不再
+# 产生新事件。XREAD 的 block 间隔决定了 SSE 转发感知 progress=SUCCESS 的最大延迟。
+# 设 500 ms 让"鸭鸭快好了"到 result 之间的尾延迟从 ~15s 压到 <0.5s；每秒 2 次
+# Redis XREAD + 2 次 SSE keep-alive，对单连接成本可忽略。
+EVENT_BLOCK_MS = 500
 
 
 async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgress[Any]):
     while progress.state == TaskStage.PENDING:
-        yield f"data: {json.dumps(QueueSSE(num_to_wait=-1, msg='排队等候中').to_dict())}\n\n"
+        yield f"data: {json.dumps(QueueSSE(num_to_wait=-1, msg='排队等候中', msg_key='progress.queued').to_dict())}\n\n"
 
         await asyncio.sleep(TICK_STEP_MS / 5 / 1000)
 
@@ -67,7 +88,7 @@ async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgr
         assert progress is not None
 
     # so it can also provide result in subsequent calls
-    events_stream = subscribe_to_events(task_id, block_ms=TICK_STEP_MS)
+    events_stream = subscribe_to_events(task_id, block_ms=EVENT_BLOCK_MS)
     while progress.state == TaskStage.STARTED:
         event = await anext(events_stream)
         if event:
@@ -78,7 +99,6 @@ async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgr
         progress = await broker.result_backend.get_progress(task_id)
         assert progress is not None
 
-    await asyncio.sleep(1)
     for _ in range(5):
         try:
             result = await broker.result_backend.get_result(task_id)

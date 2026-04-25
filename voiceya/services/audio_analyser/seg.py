@@ -133,6 +133,27 @@ def _patch_segmenter_for_frame_confidence():
     logger.info("已对 inaSpeechSegmenter 打上逐帧置信度补丁")
 
 
+def _warmup_segmenter(seg):
+    """触发 Keras graph trace，避免首请求承担 ~200 ms 的编译延迟。
+
+    SMN 输入 21 mel，Gender 输入 24 mel；patch 高度固定 68（_get_patches 的窗长）。
+    失败只 warning——warmup 本身不应阻塞 worker 启动。
+    """
+    import time
+
+    t0 = time.perf_counter()
+    try:
+        vad_in = np.zeros((1, 68, seg.vad.nmel, 1), dtype="float32")
+        seg.vad.nn.predict(vad_in, batch_size=seg.vad.batch_size, verbose=0)
+        if seg.detect_gender:
+            gen_in = np.zeros((1, 68, seg.gender.nmel, 1), dtype="float32")
+            seg.gender.nn.predict(gen_in, batch_size=seg.gender.batch_size, verbose=0)
+    except Exception as e:
+        logger.warning("Engine A warmup 失败（不影响功能，首请求会承担 trace 成本）: %s", e)
+        return
+    logger.info("Engine A warmup 完成，耗时 %.0f ms", (time.perf_counter() - t0) * 1000)
+
+
 async def load_seg():
     global SEG
     if SEG:
@@ -165,5 +186,7 @@ async def load_seg():
             getattr(_g, "_pen_model", "MISSING"),
             _dense_W.shape if (_dense_W := getattr(_g, "_dense_W", None)) else None,
         )
+
+    await asyncio.to_thread(_warmup_segmenter, seg)
 
     SEG = seg

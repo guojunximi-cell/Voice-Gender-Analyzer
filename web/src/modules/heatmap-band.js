@@ -5,13 +5,16 @@
  * `colorFn(phone)`.  Two bands live in the timeline: one keyed on pitch,
  * one on resonance.  Null / non-finite color → hatch pattern fallback.
  *
- * Layout: char-slot aligned, not time-proportional.  viewBox width = number
- * of real hanzi in the page; each char occupies exactly 1 unit.  Inside a
- * char's slot, its phones subdivide by their relative durations within the
- * char, so sub-char timing is preserved while macro columns (pitch cell /
- * hanzi / resonance cell at index i) stay rigidly aligned across the three
- * rows at any viewport width.  Silence phones between chars are skipped —
- * the page has exactly N slots for N real hanzi.
+ * Layout: weight-aligned, not time-proportional.  viewBox width = the page's
+ * `totalWeight`; each char occupies `[cumWeight, cumWeight + weight]` — so a
+ * single hanzi (weight 1) and an English "morning" (weight 7) share the row
+ * at their honest visual ratio.  Inside a char's slot, its phones subdivide
+ * by their relative durations within the char, so sub-char timing is
+ * preserved while macro columns (pitch cell / hanzi / resonance cell at
+ * char i) stay rigidly aligned across the three rows at any viewport width
+ * because TranscriptRow derives its left/width from the same weights.
+ * Silence phones between chars are skipped — the page has exactly N slots
+ * for N real hanzi.
  */
 
 import { divergingResonance } from "./diverging.js";
@@ -150,21 +153,29 @@ export class HeatmapBand {
 			return;
 		}
 
-		// viewBox unit = one char slot. preserveAspectRatio=none stretches the
-		// N unit-wide slots to fill the container, guaranteeing column i here
-		// aligns with hanzi cell i (TranscriptRow uses `left: (i/N)*100%`).
-		this.svg.setAttribute("viewBox", `0 0 ${N} 1`);
+		// viewBox unit = one weight unit (= one CJK hanzi or one English letter
+		// after clamping).  preserveAspectRatio=none stretches the totalWeight-
+		// wide slot row to fill the container; char i occupies [cumW, cumW +
+		// weight_i], and TranscriptRow derives its button's left/width from
+		// the same weights — so columns align pixel-for-pixel.  For legacy
+		// pages without a weight (e.g. a test fixture), fall back to 1.
+		const W = page.totalWeight ?? N;
+		this.svg.setAttribute("viewBox", `0 0 ${W} 1`);
 
+		let cum = 0;
 		for (let i = 0; i < N; i++) {
 			const c = page.chars[i];
+			const cw = c.weight ?? 1;
 			const cDur = Math.max(0.001, c.end - c.start);
 			const phones = c.phones || [];
 			for (const p of phones) {
 				const localStart = Math.max(0, p.start - c.start);
 				const localEnd = Math.min(cDur, p.end - c.start);
 				if (localEnd <= localStart) continue;
-				const x = i + localStart / cDur;
-				const w = Math.max(0.001, (localEnd - localStart) / cDur);
+				// x/w in viewBox (weight) units: char owns `cw` units, phone
+				// subdivides by time within that span.
+				const x = cum + (localStart / cDur) * cw;
+				const w = Math.max(0.001, ((localEnd - localStart) / cDur) * cw);
 
 				const rect = document.createElementNS(NS, "rect");
 				rect.setAttribute("x", x);
@@ -193,6 +204,7 @@ export class HeatmapBand {
 				this.rects.push(rect);
 				this.phoneRefs.push(p);
 			}
+			cum += cw;
 		}
 
 		this.svg.setAttribute("aria-description", this.ariaDescription);

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from voiceya.config import CFG
 from voiceya.services.audio_analyser.audio_tools import normalize_audio_for_analysis
@@ -19,18 +19,33 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def do_analyse(content: BytesIO, publish: PublisherT):
+async def do_analyse(
+    content: BytesIO,
+    publish: PublisherT,
+    *,
+    mode: Literal["free", "script"] = "free",
+    script: str | None = None,
+    language: Literal["zh-CN", "en-US"] = "zh-CN",
+):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     sample = await normalize_audio_for_analysis(content, publish)
 
     # ── Engine A: 时间分段 ─────────────────────────────────
     logger.info("Engine A 分析中…")
-    await publish(ProgressSSE(pct=10, msg="鸭鸭正在聆听声纹…（此步骤较慢）"))
+    await publish(
+        ProgressSSE(
+            pct=10,
+            msg="鸭鸭正在聆听声纹…（此步骤较慢）",
+            msg_key="progress.listening",
+        )
+    )
 
     segmentation_results = await do_segmentation(sample)
 
     # ── Engine B: 声学分析（仅对有声语音段）────────────
-    await publish(ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…"))
+    await publish(
+        ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…", msg_key="progress.organizing")
+    )
 
     sample.seek(0)
     # 开 Engine C 时给"开小灶"阶段留一大段进度预算（72→94）——它是最慢的一环，
@@ -43,13 +58,22 @@ async def do_analyse(content: BytesIO, publish: PublisherT):
     # ── Engine C: 进阶分析（feature-flagged，默认关）────────
     engine_c_summary = None
     if CFG.engine_c_enabled:
-        await publish(ProgressSSE(pct=72, msg="鸭鸭开小灶做进阶分析…"))
+        # script 模式跳过 ASR，直接把稿子喂给 MFA——文案同步换掉。
+        if mode == "script":
+            msg = "鸭鸭照着稿子逐字对齐…"
+            msg_key = "progress.engineCScript"
+        else:
+            msg = "鸭鸭开小灶做进阶分析…"
+            msg_key = "progress.engineCFree"
+        await publish(ProgressSSE(pct=72, msg=msg, msg_key=msg_key))
         sample.seek(0)
         audio_bytes = sample.read()
-        engine_c_summary = await run_engine_c(audio_bytes, analyse_results)
+        engine_c_summary = await run_engine_c(
+            audio_bytes, analyse_results, mode=mode, script=script, language=language
+        )
 
     # ── 全局汇总统计 ───────────────────────────────────────
-    await publish(ProgressSSE(pct=98, msg="鸭鸭快好了…"))
+    await publish(ProgressSSE(pct=98, msg="鸭鸭快好了…", msg_key="progress.almostDone"))
 
     result = do_statics(analyse_results)
     summary = result["summary"]

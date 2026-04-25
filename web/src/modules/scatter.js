@@ -11,6 +11,7 @@
 import { scoreToColor as _scoreToColorUtil, resolveCSSVar } from "../utils.js";
 import { classifyForMode, dominantForMode } from "./classify.js";
 import { getMode } from "./classify-mode.js";
+import { t } from "./i18n.js";
 
 // ─── Layout constants ────────────────────────────────────────
 const PAD = { top: 36, right: 44, bottom: 24, left: 48 };
@@ -188,15 +189,15 @@ function _draw() {
 	ctx.font = `${isSmall ? 9 : 10}px Inter, sans-serif`;
 	ctx.fillStyle = "rgba(59,130,246,0.45)";
 	ctx.textAlign = "left";
-	ctx.fillText("♂ 男", plotLeft + 4, plotBottom - 5);
+	ctx.fillText(t("scatter.male"), plotLeft + 4, plotBottom - 5);
 
 	ctx.fillStyle = "rgba(128,128,128,0.4)";
 	ctx.textAlign = "left";
-	ctx.fillText("中性", plotLeft + 4, centerY - 4);
+	ctx.fillText(t("scatter.neutral"), plotLeft + 4, centerY - 4);
 
 	ctx.fillStyle = "rgba(236,72,153,0.5)";
 	ctx.textAlign = "left";
-	ctx.fillText("♀ 女", plotLeft + 4, plotTop + 12);
+	ctx.fillText(t("scatter.female"), plotLeft + 4, plotTop + 12);
 
 	// ── Y-axis title (rotated) ─────────────────────────────────────
 	if (!isSmall) {
@@ -206,7 +207,7 @@ function _draw() {
 		ctx.textAlign = "center";
 		ctx.fillStyle = textColor;
 		ctx.font = "10px Inter, sans-serif";
-		ctx.fillText("综合性别表达", 0, 0);
+		ctx.fillText(t("scatter.yaxis"), 0, 0);
 		ctx.restore();
 	}
 
