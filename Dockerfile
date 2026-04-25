@@ -59,16 +59,19 @@ RUN uv sync --locked --no-dev --no-editable
 # 下载 inaSpeechSegmenter 模型到 /root/.keras/inaSpeechSegmenter/（remote_utils 运行时会优先查这里）
 RUN /build/.venv/bin/python scripts/init_iss_model.py
 
-# Engine C: 预下载 FunASR Paraformer-zh ONNX 模型到 $MODELSCOPE_CACHE，
+# Engine C: 预下载 FunASR Paraformer-zh 模型到 $MODELSCOPE_CACHE，
 # 避免首请求在线下载。Engine C 关闭时运行时也不会加载该模型。
 #
-# fail-open: Railway 的 build daemon 在 ~40 min 后取消构建，而 ModelScope
-# 在境外 build 节点上可能跑到 ~200 kB/s——944 MB 模型 ~50 min 才能拉完，
-# 撞 daemon timeout。用 timeout(1) 把这一步限到 25 min，超时/网络失败时
-# 清空可能残留的部分缓存并继续构建；engine_c_asr._load_model 自带 lazy
-# fallback，首次 Engine C 请求会在线下载（慢，但不阻塞部署）。
-RUN timeout 1500 /build/.venv/bin/python -c "from funasr import AutoModel; AutoModel(model='paraformer-zh', disable_update=True, disable_log=True)" \
-    || (echo "WARNING: FunASR Paraformer-zh preload skipped (timeout or network failure) — runtime will lazy-download on first Engine C request" \
+# 走自家 GitHub Release(Apache 2.0 license, mirrored from ModelScope)
+# 而非直连 ModelScope——后者在 Railway 境外 build 节点上 ~200 kB/s，944 MB
+# 要 ~50 min 才能拉完，撞 daemon ~40 min timeout 一定 fail。GitHub
+# Releases CDN 在大多数 build region 都 30-100 MB/s，秒级完成。
+#
+# fail-open: 网络/校验失败时清空残留缓存并继续构建；engine_c_asr._load_model
+# 自带 lazy fallback，首次 Engine C 请求会在线下载（慢，但不阻塞部署）。
+ARG PARAFORMER_ZH_URL=https://github.com/guojunximi-cell/Voice-Gender-Analyzer/releases/download/models-v1/paraformer-zh.tar.gz
+RUN curl -fsSL "$PARAFORMER_ZH_URL" | tar -xzf - -C /opt/modelscope \
+    || (echo "WARNING: FunASR Paraformer-zh preload skipped (download failed) — runtime will lazy-download on first Engine C request" \
         && rm -rf /opt/modelscope \
         && mkdir -p /opt/modelscope)
 
