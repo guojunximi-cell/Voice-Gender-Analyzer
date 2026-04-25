@@ -5,7 +5,7 @@
 //
 // 接口变动：get()/has() 改为 async，返回 Promise。set/remove/clear 仍为 fire-and-forget。
 
-import { STORE_AUDIO, openDB } from "./idb.js";
+import { openDB, STORE_AUDIO } from "./idb.js";
 
 const COUNT_CAP = 50;
 const BYTES_CAP = 500 * 1024 * 1024; // 500 MB

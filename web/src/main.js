@@ -174,9 +174,7 @@ function _updateClassifyModeSwitcher() {
 		// pitch / resonance depend on Engine C phone data — lock them out when absent.
 		const needsEC = m === "pitch" || m === "resonance";
 		btn.disabled = needsEC && !ecAvailable;
-		btn.title = btn.disabled
-			? t("stats.lockedTip")
-			: btn.dataset.originalTitle || btn.title;
+		btn.title = btn.disabled ? t("stats.lockedTip") : btn.dataset.originalTitle || btn.title;
 	});
 }
 

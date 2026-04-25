@@ -157,8 +157,8 @@ function _simulateLinearRgb(linRgb, kind) {
 function _linearRgbToLab([r, g, b]) {
 	// Linear RGB → XYZ (sRGB matrix, D65)
 	const X = 0.4124564 * r + 0.3575761 * g + 0.1804375 * b;
-	const Y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b;
-	const Z = 0.0193339 * r + 0.1191920 * g + 0.9503041 * b;
+	const Y = 0.2126729 * r + 0.7151522 * g + 0.072175 * b;
+	const Z = 0.0193339 * r + 0.119192 * g + 0.9503041 * b;
 	// XYZ → Lab
 	const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
 	const fx = f(X / 0.95047);
@@ -181,11 +181,7 @@ function _deltaE76(a, b) {
  * ΔE > 3 (well above the ~2.3 JND for trained observers).
  */
 export function _verifyCVD() {
-	const linearRgbs = STOPS.map(([r, g, b]) => [
-		_srgbToLinear(r),
-		_srgbToLinear(g),
-		_srgbToLinear(b),
-	]);
+	const linearRgbs = STOPS.map(([r, g, b]) => [_srgbToLinear(r), _srgbToLinear(g), _srgbToLinear(b)]);
 	const kinds = ["normal", "deut", "prot"];
 	const labs = {};
 	for (const k of kinds) {

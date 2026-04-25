@@ -5,7 +5,7 @@
 // 所有写接口都是 fire-and-forget（签名保留 void），调用方无需感知异步；
 // 出错时只打日志，不阻塞分析流程。容量上限 CAP 条，按 createdAt 升序 LRU 淘汰。
 
-import { STORE_SESSIONS, openDB, reqOK } from "./idb.js";
+import { openDB, reqOK, STORE_SESSIONS } from "./idb.js";
 
 const CAP = 50;
 
