@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from typing import TYPE_CHECKING, Literal
 
+import librosa
+import numpy as np
+from fastapi import HTTPException
+
 from voiceya.config import CFG
+from voiceya.services.audio_analyser.audio_gate import audio_gate
 from voiceya.services.audio_analyser.audio_tools import normalize_audio_for_analysis
 from voiceya.services.audio_analyser.engine_a import do_segmentation
 from voiceya.services.audio_analyser.engine_c import run_engine_c
@@ -30,6 +37,35 @@ async def do_analyse(
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     sample = await normalize_audio_for_analysis(content, publish)
 
+    # ── 提前 load + Tier-1 闸门 ───────────────────────────
+    # 闸门挡在 Engine A 之前，纯噪声/静音/削波样本直接拒，省 5–30s 的 VAD 时间。
+    # y_full / sr_full 顺手传给 Engine B，避免下游再 load 一次。
+    try:
+        y_full, sr_full = await asyncio.to_thread(librosa.load, sample, sr=None, mono=True)
+    except Exception as e:
+        logger.error("librosa 读取音频失败: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # librosa.load 默认 float64，闸门约定 float32；这里必然是真转换，不省一次拷贝。
+    violations = audio_gate(y_full.astype(np.float32), int(sr_full))
+    if violations:
+        reasons = "; ".join(v["message"] for v in violations)
+        logger.warning("音频闸门拒绝：%s", reasons)
+        raise HTTPException(
+            status_code=400,
+            detail=json.dumps(
+                {
+                    "error_code": "audio_quality_rejected",
+                    "violations": violations,
+                    "message": f"音频质量不合格：{reasons}",
+                },
+                ensure_ascii=False,
+            ),
+        )
+
+    # Engine A 仍以 BytesIO 形式喂给 inaSpeechSegmenter，要把流游标退回起点。
+    sample.seek(0)
+
     # ── Engine A: 时间分段 ─────────────────────────────────
     logger.info("Engine A 分析中…")
     await publish(
@@ -47,12 +83,11 @@ async def do_analyse(
         ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…", msg_key="progress.organizing")
     )
 
-    sample.seek(0)
     # 开 Engine C 时给"开小灶"阶段留一大段进度预算（72→94）——它是最慢的一环，
     # 进度太靠右会让用户以为马上就好，其实还要等 ASR + MFA + Praat 跑完。
     seg_end_pct = 70 if CFG.engine_c_enabled else 95
     analyse_results = await do_analyse_segments(
-        sample, segmentation_results, publish, end_pct=seg_end_pct
+        y_full, int(sr_full), segmentation_results, publish, end_pct=seg_end_pct
     )
 
     # ── Engine C: 进阶分析（feature-flagged，默认关）────────

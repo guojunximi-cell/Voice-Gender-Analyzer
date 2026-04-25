@@ -4,16 +4,13 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-import librosa
-from fastapi import HTTPException
+import numpy as np
 from pydantic import BaseModel
 
 from voiceya.services.audio_analyser.acoustic_analyzer import analyze_segment
 from voiceya.services.sse import ProgressSSE
 
 if TYPE_CHECKING:
-    from io import BytesIO
-
     from voiceya.services.events_stream import PublisherT
 
 logger = logging.getLogger(__name__)
@@ -35,27 +32,17 @@ def _is_analyzable(label: str, duration: float) -> bool:
 
 
 async def do_analyse_segments(
-    sample: BytesIO,
+    y_full: np.ndarray,
+    sr_full: int,
     segmentation_results: list[tuple],
     publish: PublisherT,
     end_pct: int = 95,
 ):
-    # ── 提前将完整音频加载入内存，避免在循环中重复 I/O 读取 ────────────
+    # 音频已由 do_analyse 提前 load + 闸门校验，这里只需切片做声学分析。
     start_pct = 55
-    await publish(
-        ProgressSSE(pct=start_pct, msg="鸭鸭正在载入音频…", msg_key="progress.loadAudio")
-    )
-    try:
-        logger.info("正在让 librosa 读取音频…")
-        y_full, sr_full = await asyncio.to_thread(librosa.load, sample, sr=None, mono=True)
+    await publish(ProgressSSE(pct=start_pct, msg="鸭鸭正在载入音频…", msg_key="progress.loadAudio"))
 
-    except Exception as e:
-        logger.error("librosa 读取音频失败: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-    total_voiced = sum(
-        1 for s in segmentation_results if _is_analyzable(s[0], s[2] - s[1])
-    )
+    total_voiced = sum(1 for s in segmentation_results if _is_analyzable(s[0], s[2] - s[1]))
     span = max(end_pct - start_pct, 0)
 
     i = 0
