@@ -167,8 +167,7 @@ const DICT = {
 		"legend.female": "女声方向",
 		"legend.infoAria": "色系说明",
 		"legend.sci1": "<strong>共鸣色条</strong>的中性点为 0.5（参考语料库均值），女声阈值 = <strong>{res}</strong>。",
-		"legend.sci2":
-			"该阈值基于 AISHELL-3 语料库（134 男 + 134 女）的 10-fold 交叉验证，精度 <strong>0.900</strong>。",
+		"legend.sci2": "该阈值基于 AISHELL-3 语料库（134 男 + 134 女）的 10-fold 交叉验证，精度 <strong>0.900</strong>。",
 		"legend.sci3":
 			"<strong>音高参考</strong>：{neutral} Hz 为男声上限 / 女声下限交界，{fem} Hz 为声音训练常用的女声感知阈值。",
 		"legend.sciNote": "色值仅作方向参考，不是性别判定。",
@@ -207,6 +206,8 @@ const DICT = {
 		"toast.hideFeedback": "已隐藏反馈按钮（URL 加 ?feedback=1 可恢复）",
 
 		"progress.queued": "排队等候中",
+		"progress.queuedNext": "马上轮到您了…",
+		"progress.queuedCount": "排队中，前面还有 {n} 人",
 		"progress.processing": "鸭鸭正在处理音频…",
 		"progress.listening": "鸭鸭正在聆听声纹…（此步骤较慢）",
 		"progress.organizing": "鸭鸭听完了！正在整理笔记…",
@@ -245,7 +246,19 @@ const DICT = {
 		"help.title": "🦆 声音分析鸭 · 使用说明",
 		"help.what.h": "这是什么？",
 		"help.what.p":
-			"上传或录制一段音频（中文普通话或英文），分析声音的性别声学特征。输出整段均值 + 逐字音高/共鸣色彩，可用作声音训练参考。",
+			"上传或录制一段普通话或英文音频，分析声音的性别声学特征。输出整段均值 + 逐字音高/共鸣色彩，作声音训练的参考工具——并非判定。",
+		"help.flow.h": "分析流程",
+		"help.flow.s1.h": "上传 / 录音",
+		"help.flow.s1.note": "拖拽音频、选择文件，或调用麦克风（≤ {mb} MB，< {min} 分钟，中文 zh-CN 或英文 en-US）",
+		"help.flow.s2.h": "VAD 分段",
+		"help.flow.s2.note": "Engine A · inaSpeechSegmenter K-3 神经网络分出语音 / 音乐 / 静音",
+		"help.flow.s3.h": "文本对齐",
+		"help.flow.s3.note":
+			"Engine C · 自由模式跑 ASR（FunASR / faster-whisper），跟稿模式直接用您的稿子；Montreal Forced Aligner 对齐到音素",
+		"help.flow.s4.h": "共振峰 + z-score",
+		"help.flow.s4.note": "Praat 提 F1 / F2 / F3 → z-score 合成共鸣值",
+		"help.flow.s5.h": "三面板渲染",
+		"help.flow.s5.note": "波形 · 中央三明治时间轴 · 右侧整段均值",
 		"help.how.h": "如何使用？",
 		"help.how.1": "拖拽音频 / 点击上传 / 录音（≤ {mb} MB，< {min} 分钟）",
 		"help.how.2": "点击「开始分析」，等待鸭子跑完进度条",
@@ -257,8 +270,7 @@ const DICT = {
 		"help.tour.timelineDD":
 			"音高色带 → 字形 → 共鸣色带的三明治：三行按时间严格同轴，每字一格槽位；字内多个音素按时长细分。点击色块或字形跳转播放；← N/M → 翻页浏览全文。",
 		"help.tour.rightDT": "右侧面板",
-		"help.tour.rightDD":
-			"整段音频的均值：基频、共鸣、F1/F2/F3 与音高范围参考条，底部为 AI 分类器的加权置信度。",
+		"help.tour.rightDD": "整段音频的均值：基频、共鸣、F1/F2/F3 与音高范围参考条，底部为 AI 分类器的加权置信度。",
 		"help.color.h": "色彩与区间",
 		"help.color.dirDT": "色彩方向",
 		"help.color.dirDD":
@@ -269,6 +281,35 @@ const DICT = {
 		"help.color.f2DD": "< 1400 Hz 偏男，1600~1900 Hz 中性，> 2200 Hz 偏女。",
 		"help.color.resDT": "共鸣（0~100%）",
 		"help.color.resDD": "基于 F1/F2/F3 z-score 的合成分，越高越偏女声方向。",
+		"help.qa.h": "常见问题",
+		"help.qa.q1": "音频有什么限制？",
+		"help.qa.a1": "≤ {mb} MB、< {min} 分钟，常见格式（mp3 / wav / m4a / webm 等）。建议 ≥ 30 秒、安静环境单人朗读。",
+		"help.qa.q2": "中英怎么切换？",
+		"help.qa.a2": "上传前在右上角语言切换里选 zh-CN 或 en-US。语言决定示例稿件、ASR 模型、MFA 资源路径。",
+		"help.qa.q3": "「自由模式」和「跟稿模式」有什么区别？",
+		"help.qa.a3":
+			"自由模式跑 ASR 自动出文本；跟稿模式直接用您粘贴的稿子，更快、对齐更稳定。短音频或方言/嘈杂环境推荐跟稿。",
+		"help.qa.q4": "为什么有些字没显示？",
+		"help.qa.a4": "MFA 对齐到那个字时置信度过低就会跳过；可以改用跟稿模式贴入完整稿子改善。",
+		"help.qa.q5": "进度卡住或断开怎么办？",
+		"help.qa.a5": "SSE 走 Redis Stream 流式回放，刷新页面可以重新接收，结果不会丢失。",
+		"help.qa.q6": "数据会保留吗？",
+		"help.qa.a6": "服务端不持久化音频与转写结果；浏览器会话结束即清空。",
+		"help.qa.q7": "结果靠谱吗？",
+		"help.qa.a7": "参考工具，非医学/法律/身份判定。模型有偏差，请结合主观感受与训练目标使用。",
+		"help.qa.q8": "移动端能用吗？",
+		"help.qa.a8": "支持触屏与录音；建议横屏查看时间轴；viewport 已锁，不会被双指缩放。",
+		"help.links.h": "友情链接",
+		"help.links.projGroup": "项目自身",
+		"help.links.creditsGroup": "技术致谢",
+		"help.links.repo": "GitHub 仓库",
+		"help.links.issues": "提交反馈 / Issue",
+		"help.links.ina": "inaSpeechSegmenter（K-3 fork）",
+		"help.links.gvv": "gender-voice-visualization",
+		"help.links.mfa": "Montreal Forced Aligner",
+		"help.links.praat": "Praat",
+		"help.links.funasr": "FunASR",
+		"help.links.whisper": "faster-whisper",
 	},
 
 	"en-US": {
@@ -319,8 +360,7 @@ const DICT = {
 		"record.modeFree": "Free speech",
 		"record.scriptTip": "Read the script below — skips ASR, alignment is faster and steadier.",
 		"record.freeTip": "Speak freely, transcribed automatically (slower, more CPU).",
-		"record.hint":
-			"Read the text above. We feed your script straight to the aligner — no speech-to-text step.",
+		"record.hint": "Read the text above. We feed your script straight to the aligner — no speech-to-text step.",
 
 		"stats.title": "Segment distribution",
 		"stats.modeAria": "Classification basis",
@@ -374,8 +414,7 @@ const DICT = {
 			"* Duration-weighted average for the whole file. Alternating masculine/feminine labels in the segment list below are normal. The classifier is noisy near the boundary, not tracking multiple speakers.",
 		"metrics.headerOverall": "Whole file",
 		"metrics.headerOverallSpeech": "Whole file · speech {dur}",
-		"metrics.disclaimer.prefix":
-			"Built on two open-source projects: the neural classifier is ",
+		"metrics.disclaimer.prefix": "Built on two open-source projects: the neural classifier is ",
 		"metrics.disclaimer.mid": ". The phone-level formant z-score pipeline is a ",
 		"metrics.disclaimer.forkLabel": "fork",
 
@@ -392,18 +431,15 @@ const DICT = {
 		"timeline.pitchTitle": "{char} {phone} · pitch {raw}",
 		"timeline.pitchTitleInterp": "{char} {phone} · pitch {raw} (char-level {interp} Hz)",
 		"timeline.resonanceTitle": "{char} {phone} · resonance {res}",
-		"timeline.ariaPitch":
-			"Pitch heatmap; color per character (unvoiced consonants inherit the vowel color).",
+		"timeline.ariaPitch": "Pitch heatmap; color per character (unvoiced consonants inherit the vowel color).",
 		"timeline.ariaPitchDesc": "Pitch heatmap for the current page",
-		"timeline.ariaResonance":
-			"Resonance heatmap; each cell is one phone's resonance value, 0–1.",
+		"timeline.ariaResonance": "Resonance heatmap; each cell is one phone's resonance value, 0–1.",
 		"timeline.ariaResonanceDesc": "Resonance heatmap for the current page. Palette midline = 0.5.",
 		"timeline.announceReady": "Analysis complete, {n} characters shown",
 		"timeline.returnToCurrent": "Jump to now",
 
 		"fallback.noTimelineTitle": "Couldn't build the phone-level timeline",
-		"fallback.noTimelineLead":
-			"We received the audio but couldn't finish phone-level alignment.",
+		"fallback.noTimelineLead": "We received the audio but couldn't finish phone-level alignment.",
 		"fallback.commonReasons": "Common causes",
 		"fallback.reasonTooShort": "Recording is too short (aim for 5+ seconds)",
 		"fallback.reasonWrongLang":
@@ -418,8 +454,7 @@ const DICT = {
 		"fallback.lowPhone":
 			"Only {n} phones detected — statistics may be unstable. Record at least 10 seconds of continuous speech for more reliable numbers.",
 		"fallback.noSpeechTitle": "No speech detected",
-		"fallback.noSpeechLead":
-			"Nothing in the audio looks analyzable. Is it music or ambient noise?",
+		"fallback.noSpeechLead": "Nothing in the audio looks analyzable. Is it music or ambient noise?",
 		"fallback.noSpeechHint": "Record a clip with clear speech and try again.",
 
 		"legend.azimuthAria": "Resonance color key",
@@ -467,10 +502,11 @@ const DICT = {
 		"toast.batchItemFmt": "{name} failed: {msg}",
 		"toast.confirmClear": "Clear all saved sessions?",
 		"toast.processing": "Processing…",
-		"toast.hideFeedback":
-			"Feedback button hidden (append ?feedback=1 to the URL to restore).",
+		"toast.hideFeedback": "Feedback button hidden (append ?feedback=1 to the URL to restore).",
 
 		"progress.queued": "Queued, waiting for a worker…",
+		"progress.queuedNext": "Almost your turn…",
+		"progress.queuedCount": "Queued — {n} ahead of you",
 		"progress.processing": "Preparing the audio…",
 		"progress.listening": "Listening to the voiceprint… (this step is slow)",
 		"progress.organizing": "Done listening — organizing notes…",
@@ -509,7 +545,19 @@ const DICT = {
 		"help.title": "🦆 Voiceya · How to use",
 		"help.what.h": "What is this?",
 		"help.what.p":
-			"Upload or record a short clip of speech (English or Mandarin Chinese). The tool shows phone-level pitch and resonance color strips plus whole-file acoustic averages — meant as a reference for voice training, not a verdict.",
+			"Upload or record a short clip of speech (English or Mandarin Chinese). The tool returns whole-file acoustic averages and phone-level pitch / resonance colors — a reference for voice training, not a verdict.",
+		"help.flow.h": "Pipeline",
+		"help.flow.s1.h": "Upload / record",
+		"help.flow.s1.note": "Drop a file, pick one, or use the mic (≤ {mb} MB, < {min} min, zh-CN or en-US).",
+		"help.flow.s2.h": "VAD segmentation",
+		"help.flow.s2.note": "Engine A · inaSpeechSegmenter K-3 splits speech / music / silence.",
+		"help.flow.s3.h": "Text alignment",
+		"help.flow.s3.note":
+			"Engine C · free mode runs ASR (FunASR / faster-whisper); script mode uses your pasted text. Montreal Forced Aligner aligns to phones.",
+		"help.flow.s4.h": "Formants + z-score",
+		"help.flow.s4.note": "Praat extracts F1 / F2 / F3 → z-score blends into the resonance value.",
+		"help.flow.s5.h": "Three-panel render",
+		"help.flow.s5.note": "Waveform · center sandwich timeline · right-side whole-file averages.",
 		"help.how.h": "How to use",
 		"help.how.1": "Drag a file, pick one, or record (≤ {mb} MB, < {min} min).",
 		"help.how.2": "Press Analyze and wait for the duck progress bar.",
@@ -531,11 +579,43 @@ const DICT = {
 		"help.color.f0DT": "F0 (pitch)",
 		"help.color.f0DD": "< 155 Hz typical masculine, 155–185 Hz androgynous, > 185 Hz feminine-leaning.",
 		"help.color.f2DT": "Formant F2",
-		"help.color.f2DD":
-			"< 1400 Hz masculine-leaning, 1600–1900 Hz androgynous, > 2200 Hz feminine-leaning.",
+		"help.color.f2DD": "< 1400 Hz masculine-leaning, 1600–1900 Hz androgynous, > 2200 Hz feminine-leaning.",
 		"help.color.resDT": "Resonance (0–100%)",
-		"help.color.resDD":
-			"A composite from F1/F2/F3 z-scores. Higher values lean feminine.",
+		"help.color.resDD": "A composite from F1/F2/F3 z-scores. Higher values lean feminine.",
+		"help.qa.h": "FAQ",
+		"help.qa.q1": "What are the audio limits?",
+		"help.qa.a1":
+			"≤ {mb} MB, < {min} min, common formats (mp3 / wav / m4a / webm…). 30+ seconds in a quiet, single-speaker setting works best.",
+		"help.qa.q2": "How do I switch language?",
+		"help.qa.a2":
+			"Pick zh-CN or en-US in the top-right language toggle before uploading. Language drives the script library, ASR model, and MFA resources.",
+		"help.qa.q3": "Free vs script mode?",
+		"help.qa.a3":
+			"Free mode runs ASR to transcribe automatically; script mode uses the text you paste — faster and more stable for short clips, accents, or noisy audio.",
+		"help.qa.q4": "Why are some characters missing?",
+		"help.qa.a4":
+			"MFA skipped them because alignment confidence was too low. Switching to script mode with a full transcript usually helps.",
+		"help.qa.q5": "Progress stuck or disconnected — what now?",
+		"help.qa.a5": "SSE replays from a Redis Stream, so refreshing reconnects and resumes; the result is not lost.",
+		"help.qa.q6": "Is my data kept?",
+		"help.qa.a6": "The server does not persist audio or transcripts; everything clears when your browser session ends.",
+		"help.qa.q7": "How reliable are the results?",
+		"help.qa.a7":
+			"A reference tool — not a medical, legal, or identity verdict. The models have bias; combine with your own ear and training goals.",
+		"help.qa.q8": "Does it work on mobile?",
+		"help.qa.a8":
+			"Touch and recording are supported; landscape is best for the timeline. The viewport is locked so pinch-zoom won't break the layout.",
+		"help.links.h": "Links",
+		"help.links.projGroup": "This project",
+		"help.links.creditsGroup": "Tech credits",
+		"help.links.repo": "GitHub repository",
+		"help.links.issues": "Report an issue",
+		"help.links.ina": "inaSpeechSegmenter (K-3 fork)",
+		"help.links.gvv": "gender-voice-visualization",
+		"help.links.mfa": "Montreal Forced Aligner",
+		"help.links.praat": "Praat",
+		"help.links.funasr": "FunASR",
+		"help.links.whisper": "faster-whisper",
 	},
 };
 

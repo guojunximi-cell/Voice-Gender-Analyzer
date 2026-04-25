@@ -321,9 +321,7 @@
 							<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
 							<path d="M7 11V7a5 5 0 0 1 10 0v4" />
 						</svg>
-						<span data-i18n="upload.privacy">
-							服务器不留存音频与分析结果；历史记录保存在您本地浏览器，可随时清空
-						</span>
+						<span data-i18n="upload.privacy"> 服务器不留存音频与分析结果；历史记录保存在您本地浏览器，可随时清空 </span>
 					</p>
 				</section>
 
@@ -368,7 +366,13 @@
 							</svg>
 						</button>
 						<span id="current-time" class="time-label">0:00</span>
-						<div id="seek-bar" class="seek-bar" role="slider" data-i18n-aria-label="action.seekAria" aria-label="播放进度">
+						<div
+							id="seek-bar"
+							class="seek-bar"
+							role="slider"
+							data-i18n-aria-label="action.seekAria"
+							aria-label="播放进度"
+						>
 							<div class="seek-track">
 								<div id="seek-progress" class="seek-progress"></div>
 								<div id="seek-thumb" class="seek-thumb"></div>
@@ -560,7 +564,11 @@
 									data-i18n-title="metrics.zoneOverlap"
 									title="中间 145~185 Hz"
 								></div>
-								<div class="pitch-zone pitch-zone-female" data-i18n-title="metrics.zoneFemale" title="女性 175~255 Hz"></div>
+								<div
+									class="pitch-zone pitch-zone-female"
+									data-i18n-title="metrics.zoneFemale"
+									title="女性 175~255 Hz"
+								></div>
 								<div class="pitch-range-span" id="mc-pitch-range"></div>
 								<div class="pitch-indicator" id="mc-pitch-indicator"></div>
 							</div>
@@ -638,106 +646,319 @@
 		<!-- Toast -->
 		<div id="toast" class="toast" role="alert" aria-live="assertive"></div>
 
-		<!-- 帮助说明浮层 -->
-		<div id="help-modal" class="vga-help-modal card">
-			<div class="vga-help-header">
-				<span data-i18n="help.title">🦆 声音分析鸭 · 使用说明</span>
-				<button id="help-close" class="icon-btn" data-i18n-aria-label="feedback.close" aria-label="关闭">✕</button>
+		<!-- 帮助说明浮层（全屏 overlay） -->
+		<div id="help-modal" class="vga-help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+			<div class="vga-help-backdrop" id="help-backdrop"></div>
+			<div class="vga-help-overlay-card card">
+				<div class="vga-help-header">
+					<span id="help-modal-title" data-i18n="help.title">🦆 声音分析鸭 · 使用说明</span>
+					<button id="help-close" class="icon-btn" data-i18n-aria-label="feedback.close" aria-label="关闭">✕</button>
+				</div>
+
+				<section class="vga-help-section">
+					<h4 data-i18n="help.what.h">这是什么？</h4>
+					<p data-i18n="help.what.p">
+						上传或录制一段普通话或英文音频，分析声音的性别声学特征。输出整段均值 +
+						逐字音高/共鸣色彩，作声音训练的参考工具——并非判定。
+					</p>
+				</section>
+
+				<section class="vga-help-section">
+					<h4 data-i18n="help.flow.h">分析流程</h4>
+					<div class="vga-help-flow">
+						<div class="vga-help-flow-step">
+							<div class="vga-help-flow-step-h" data-i18n="help.flow.s1.h">上传 / 录音</div>
+							<div class="vga-help-flow-step-note" data-i18n="help.flow.s1.note" data-i18n-params='{"mb":5,"min":3}'>
+								拖拽音频、选择文件，或调用麦克风（≤ 5 MB，&lt; 3 分钟，中文 zh-CN 或英文 en-US）
+							</div>
+						</div>
+						<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
+						<div class="vga-help-flow-step">
+							<div class="vga-help-flow-step-h" data-i18n="help.flow.s2.h">VAD 分段</div>
+							<div class="vga-help-flow-step-note" data-i18n="help.flow.s2.note">
+								Engine A · inaSpeechSegmenter K-3 神经网络分出语音 / 音乐 / 静音
+							</div>
+						</div>
+						<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
+						<div class="vga-help-flow-step">
+							<div class="vga-help-flow-step-h" data-i18n="help.flow.s3.h">文本对齐</div>
+							<div class="vga-help-flow-step-note" data-i18n="help.flow.s3.note">
+								Engine C · 自由模式跑 ASR（FunASR / faster-whisper），跟稿模式直接用您的稿子；Montreal Forced Aligner
+								对齐到音素
+							</div>
+						</div>
+						<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
+						<div class="vga-help-flow-step">
+							<div class="vga-help-flow-step-h" data-i18n="help.flow.s4.h">共振峰 + z-score</div>
+							<div class="vga-help-flow-step-note" data-i18n="help.flow.s4.note">
+								Praat 提 F1 / F2 / F3 → z-score 合成共鸣值
+							</div>
+						</div>
+						<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
+						<div class="vga-help-flow-step">
+							<div class="vga-help-flow-step-h" data-i18n="help.flow.s5.h">三面板渲染</div>
+							<div class="vga-help-flow-step-note" data-i18n="help.flow.s5.note">
+								波形 · 中央三明治时间轴 · 右侧整段均值
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<section class="vga-help-section">
+					<h4 data-i18n="help.how.h">如何使用？</h4>
+					<ol>
+						<li data-i18n="help.how.1" data-i18n-params='{"mb":5,"min":3}'>
+							拖拽音频 / 点击上传 / 录音（≤ 5 MB，&lt; 3 分钟）
+						</li>
+						<li data-i18n="help.how.2">点击「开始分析」，等待鸭子跑完进度条</li>
+						<li data-i18n="help.how.3">三块面板自动填充，无需额外点击</li>
+					</ol>
+				</section>
+
+				<section class="vga-help-section">
+					<h4 data-i18n="help.tour.h">界面导览</h4>
+					<dl>
+						<dt data-i18n="help.tour.waveDT">上方波形</dt>
+						<dd data-i18n="help.tour.waveDD">时间轴；拖动跳转播放，分段着色代表 AI 识别的语音 / 音乐 / 静音。</dd>
+						<dt data-i18n="help.tour.timelineDT">中央时间轴</dt>
+						<dd data-i18n="help.tour.timelineDD">
+							音高色带 → 汉字 →
+							共鸣色带的三明治：三行按字严格同轴，每字一格槽位；字内多个音素按时长细分。点击色块或汉字跳转播放；← N/M →
+							翻页浏览全文。
+						</dd>
+						<dt data-i18n="help.tour.rightDT">右侧面板</dt>
+						<dd data-i18n="help.tour.rightDD">
+							整段音频的均值：基频、共鸣、F1/F2/F3 与音高范围参考条，底部为 AI 分类器的加权置信度。
+						</dd>
+					</dl>
+				</section>
+
+				<section class="vga-help-section">
+					<h4 data-i18n="help.color.h">色彩与区间</h4>
+					<dl>
+						<dt data-i18n="help.color.dirDT">色彩方向</dt>
+						<dd data-i18n-html="help.color.dirDD">
+							<strong>蓝色</strong> = 男声方向（低音高 / 宽声道共鸣）；<strong>粉色</strong> = 女声方向（高音高 /
+							窄声道共鸣）。
+						</dd>
+						<dt data-i18n="help.color.f0DT">基频 F0</dt>
+						<dd data-i18n="help.color.f0DD">&lt; 155 Hz 典型男声，155~185 Hz 中性区，&gt; 185 Hz 偏女声。</dd>
+						<dt data-i18n="help.color.f2DT">共振峰 F2</dt>
+						<dd data-i18n="help.color.f2DD">&lt; 1400 Hz 偏男，1600~1900 Hz 中性，&gt; 2200 Hz 偏女。</dd>
+						<dt data-i18n="help.color.resDT">共鸣（0~100%）</dt>
+						<dd data-i18n="help.color.resDD">基于 F1/F2/F3 z-score 的合成分，越高越偏女声方向。</dd>
+					</dl>
+				</section>
+
+				<section class="vga-help-section">
+					<h4 data-i18n="help.qa.h">常见问题</h4>
+					<div class="vga-help-qa">
+						<details>
+							<summary data-i18n="help.qa.q1">音频有什么限制？</summary>
+							<p data-i18n="help.qa.a1" data-i18n-params='{"mb":5,"min":3}'>
+								≤ 5 MB、&lt; 3 分钟，常见格式（mp3 / wav / m4a / webm 等）。建议 ≥ 30 秒、安静环境单人朗读。
+							</p>
+						</details>
+						<details>
+							<summary data-i18n="help.qa.q2">中英怎么切换？</summary>
+							<p data-i18n="help.qa.a2">
+								上传前在右上角语言切换里选 zh-CN 或 en-US。语言决定示例稿件、ASR 模型、MFA 资源路径。
+							</p>
+						</details>
+						<details>
+							<summary data-i18n="help.qa.q3">「自由模式」和「跟稿模式」有什么区别？</summary>
+							<p data-i18n="help.qa.a3">
+								自由模式跑 ASR 自动出文本；跟稿模式直接用您粘贴的稿子，更快、对齐更稳定。短音频或方言/嘈杂环境推荐跟稿。
+							</p>
+						</details>
+						<details>
+							<summary data-i18n="help.qa.q4">为什么有些字没显示？</summary>
+							<p data-i18n="help.qa.a4">MFA 对齐到那个字时置信度过低就会跳过；可以改用跟稿模式贴入完整稿子改善。</p>
+						</details>
+						<details>
+							<summary data-i18n="help.qa.q5">进度卡住或断开怎么办？</summary>
+							<p data-i18n="help.qa.a5">SSE 走 Redis Stream 流式回放，刷新页面可以重新接收，结果不会丢失。</p>
+						</details>
+						<details>
+							<summary data-i18n="help.qa.q6">数据会保留吗？</summary>
+							<p data-i18n="help.qa.a6">服务端不持久化音频与转写结果；浏览器会话结束即清空。</p>
+						</details>
+						<details>
+							<summary data-i18n="help.qa.q7">结果靠谱吗？</summary>
+							<p data-i18n="help.qa.a7">参考工具，非医学/法律/身份判定。模型有偏差，请结合主观感受与训练目标使用。</p>
+						</details>
+						<details>
+							<summary data-i18n="help.qa.q8">移动端能用吗？</summary>
+							<p data-i18n="help.qa.a8">支持触屏与录音；建议横屏查看时间轴；viewport 已锁，不会被双指缩放。</p>
+						</details>
+					</div>
+				</section>
+
+				<section class="vga-help-section">
+					<h4 data-i18n="help.links.h">友情链接</h4>
+					<div class="vga-help-links-group">
+						<h5 data-i18n="help.links.projGroup">项目自身</h5>
+						<ul>
+							<li>
+								<a
+									href="https://github.com/guojunximi-cell/Voice-Gender-Analyzer"
+									target="_blank"
+									rel="noopener noreferrer"
+									data-i18n="help.links.repo"
+								>
+									GitHub 仓库
+								</a>
+							</li>
+							<li>
+								<a
+									href="https://github.com/guojunximi-cell/Voice-Gender-Analyzer/issues"
+									target="_blank"
+									rel="noopener noreferrer"
+									data-i18n="help.links.issues"
+								>
+									提交反馈 / Issue
+								</a>
+							</li>
+						</ul>
+					</div>
+					<div class="vga-help-links-group">
+						<h5 data-i18n="help.links.creditsGroup">技术致谢</h5>
+						<ul>
+							<li>
+								<a
+									href="https://github.com/k3-cat/inaSpeechSegmenter"
+									target="_blank"
+									rel="noopener noreferrer"
+									data-i18n="help.links.ina"
+								>
+									inaSpeechSegmenter（K-3 fork）
+								</a>
+							</li>
+							<li>
+								<a
+									href="https://github.com/guojunximi-cell/gender-voice-visualization"
+									target="_blank"
+									rel="noopener noreferrer"
+									data-i18n="help.links.gvv"
+								>
+									gender-voice-visualization
+								</a>
+							</li>
+							<li>
+								<a
+									href="https://montreal-forced-aligner.readthedocs.io/"
+									target="_blank"
+									rel="noopener noreferrer"
+									data-i18n="help.links.mfa"
+								>
+									Montreal Forced Aligner
+								</a>
+							</li>
+							<li>
+								<a
+									href="https://www.fon.hum.uva.nl/praat/"
+									target="_blank"
+									rel="noopener noreferrer"
+									data-i18n="help.links.praat"
+								>
+									Praat
+								</a>
+							</li>
+							<li>
+								<a
+									href="https://github.com/modelscope/FunASR"
+									target="_blank"
+									rel="noopener noreferrer"
+									data-i18n="help.links.funasr"
+								>
+									FunASR
+								</a>
+							</li>
+							<li>
+								<a
+									href="https://github.com/SYSTRAN/faster-whisper"
+									target="_blank"
+									rel="noopener noreferrer"
+									data-i18n="help.links.whisper"
+								>
+									faster-whisper
+								</a>
+							</li>
+						</ul>
+					</div>
+				</section>
 			</div>
-			<section class="vga-help-section">
-				<h4 data-i18n="help.what.h">这是什么？</h4>
-				<p data-i18n="help.what.p">
-					上传或录制一段中文音频，分析声音的性别声学特征。输出整段均值 + 逐字音高/共鸣色彩，可用作声音训练参考。
-				</p>
-			</section>
-			<section class="vga-help-section">
-				<h4 data-i18n="help.how.h">如何使用？</h4>
-				<ol>
-					<li data-i18n="help.how.1" data-i18n-params='{"mb":5,"min":3}'>
-						拖拽音频 / 点击上传 / 录音（≤ 5 MB，&lt; 3 分钟）
-					</li>
-					<li data-i18n="help.how.2">点击「开始分析」，等待鸭子跑完进度条</li>
-					<li data-i18n="help.how.3">三块面板自动填充，无需额外点击</li>
-				</ol>
-			</section>
-			<section class="vga-help-section">
-				<h4 data-i18n="help.tour.h">界面导览</h4>
-				<dl>
-					<dt data-i18n="help.tour.waveDT">上方波形</dt>
-					<dd data-i18n="help.tour.waveDD">
-						时间轴；拖动跳转播放，分段着色代表 AI 识别的语音 / 音乐 / 静音。
-					</dd>
-					<dt data-i18n="help.tour.timelineDT">中央时间轴</dt>
-					<dd data-i18n="help.tour.timelineDD">
-						音高色带 → 汉字 →
-						共鸣色带的三明治：三行按字严格同轴，每字一格槽位；字内多个音素按时长细分。点击色块或汉字跳转播放；← N/M →
-						翻页浏览全文。
-					</dd>
-					<dt data-i18n="help.tour.rightDT">右侧面板</dt>
-					<dd data-i18n="help.tour.rightDD">
-						整段音频的均值：基频、共鸣、F1/F2/F3 与音高范围参考条，底部为 AI 分类器的加权置信度。
-					</dd>
-				</dl>
-			</section>
-			<section class="vga-help-section">
-				<h4 data-i18n="help.color.h">色彩与区间</h4>
-				<dl>
-					<dt data-i18n="help.color.dirDT">色彩方向</dt>
-					<dd data-i18n-html="help.color.dirDD">
-						<strong>蓝色</strong> = 男声方向（低音高 / 宽声道共鸣）；<strong>粉色</strong> = 女声方向（高音高 /
-						窄声道共鸣）。
-					</dd>
-					<dt data-i18n="help.color.f0DT">基频 F0</dt>
-					<dd data-i18n="help.color.f0DD">&lt; 155 Hz 典型男声，155~185 Hz 中性区，&gt; 185 Hz 偏女声。</dd>
-					<dt data-i18n="help.color.f2DT">共振峰 F2</dt>
-					<dd data-i18n="help.color.f2DD">&lt; 1400 Hz 偏男，1600~1900 Hz 中性，&gt; 2200 Hz 偏女。</dd>
-					<dt data-i18n="help.color.resDT">共鸣（0~100%）</dt>
-					<dd data-i18n="help.color.resDD">基于 F1/F2/F3 z-score 的合成分，越高越偏女声方向。</dd>
-				</dl>
-			</section>
 		</div>
 		<style>
+			/* ── Overlay container ───────────────────────────── */
 			.vga-help-modal {
 				display: none;
 				position: fixed;
-				top: 56px;
-				right: 16px;
-				width: 360px;
-				max-height: calc(100vh - 72px);
-				overflow-y: auto;
-				padding: 18px 20px 20px;
+				inset: 0;
 				z-index: 9998;
 			}
 			.vga-help-modal.show {
-				display: block;
-				animation: vgaPopIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+				display: flex;
+				align-items: flex-start;
+				justify-content: center;
 			}
+			.vga-help-backdrop {
+				position: absolute;
+				inset: 0;
+				background: rgba(0, 0, 0, 0.45);
+				-webkit-backdrop-filter: blur(2px);
+				backdrop-filter: blur(2px);
+			}
+			.vga-help-overlay-card {
+				position: relative;
+				width: min(720px, calc(100vw - 32px));
+				max-height: 90vh;
+				margin: 5vh 16px;
+				overflow-y: auto;
+				padding: 0 24px 24px;
+				animation: vgaPopIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+				-webkit-overflow-scrolling: touch;
+			}
+
+			/* ── Sticky header so the close button stays in reach ── */
 			.vga-help-header {
+				position: sticky;
+				top: 0;
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
-				margin-bottom: 14px;
-				font-size: 0.875rem;
+				font-size: 0.95rem;
 				font-weight: 600;
 				color: var(--text-primary);
+				background: var(--surface);
+				padding: 16px 0 10px;
+				margin: 0 0 4px;
+				border-bottom: 1px solid var(--border);
+				z-index: 1;
 			}
+
+			/* ── Section common ─────────────────────────────── */
 			.vga-help-section {
 				margin-bottom: 14px;
 				border-top: 1px solid var(--border);
-				padding-top: 12px;
+				padding-top: 14px;
+			}
+			.vga-help-section:first-of-type {
+				border-top: none;
+				padding-top: 8px;
 			}
 			.vga-help-section h4 {
-				font-size: 0.8rem;
+				font-size: 0.78rem;
 				font-weight: 600;
 				color: var(--text-secondary);
-				margin: 0 0 8px;
+				margin: 0 0 10px;
 				text-transform: uppercase;
 				letter-spacing: 0.04em;
 			}
 			.vga-help-section p,
 			.vga-help-section ol,
 			.vga-help-section dd {
-				font-size: 0.82rem;
+				font-size: 0.84rem;
 				color: var(--text-secondary);
 				line-height: 1.6;
 				margin: 0 0 6px 0;
@@ -749,10 +970,139 @@
 				margin: 0;
 			}
 			.vga-help-section dt {
-				font-size: 0.82rem;
+				font-size: 0.84rem;
 				font-weight: 600;
 				color: var(--text-primary);
 				margin-top: 8px;
+			}
+
+			/* ── Flow chart ─────────────────────────────────── */
+			.vga-help-flow {
+				display: flex;
+				flex-direction: column;
+				align-items: stretch;
+				gap: 0;
+			}
+			.vga-help-flow-step {
+				border: 1px solid var(--border);
+				background: var(--surface-hover);
+				border-radius: 12px;
+				padding: 10px 14px;
+				box-shadow: var(--shadow-sm);
+			}
+			.vga-help-flow-step-h {
+				font-size: 0.86rem;
+				font-weight: 600;
+				color: var(--text-primary);
+				margin-bottom: 2px;
+			}
+			.vga-help-flow-step-note {
+				font-size: 0.78rem;
+				color: var(--text-muted);
+				line-height: 1.5;
+			}
+			.vga-help-flow-arrow {
+				color: var(--border-strong);
+				text-align: center;
+				font-size: 0.95rem;
+				line-height: 1;
+				padding: 4px 0;
+				user-select: none;
+			}
+
+			/* ── Q&A accordion ──────────────────────────────── */
+			.vga-help-qa details {
+				border-top: 1px solid var(--border);
+				padding: 6px 0;
+			}
+			.vga-help-qa details:first-child {
+				border-top: none;
+			}
+			.vga-help-qa summary {
+				cursor: pointer;
+				list-style: none;
+				font-size: 0.84rem;
+				font-weight: 600;
+				color: var(--text-primary);
+				padding: 6px 0 6px 18px;
+				position: relative;
+				transition: color var(--transition);
+			}
+			.vga-help-qa summary::-webkit-details-marker {
+				display: none;
+			}
+			.vga-help-qa summary::before {
+				content: "▸";
+				position: absolute;
+				left: 0;
+				top: 6px;
+				color: var(--text-muted);
+				transition: transform var(--transition);
+			}
+			.vga-help-qa details[open] summary::before {
+				transform: rotate(90deg);
+			}
+			.vga-help-qa summary:hover {
+				color: var(--accent);
+			}
+			.vga-help-qa details > p {
+				margin: 4px 0 6px 18px;
+				font-size: 0.82rem;
+				color: var(--text-secondary);
+				line-height: 1.6;
+			}
+
+			/* ── Friendly links ─────────────────────────────── */
+			.vga-help-links-group {
+				margin-bottom: 14px;
+			}
+			.vga-help-links-group:last-child {
+				margin-bottom: 0;
+			}
+			.vga-help-links-group h5 {
+				font-size: 0.74rem;
+				font-weight: 600;
+				color: var(--text-muted);
+				margin: 0 0 6px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+			.vga-help-links-group ul {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+			}
+			.vga-help-links-group a {
+				font-size: 0.84rem;
+				color: var(--text-primary);
+				text-decoration: none;
+				border-bottom: 1px dashed var(--border);
+				padding-bottom: 1px;
+				transition:
+					color var(--transition),
+					border-color var(--transition);
+			}
+			.vga-help-links-group a:hover {
+				color: var(--female);
+				border-bottom-color: var(--female);
+			}
+
+			/* ── Mobile breakpoint ─────────────────────────── */
+			@media (max-width: 520px) {
+				.vga-help-overlay-card {
+					width: 100vw;
+					max-height: 100vh;
+					margin: 0;
+					border-radius: 0;
+					padding: 0 18px 20px;
+				}
+				.vga-help-header {
+					font-size: 0.9rem;
+					padding: 14px 0 10px;
+				}
 			}
 		</style>
 		<script>
@@ -760,17 +1110,25 @@
 				const helpToggle = document.getElementById("help-toggle");
 				const helpModal = document.getElementById("help-modal");
 				const helpClose = document.getElementById("help-close");
-				helpToggle.addEventListener("click", () => helpModal.classList.toggle("show"));
-				helpClose.addEventListener("click", () => helpModal.classList.remove("show"));
-				document.addEventListener("click", (e) => {
-					if (
-						helpModal.classList.contains("show") &&
-						!helpModal.contains(e.target) &&
-						e.target !== helpToggle &&
-						!helpToggle.contains(e.target)
-					) {
-						helpModal.classList.remove("show");
-					}
+				const helpBackdrop = document.getElementById("help-backdrop");
+
+				function openHelp() {
+					helpModal.classList.add("show");
+					document.body.style.overflow = "hidden";
+				}
+				function closeHelp() {
+					helpModal.classList.remove("show");
+					document.body.style.overflow = "";
+				}
+
+				helpToggle.addEventListener("click", () => {
+					if (helpModal.classList.contains("show")) closeHelp();
+					else openHelp();
+				});
+				helpClose.addEventListener("click", closeHelp);
+				helpBackdrop.addEventListener("click", closeHelp);
+				document.addEventListener("keydown", (e) => {
+					if (e.key === "Escape" && helpModal.classList.contains("show")) closeHelp();
 				});
 			})();
 		</script>
