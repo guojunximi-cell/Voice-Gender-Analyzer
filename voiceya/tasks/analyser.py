@@ -10,6 +10,7 @@ from voiceya.services.audio_analyser import do_analyse
 from voiceya.services.events_stream import (
     get_event_publister,
 )
+from voiceya.services.queue_position import dequeue
 from voiceya.taskiq import TaskStage, broker
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ async def analyse_voice(
     language: Literal["zh-CN", "en-US"] = "zh-CN",
 ):
     await progress_tacker.set_progress(TaskStage.STARTED)
+    await dequeue(context.message.task_id)
     logger.info(
         "worker 收到 %d 字节，mode=%s，language=%s，头 16: %r",
         len(content),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import time
 from contextlib import AsyncExitStack
 from typing import TYPE_CHECKING
 
@@ -28,12 +29,15 @@ class TaskStage(enum.StrEnum):
 
 class ProgressMiddleware(TaskiqMiddleware):
     async def pre_send(self, message: TaskiqMessage) -> TaskiqMessage:
+        from voiceya.services.queue_position import enqueue
+
         progress = TaskProgress(
             state=TaskStage.PENDING,
             meta=None,
         )
 
         await self.broker.result_backend.set_progress(message.task_id, progress)
+        await enqueue(message.task_id, time.time())
 
         return message
 

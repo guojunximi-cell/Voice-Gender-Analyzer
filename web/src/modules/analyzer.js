@@ -128,7 +128,14 @@ async function _readSSEStream(response, onProgress) {
 						const label = payload.msg_key ? t(payload.msg_key, params) : payload.msg;
 						onProgress(payload.pct, label);
 					} else if (payload.type === "queue") {
-						const label = payload.msg_key ? t(payload.msg_key) : payload.msg;
+						let label;
+						if (payload.num_to_wait === 0) {
+							label = t("progress.queuedNext");
+						} else if (payload.num_to_wait > 0) {
+							label = t("progress.queuedCount", { n: payload.num_to_wait });
+						} else {
+							label = payload.msg_key ? t(payload.msg_key) : payload.msg;
+						}
 						onProgress(0, label);
 					} else if (payload.type === "result") {
 						onProgress(100, t("duck.done"));
