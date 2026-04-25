@@ -78,7 +78,12 @@
       "Bash(ruff check *)",
       "Bash(ruff format *)",
       "Bash(git commit *)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(gh pr *)",
+      "Bash(uvx ruff *)",
+      "Bash(grep -v \"^  \\\\|^help:\\\\|^\\\\s*$\\\\|^-->\")"
     ]
   }
 }
