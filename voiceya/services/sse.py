@@ -71,6 +71,11 @@ class ResultSSE(SSE):
 
 
 TICK_STEP_MS = 15_000
+# STARTED 阶段：worker 发完最后一个 progress 事件（如 pct=98）就 return，之后不再
+# 产生新事件。XREAD 的 block 间隔决定了 SSE 转发感知 progress=SUCCESS 的最大延迟。
+# 设 500 ms 让"鸭鸭快好了"到 result 之间的尾延迟从 ~15s 压到 <0.5s；每秒 2 次
+# Redis XREAD + 2 次 SSE keep-alive，对单连接成本可忽略。
+EVENT_BLOCK_MS = 500
 
 
 async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgress[Any]):
@@ -83,7 +88,7 @@ async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgr
         assert progress is not None
 
     # so it can also provide result in subsequent calls
-    events_stream = subscribe_to_events(task_id, block_ms=TICK_STEP_MS)
+    events_stream = subscribe_to_events(task_id, block_ms=EVENT_BLOCK_MS)
     while progress.state == TaskStage.STARTED:
         event = await anext(events_stream)
         if event:
@@ -94,7 +99,6 @@ async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgr
         progress = await broker.result_backend.get_progress(task_id)
         assert progress is not None
 
-    await asyncio.sleep(1)
     for _ in range(5):
         try:
             result = await broker.result_backend.get_result(task_id)
