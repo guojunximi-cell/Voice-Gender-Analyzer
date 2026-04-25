@@ -70,7 +70,9 @@ RUN /build/.venv/bin/python scripts/init_iss_model.py
 # fail-open: 网络/校验失败时清空残留缓存并继续构建；engine_c_asr._load_model
 # 自带 lazy fallback，首次 Engine C 请求会在线下载（慢，但不阻塞部署）。
 ARG PARAFORMER_ZH_URL=https://github.com/guojunximi-cell/Voice-Gender-Analyzer/releases/download/models-v1/paraformer-zh.tar.gz
-RUN curl -fsSL "$PARAFORMER_ZH_URL" | tar -xzf - -C /opt/modelscope \
+# tarball top-level dir 是 ``modelscope/``，所以解到 /opt（不是 /opt/modelscope），
+# 最终得到 /opt/modelscope/models/iic/... ——FunASR 的 MODELSCOPE_CACHE 期待的布局。
+RUN curl -fsSL "$PARAFORMER_ZH_URL" | tar -xzf - -C /opt \
     || (echo "WARNING: FunASR Paraformer-zh preload skipped (download failed) — runtime will lazy-download on first Engine C request" \
         && rm -rf /opt/modelscope \
         && mkdir -p /opt/modelscope)
