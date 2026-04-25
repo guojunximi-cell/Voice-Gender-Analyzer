@@ -31,6 +31,7 @@ RUN apt-get update \
         ffmpeg \
         ca-certificates \
         build-essential \
+        curl \
         git \
     && rm -rf /var/lib/apt/lists/*
 
