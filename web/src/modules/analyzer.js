@@ -129,12 +129,12 @@ async function _readSSEStream(response, onProgress) {
 						onProgress(payload.pct, label);
 					} else if (payload.type === "queue") {
 						let label;
-						if (payload.num_to_wait === 0) {
-							label = t("progress.queuedNext");
-						} else if (payload.num_to_wait > 0) {
+						if (payload.num_to_wait > 0) {
 							label = t("progress.queuedCount", { n: payload.num_to_wait });
+						} else if (payload.num_to_wait === 0) {
+							label = t("progress.queuedNext");
 						} else {
-							label = payload.msg_key ? t(payload.msg_key) : payload.msg;
+							label = t("progress.processing");
 						}
 						onProgress(0, label);
 					} else if (payload.type === "result") {

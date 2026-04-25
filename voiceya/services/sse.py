@@ -82,7 +82,10 @@ EVENT_BLOCK_MS = 500
 async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgress[Any]):
     while progress.state == TaskStage.PENDING:
         pos = await get_position(task_id)
-        yield f"data: {json.dumps(QueueSSE(num_to_wait=pos, msg='排队等候中', msg_key='progress.queued').to_dict())}\n\n"
+        if pos > 0:
+            yield f"data: {json.dumps(QueueSSE(num_to_wait=pos, msg='排队等候中', msg_key='progress.queued').to_dict())}\n\n"
+        else:
+            yield f"data: {json.dumps(ProgressSSE(pct=0, msg='鸭鸭正在准备…', msg_key='progress.processing').to_dict())}\n\n"
 
         await asyncio.sleep(TICK_STEP_MS / 5 / 1000)
 
