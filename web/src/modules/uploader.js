@@ -35,40 +35,40 @@ export function validateFile(file, maxBytes = DEFAULT_MAX_BYTES) {
 }
 
 export function setupUploader({ onFile, onFiles, onError, multiple = false, maxBytes = DEFAULT_MAX_BYTES }) {
-	const section = document.getElementById("upload-section");
+	// Click + drag are scoped to #upload-dropzone so the surrounding tab
+	// switcher / record panel don't accidentally open the file picker.
+	const dropzone = document.getElementById("upload-dropzone");
 	const fileInput = document.getElementById("file-input");
 	const browseBtn = document.getElementById("browse-btn");
 
 	if (fileInput) fileInput.multiple = multiple;
 
-	// Click to browse
 	browseBtn?.addEventListener("click", (e) => {
 		e.stopPropagation();
 		fileInput.click();
 	});
 
-	section?.addEventListener("click", () => fileInput.click());
+	dropzone?.addEventListener("click", () => fileInput.click());
 
 	fileInput?.addEventListener("change", () => {
 		_handleFiles([...fileInput.files], multiple, onFile, onFiles, onError, maxBytes);
 		fileInput.value = "";
 	});
 
-	// Drag & drop
-	section?.addEventListener("dragover", (e) => {
+	dropzone?.addEventListener("dragover", (e) => {
 		e.preventDefault();
-		section.classList.add("drag-over");
+		dropzone.classList.add("drag-over");
 	});
 
-	section?.addEventListener("dragleave", (e) => {
-		if (!section.contains(e.relatedTarget)) {
-			section.classList.remove("drag-over");
+	dropzone?.addEventListener("dragleave", (e) => {
+		if (!dropzone.contains(e.relatedTarget)) {
+			dropzone.classList.remove("drag-over");
 		}
 	});
 
-	section?.addEventListener("drop", (e) => {
+	dropzone?.addEventListener("drop", (e) => {
 		e.preventDefault();
-		section.classList.remove("drag-over");
+		dropzone.classList.remove("drag-over");
 		_handleFiles([...e.dataTransfer.files], multiple, onFile, onFiles, onError, maxBytes);
 	});
 }

@@ -83,7 +83,10 @@
       "Bash(python3 *)",
       "Bash(gh pr *)",
       "Bash(uvx ruff *)",
-      "Bash(grep -v \"^  \\\\|^help:\\\\|^\\\\s*$\\\\|^-->\")"
+      "Bash(grep -v \"^  \\\\|^help:\\\\|^\\\\s*$\\\\|^-->\")",
+      "Bash(git -C /home/yaya/Voice-Gender-Analyzer diff web/src/main.js)",
+      "Bash(git -C /home/yaya/Voice-Gender-Analyzer diff web/src/modules/recorder.js web/src/modules/uploader.js)",
+      "Bash(pnpm --filter ./web run lint)"
     ]
   }
 }

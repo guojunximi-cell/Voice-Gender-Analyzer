@@ -203,30 +203,87 @@ body {
 }
 
 /* ============================================================
-   UPLOAD ZONE
+   UPLOAD SECTION
    ============================================================ */
-.upload-zone {
-	padding: 52px 32px;
+/* Outer card: holds the input-method tabs, the active panel, and the
+   privacy badge. Padding lives here so the tabs/panels can stretch full-width. */
+.upload-section {
+	padding: 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+/* Segmented control at the top of the upload card — picks Upload vs Record. */
+.input-method-tabs {
+	display: flex;
+	gap: 4px;
+	padding: 4px;
+	border-radius: 10px;
+	background: var(--bg-secondary);
+	border: 1px solid var(--border);
+}
+.input-method-tab {
+	flex: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	padding: 8px 12px;
+	background: transparent;
+	border: 0;
+	border-radius: 7px;
+	cursor: pointer;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 0.85rem;
+	font-weight: 500;
+	transition:
+		background var(--transition),
+		color var(--transition),
+		box-shadow var(--transition);
+}
+.input-method-tab:hover:not(.is-active) {
+	color: var(--text-primary);
+}
+.input-method-tab.is-active {
+	background: var(--surface);
+	color: var(--text-primary);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.input-method-tab svg {
+	flex-shrink: 0;
+}
+.input-method-tab[hidden] {
+	display: none;
+}
+.input-method-panel[hidden] {
+	display: none;
+}
+
+/* Drop / click target inside the upload tab. */
+.upload-dropzone {
+	padding: 40px 24px;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: 10px;
 	cursor: pointer;
 	border: 1.5px dashed var(--border-strong);
+	border-radius: 10px;
+	background: transparent;
 	transition:
 		border-color var(--transition),
 		background var(--transition),
 		box-shadow var(--transition);
 }
-
-.upload-zone:hover,
-.upload-zone.drag-over {
+.upload-dropzone:hover,
+.upload-dropzone.drag-over {
 	border-color: var(--accent);
 	background: var(--accent-subtle);
 	box-shadow: 0 0 0 4px var(--accent-subtle);
 }
-
-.upload-zone.drag-over {
+.upload-dropzone.drag-over {
 	box-shadow: 0 0 0 6px var(--accent-subtle);
 }
 
@@ -249,6 +306,23 @@ body {
 	font-size: 0.78rem;
 	color: var(--text-muted);
 	margin-top: 2px;
+}
+
+/* Record tab content (mode toggle + script preview + mic button). */
+.record-panel-content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+	padding: 6px 0 4px;
+}
+
+/* Recorder hint sits under the big mic button to telegraph the time cap. */
+.recorder-hint {
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	margin: 0;
+	text-align: center;
 }
 
 /* ============================================================
@@ -950,28 +1024,10 @@ body {
 }
 
 /* ============================================================
-   UPLOAD ZONE (center panel, compact version)
+   UPLOAD SECTION (center-panel compact override)
    ============================================================ */
-.upload-zone {
-	padding: 48px 24px;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 10px;
-	cursor: pointer;
-	border: 1.5px dashed var(--border-strong);
-	transition:
-		border-color var(--transition),
-		background var(--transition),
-		box-shadow var(--transition);
+.upload-section {
 	flex-shrink: 0;
-}
-
-.upload-zone:hover,
-.upload-zone.drag-over {
-	border-color: var(--accent);
-	background: var(--accent-subtle);
-	box-shadow: 0 0 0 4px var(--accent-subtle);
 }
 
 /* ============================================================
@@ -1533,8 +1589,11 @@ body {
 		border-left: none;
 		border-top: 1px solid var(--border);
 	}
-	.upload-zone {
-		padding: 36px 20px;
+	.upload-section {
+		padding: 14px;
+	}
+	.upload-dropzone {
+		padding: 30px 18px;
 	}
 	/* .stats-grid / .stat-card use the same single-line row layout at all
 	   widths now (see base rules above) — no per-breakpoint overrides needed. */
@@ -1734,18 +1793,15 @@ body {
 .record-mode-panel {
 	width: 100%;
 	max-width: 460px;
-	margin: 12px auto 0;
+	align-self: center;
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
-	/* 父级 .upload-zone 带 cursor: pointer；面板内 JS 已 stopPropagation，
-	   视觉上也要取消手型，避免用户以为面板也是上传热区。 */
-	cursor: auto;
 }
 .record-mode-header {
 	display: flex;
 	align-items: center;
-	justify-content: center;
+	justify-content: space-between;
 	gap: 10px;
 	flex-wrap: wrap;
 }
@@ -1761,17 +1817,51 @@ body {
 }
 .record-script-header {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+/* Picker label: caption pinned left, dropdown pushed right. */
+.record-script-picker-label {
+	display: flex;
+	width: 100%;
+	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
-	margin-bottom: 6px;
+	flex-wrap: wrap;
 }
-.record-script-title {
-	font-size: 0.72rem;
+.record-script-picker-cap {
+	font-size: 0.82rem;
 	font-weight: 600;
-	color: var(--text-muted);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
+	color: var(--text-primary);
+}
+.record-script-select {
+	appearance: none;
+	-webkit-appearance: none;
+	background-color: var(--surface);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	padding: 5px 26px 5px 10px;
+	font: inherit;
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: var(--text-primary);
+	cursor: pointer;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%23999' stroke-width='1.4' stroke-linecap='round'><path d='M1 1l4 4 4-4'/></svg>");
+	background-repeat: no-repeat;
+	background-position: right 8px center;
+	transition:
+		border-color var(--transition),
+		background-color var(--transition);
+	max-width: 100%;
+}
+.record-script-select:hover {
+	border-color: var(--accent-border);
+}
+.record-script-select:focus-visible {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 .record-script-text {
 	font-size: 1rem;
@@ -1787,23 +1877,6 @@ body {
 }
 
 /* ── Recorder UI ──────────────────────────────────────── */
-.upload-divider {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	width: 100%;
-	max-width: 200px;
-	color: var(--text-muted);
-	font-size: 0.72rem;
-}
-.upload-divider::before,
-.upload-divider::after {
-	content: "";
-	flex: 1;
-	height: 1px;
-	background: var(--border);
-}
-
 .recorder-mic-btn {
 	display: inline-flex;
 	align-items: center;
@@ -1827,10 +1900,44 @@ body {
 	border-color: var(--accent-border);
 }
 
+/* Large primary-style mic button used as the record-tab CTA. */
+.recorder-mic-btn-large {
+	gap: 9px;
+	padding: 12px 26px;
+	font-size: 0.95rem;
+	font-weight: 500;
+	border-radius: var(--radius-md);
+	border: 1.5px solid var(--accent-border);
+	background: var(--accent-subtle);
+	color: var(--accent);
+}
+.recorder-mic-btn-large:hover {
+	background: var(--accent);
+	color: #fff;
+	border-color: var(--accent);
+}
+
+.recorder-idle-ui {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+}
+
 .recorder-active-ui {
 	display: flex;
 	align-items: center;
 	gap: 10px;
+	width: 100%;
+	max-width: 360px;
+}
+
+.recorder-waveform {
+	flex: 1;
+	height: 44px;
+	min-width: 80px;
+	display: block;
+	border-radius: 6px;
 }
 
 .recorder-dot {
@@ -1901,8 +2008,11 @@ body {
 	.panel-center {
 		padding: 12px 12px 40px;
 	}
-	.upload-zone {
-		padding: 28px 16px;
+	.upload-section {
+		padding: 12px;
+	}
+	.upload-dropzone {
+		padding: 22px 14px;
 	}
 	.upload-title {
 		font-size: 0.9rem;

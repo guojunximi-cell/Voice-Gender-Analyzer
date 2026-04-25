@@ -61,9 +61,12 @@ function setAudioUnavailableHint(show) {
 // ─── Record mode (free-speech vs. script mode for Engine C) ──────
 // When Engine C is on, script mode skips FunASR and feeds the preset text
 // straight to MFA — same phone alignment, lower CPU/RAM. Disabled and
-// forced to "free" when Engine C is off.
+// forced to "free" when Engine C is off. Upload tab always uses free mode
+// since pre-recorded audio rarely matches a preset script verbatim.
 let _recordMode = "script"; // 默认跟读；Engine C 关时强制 "free"
 let _scriptIdx = 0;
+let _engineCEnabled = false;
+let _activeInputTab = "record";
 
 function _getScriptList() {
 	return scriptsForLang(getLang());
@@ -75,6 +78,7 @@ function _getCurrentScript() {
 }
 
 function _getRecordOptions() {
+	if (_activeInputTab === "upload") return { mode: "free", script: null };
 	if (_recordMode !== "script") return { mode: "free", script: null };
 	const s = _getCurrentScript();
 	return { mode: "script", script: s?.text ?? null };
@@ -94,25 +98,71 @@ function _applyRecordMode() {
 
 function _renderCurrentScript() {
 	const s = _getCurrentScript();
-	const titleEl = $("record-script-title");
 	const textEl = $("record-script-text");
-	if (titleEl) titleEl.textContent = s?.title ?? "";
 	if (textEl) textEl.textContent = s?.text ?? "";
+	const select = $("record-script-select");
+	if (select && s?.id != null) select.value = s.id;
+}
+
+function _populateScriptSelect() {
+	const select = $("record-script-select");
+	if (!select) return;
+	const list = _getScriptList();
+	select.replaceChildren(
+		...list.map((s) => {
+			const opt = document.createElement("option");
+			opt.value = s.id;
+			opt.textContent = s.title;
+			return opt;
+		}),
+	);
+	const cur = list[_scriptIdx % list.length];
+	if (cur?.id != null) select.value = cur.id;
+}
+
+function _initInputMethodTabs() {
+	const tabs = document.getElementById("input-method-tabs");
+	if (!tabs) return;
+	const panels = {
+		upload: $("upload-tab-upload"),
+		record: $("upload-tab-record"),
+	};
+	const activeBtn = tabs.querySelector(".input-method-tab.is-active");
+	if (activeBtn?.dataset.tab) _activeInputTab = activeBtn.dataset.tab;
+	_syncRecordModePanelVisibility();
+	tabs.addEventListener("click", (e) => {
+		const btn = e.target.closest(".input-method-tab");
+		if (!btn || btn.classList.contains("is-active")) return;
+		const target = btn.dataset.tab;
+		tabs.querySelectorAll(".input-method-tab").forEach((b) => {
+			const active = b === btn;
+			b.classList.toggle("is-active", active);
+			b.setAttribute("aria-selected", active ? "true" : "false");
+		});
+		for (const [name, panel] of Object.entries(panels)) {
+			if (panel) panel.hidden = name !== target;
+		}
+		_activeInputTab = target;
+		_syncRecordModePanelVisibility();
+	});
+}
+
+function _syncRecordModePanelVisibility() {
+	const panel = $("record-mode-panel");
+	if (!panel) return;
+	panel.hidden = !_engineCEnabled || _activeInputTab !== "record";
 }
 
 function _initRecordMode(engineCEnabled) {
 	const panel = $("record-mode-panel");
 	if (!panel) return;
+	_engineCEnabled = engineCEnabled;
 	if (!engineCEnabled) {
 		panel.hidden = true;
 		_recordMode = "free";
 		return;
 	}
-	panel.hidden = false;
-
-	// #upload-section 整块都是点击上传热区（uploader.js:46），面板里的任何
-	// 点击都要吞掉，否则切换按钮/换稿/长按选稿都会顺带弹出文件选择框。
-	panel.addEventListener("click", (e) => e.stopPropagation());
+	_syncRecordModePanelVisibility();
 
 	const savedMode = localStorage.getItem("record-mode");
 	if (savedMode === "free" || savedMode === "script") _recordMode = savedMode;
@@ -123,6 +173,7 @@ function _initRecordMode(engineCEnabled) {
 		_scriptIdx = savedIdx;
 	}
 
+	_populateScriptSelect();
 	_applyRecordMode();
 	_renderCurrentScript();
 
@@ -134,17 +185,21 @@ function _initRecordMode(engineCEnabled) {
 		_applyRecordMode();
 	});
 
-	$("record-script-next")?.addEventListener("click", () => {
-		const len = _getScriptList().length;
-		_scriptIdx = (_scriptIdx + 1) % len;
+	$("record-script-select")?.addEventListener("change", (e) => {
+		const id = e.target.value;
+		const list = _getScriptList();
+		const idx = list.findIndex((s) => s.id === id);
+		if (idx < 0) return;
+		_scriptIdx = idx;
 		localStorage.setItem("record-script-idx", String(_scriptIdx));
 		_renderCurrentScript();
 	});
 
-	// 切语言时列表长度/内容都会变 — 把索引折进当前语言的范围，再重画标题+正文。
+	// 切语言时列表长度/内容都会变 — 把索引折进当前语言的范围，再重画选项+正文。
 	onLangChange(() => {
 		const len = _getScriptList().length;
 		_scriptIdx = _scriptIdx % len;
+		_populateScriptSelect();
 		_renderCurrentScript();
 	});
 }
@@ -577,6 +632,10 @@ async function initUploaders() {
 	setupRecorder({
 		onFile: onFileSelected,
 		onError: (msg) => showToast(msg, "error"),
+		onTabActivate: (tab) => {
+			_activeInputTab = tab;
+			_syncRecordModePanelVisibility();
+		},
 	});
 
 	// Scatter panel upload button (always available, single file only)
@@ -939,6 +998,7 @@ initTheme();
 applyStaticDom();
 _updateLangToggleLabel();
 setPhase("idle");
+_initInputMethodTabs();
 _initClassifyModeSwitcher();
 _updateClassifyModeSwitcher();
 initScatterFromStorage();

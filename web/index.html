@@ -183,45 +183,115 @@
 			<!-- ══ CENTER PANEL: Waveform + Stats + Segments ═══════════════════════ -->
 			<main class="panel panel-center">
 				<!-- Upload Zone (shown when no file is loaded) -->
-				<section id="upload-section" class="card upload-zone">
+				<section id="upload-section" class="card upload-section">
 					<input
 						type="file"
 						id="file-input"
 						accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac,.opus,.aiff,.au,.caf,.webm"
 						hidden
 					/>
-					<div class="upload-icon">
-						<svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-							<rect width="40" height="40" rx="12" fill="var(--accent-subtle)" />
-							<path
-								d="M20 26V14M14 20l6-6 6 6"
-								stroke="var(--accent)"
+
+					<!-- Input method tabs: pick "upload a file" vs "record from mic" -->
+					<div
+						id="input-method-tabs"
+						class="input-method-tabs"
+						role="tablist"
+						data-i18n-aria-label="input.tabsAria"
+						aria-label="选择输入方式"
+					>
+						<button
+							class="input-method-tab"
+							type="button"
+							data-tab="upload"
+							role="tab"
+							aria-selected="false"
+							aria-controls="upload-tab-upload"
+						>
+							<svg
+								width="15"
+								height="15"
+								viewBox="0 0 16 16"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M8 11V3M4 7l4-4 4 4" />
+								<path d="M2 13h12" />
+							</svg>
+							<span data-i18n="input.tabUpload">上传文件</span>
+						</button>
+						<button
+							class="input-method-tab is-active"
+							type="button"
+							data-tab="record"
+							role="tab"
+							aria-selected="true"
+							aria-controls="upload-tab-record"
+						>
+							<svg
+								width="15"
+								height="15"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
 								stroke-width="2"
 								stroke-linecap="round"
 								stroke-linejoin="round"
-							/>
-							<path d="M13 29h14" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" />
-						</svg>
+								aria-hidden="true"
+							>
+								<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+								<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+								<line x1="12" y1="19" x2="12" y2="23" />
+								<line x1="8" y1="23" x2="16" y2="23" />
+							</svg>
+							<span data-i18n="input.tabRecord">麦克风录音</span>
+						</button>
 					</div>
-					<p class="upload-title" data-i18n="upload.title">拖拽音频文件到此处</p>
-					<p class="upload-subtitle">
-						<span data-i18n="upload.or">或</span>
-						<button class="link-btn" id="browse-btn" data-i18n="action.browse">点击选择文件</button>
-					</p>
-					<p class="upload-hint" data-i18n="upload.hint" data-i18n-params='{"mb":5,"min":3}'>
-						支持 MP3 · WAV · OGG · M4A · FLAC · 最大 5 MB / 3 分钟
-					</p>
 
-					<!-- 录音模式切换 + 跟读稿件（仅 Engine C 开启时可见） -->
+					<!-- ── Upload tab ─────────────────────────────────────────── -->
+					<div id="upload-tab-upload" class="input-method-panel" role="tabpanel" hidden>
+						<div id="upload-dropzone" class="upload-dropzone">
+							<div class="upload-icon">
+								<svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+									<rect width="40" height="40" rx="12" fill="var(--accent-subtle)" />
+									<path
+										d="M20 26V14M14 20l6-6 6 6"
+										stroke="var(--accent)"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									/>
+									<path d="M13 29h14" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" />
+								</svg>
+							</div>
+							<p class="upload-title" data-i18n="upload.title">拖拽音频文件到此处</p>
+							<p class="upload-subtitle">
+								<span data-i18n="upload.or">或</span>
+								<button class="link-btn" id="browse-btn" type="button" data-i18n="action.browse">点击选择文件</button>
+							</p>
+							<p class="upload-hint" data-i18n="upload.hint" data-i18n-params='{"mb":5,"min":3}'>
+								支持 MP3 · WAV · OGG · M4A · FLAC · 最大 5 MB / 3 分钟
+							</p>
+						</div>
+					</div>
+
+					<!-- ── Analysis mode + script picker (record tab only) ──────
+					     Only meaningful when the user is about to record live —
+					     uploaded files rarely match a preset script verbatim, so
+					     the upload flow is hard-coded to free mode. Hidden when
+					     Engine C is off, or when the upload tab is active. -->
 					<div id="record-mode-panel" class="record-mode-panel" hidden>
 						<div class="record-mode-header">
-							<span class="record-mode-label" data-i18n="record.modeLabel">录音模式</span>
+							<span class="record-mode-label" data-i18n="record.modeLabel">分析模式</span>
 							<div
 								id="record-mode-switcher"
 								class="classify-mode-switcher"
 								role="radiogroup"
 								data-i18n-aria-label="record.modeAria"
-								aria-label="录音模式"
+								aria-label="分析模式"
 							>
 								<button
 									class="classify-mode-btn is-active"
@@ -247,10 +317,15 @@
 						</div>
 						<div id="record-script-panel" class="record-script-panel">
 							<div class="record-script-header">
-								<span id="record-script-title" class="record-script-title">—</span>
-								<button type="button" class="link-btn small" id="record-script-next" data-i18n="action.next">
-									换一段
-								</button>
+								<label class="record-script-picker-label" for="record-script-select">
+									<span class="record-script-picker-cap" data-i18n="record.scriptPickerLabel">选择稿件</span>
+									<select
+										id="record-script-select"
+										class="record-script-select"
+										data-i18n-aria-label="record.scriptPickerAria"
+										aria-label="选择跟读稿件"
+									></select>
+								</label>
 							</div>
 							<p id="record-script-text" class="record-script-text">—</p>
 							<p class="record-script-hint" data-i18n="record.hint">
@@ -259,51 +334,55 @@
 						</div>
 					</div>
 
-					<!-- 录音 -->
-					<div class="upload-divider"><span data-i18n="upload.orRecord">或</span></div>
-
-					<div class="recorder-idle-ui" id="recorder-idle-ui">
-						<button
-							class="recorder-mic-btn"
-							id="recorder-mic-btn"
-							type="button"
-							data-i18n-aria-label="action.recordStart"
-							aria-label="开始录制"
-						>
-							<svg
-								width="14"
-								height="14"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
+					<!-- ── Record tab ─────────────────────────────────────────── -->
+					<div id="upload-tab-record" class="input-method-panel record-panel-content" role="tabpanel">
+						<!-- Mic recorder UI -->
+						<div class="recorder-idle-ui" id="recorder-idle-ui">
+							<button
+								class="recorder-mic-btn recorder-mic-btn-large"
+								id="recorder-mic-btn"
+								type="button"
+								data-i18n-aria-label="action.recordStart"
+								aria-label="开始录制"
 							>
-								<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-								<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-								<line x1="12" y1="19" x2="12" y2="23" />
-								<line x1="8" y1="23" x2="16" y2="23" />
-							</svg>
-							<span data-i18n="action.record">录制声音</span>
-						</button>
-					</div>
+								<svg
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+									<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+									<line x1="12" y1="19" x2="12" y2="23" />
+									<line x1="8" y1="23" x2="16" y2="23" />
+								</svg>
+								<span data-i18n="action.recordStartBig">开始录制</span>
+							</button>
+							<p class="recorder-hint" data-i18n="recorder.idleHint">最长录制 3 分钟；录完会自动跳到分析按钮。</p>
+						</div>
 
-					<div class="recorder-active-ui" id="recorder-active-ui" hidden>
-						<span class="recorder-dot" aria-hidden="true"></span>
-						<span class="recorder-timer" id="recorder-timer">0:00</span>
-						<button
-							class="recorder-stop-btn"
-							id="recorder-stop-btn"
-							type="button"
-							data-i18n-aria-label="action.recordStop"
-							aria-label="停止录制"
-						>
-							<svg width="9" height="9" viewBox="0 0 10 10">
-								<rect width="10" height="10" rx="2" fill="currentColor" />
-							</svg>
-							<span data-i18n="action.stop">停止</span>
-						</button>
+						<div class="recorder-active-ui" id="recorder-active-ui" hidden>
+							<span class="recorder-dot" aria-hidden="true"></span>
+							<span class="recorder-timer" id="recorder-timer">0:00</span>
+							<canvas id="recorder-waveform" class="recorder-waveform" aria-hidden="true"></canvas>
+							<button
+								class="recorder-stop-btn"
+								id="recorder-stop-btn"
+								type="button"
+								data-i18n-aria-label="action.recordStop"
+								aria-label="停止录制"
+							>
+								<svg width="9" height="9" viewBox="0 0 10 10">
+									<rect width="10" height="10" rx="2" fill="currentColor" />
+								</svg>
+								<span data-i18n="action.stop">停止</span>
+							</button>
+						</div>
 					</div>
 
 					<p class="upload-privacy-badge">
@@ -1172,12 +1251,23 @@
 					background var(--transition),
 					box-shadow var(--transition);
 				z-index: 9999;
+				touch-action: none;
+				user-select: none;
+				-webkit-user-select: none;
 				--vga-lp: 0deg;
 			}
 			.vga-feedback-btn:hover {
 				background: var(--accent-hover);
 				transform: translateY(-2px);
 				box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+			}
+			.vga-feedback-btn.is-dragging {
+				cursor: grabbing;
+				transition: background var(--transition);
+				box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+			}
+			.vga-feedback-btn.is-dragging:hover {
+				transform: none;
 			}
 			/* 长按进度环 */
 			.vga-feedback-btn::before {
@@ -1413,67 +1503,183 @@
 				document.getElementById("vgaFeedbackModal").classList.toggle("show");
 			}
 
-			// 长按隐藏反馈按钮——URL 带 ?feedback=1 可强制恢复
+			// 反馈按钮交互：短按打开浮层、长按 800ms 隐藏、超过阈值的拖拽则移动按钮
+			// URL 带 ?feedback=1 可强制恢复隐藏的按钮；位置持久化在 localStorage
 			(function () {
 				const btn = document.getElementById("vgaFeedbackBtn");
-				const KEY = "vga.feedbackHidden";
+				const modal = document.getElementById("vgaFeedbackModal");
+				const HIDE_KEY = "vga.feedbackHidden";
+				const POS_KEY = "vga.feedbackPos";
+				const DRAG_THRESHOLD = 6;
+				const MARGIN = 12;
 				const forceShow = new URLSearchParams(location.search).get("feedback") === "1";
-				if (!forceShow && localStorage.getItem(KEY) === "1") {
+				if (!forceShow && localStorage.getItem(HIDE_KEY) === "1") {
 					btn.style.display = "none";
 					return;
 				}
+
+				const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+				const isCustomPos = () => btn.style.left !== "" && btn.style.top !== "";
+				const applyPos = (left, top) => {
+					const w = btn.offsetWidth || 44;
+					const h = btn.offsetHeight || 44;
+					left = clamp(left, MARGIN, window.innerWidth - w - MARGIN);
+					top = clamp(top, MARGIN, window.innerHeight - h - MARGIN);
+					btn.style.left = left + "px";
+					btn.style.top = top + "px";
+					btn.style.right = "auto";
+					btn.style.bottom = "auto";
+				};
+
+				try {
+					const raw = localStorage.getItem(POS_KEY);
+					if (raw) {
+						const saved = JSON.parse(raw);
+						if (typeof saved.left === "number" && typeof saved.top === "number") {
+							applyPos(saved.left, saved.top);
+						}
+					}
+				} catch (_) {}
+
+				// 浮层默认锚右下；按钮被拖动后让浮层贴近按钮
+				const positionModal = () => {
+					if (!isCustomPos()) {
+						modal.style.left = modal.style.top = modal.style.right = modal.style.bottom = "";
+						return;
+					}
+					const r = btn.getBoundingClientRect();
+					const mw = modal.offsetWidth || 320;
+					const mh = modal.offsetHeight || 220;
+					let top = r.top - mh - 14;
+					let left = r.right - mw;
+					if (top < MARGIN) top = r.bottom + 14;
+					left = clamp(left, MARGIN, window.innerWidth - mw - MARGIN);
+					top = clamp(top, MARGIN, window.innerHeight - mh - MARGIN);
+					modal.style.left = left + "px";
+					modal.style.top = top + "px";
+					modal.style.right = "auto";
+					modal.style.bottom = "auto";
+				};
+				const origToggle = window.toggleVgaFeedback;
+				window.toggleVgaFeedback = function () {
+					origToggle();
+					if (modal.classList.contains("show")) positionModal();
+				};
+
 				let warnTimer = null;
 				let commitTimer = null;
-				let fired = false;
-				const start = () => {
-					fired = false;
+				let longPressFired = false;
+				let dragArmed = false;
+				let dragging = false;
+				let dragged = false;
+				let startX = 0;
+				let startY = 0;
+				let originLeft = 0;
+				let originTop = 0;
+
+				const clearLongPress = () => {
+					if (warnTimer) clearTimeout(warnTimer);
+					if (commitTimer) clearTimeout(commitTimer);
+					warnTimer = commitTimer = null;
+					btn.classList.remove("is-longpress", "is-longpress-warn");
+				};
+
+				btn.addEventListener("pointerdown", (e) => {
+					if (e.button !== undefined && e.button !== 0) return;
+					const r = btn.getBoundingClientRect();
+					startX = e.clientX;
+					startY = e.clientY;
+					originLeft = r.left;
+					originTop = r.top;
+					dragArmed = true;
+					dragging = false;
+					dragged = false;
+					longPressFired = false;
 					btn.classList.add("is-longpress");
-					// 300ms：先显示红 X 作为"即将关闭"的预警
+					// 300ms：红 X 预警
 					warnTimer = setTimeout(() => {
 						btn.classList.add("is-longpress-warn");
 					}, 300);
-					// 800ms：继续按住则真正关闭
+					// 800ms：真正关闭
 					commitTimer = setTimeout(() => {
-						fired = true;
+						longPressFired = true;
+						dragArmed = false;
 						btn.classList.remove("is-longpress", "is-longpress-warn");
 						btn.classList.add("is-longpress-done");
-						document.getElementById("vgaFeedbackModal").classList.remove("show");
-						localStorage.setItem(KEY, "1");
+						modal.classList.remove("show");
+						localStorage.setItem(HIDE_KEY, "1");
 						const toast = document.getElementById("toast");
 						if (toast) {
 							toast.textContent = "已隐藏反馈按钮（URL 加 ?feedback=1 可恢复）";
 							toast.classList.add("show");
 							setTimeout(() => toast.classList.remove("show"), 2600);
 						}
-						// pop 动画结束后真正 display:none（动画期间保留可见）
 						setTimeout(() => {
 							btn.style.display = "none";
 							btn.classList.remove("is-longpress-done");
 						}, 440);
 					}, 800);
+				});
+
+				window.addEventListener("pointermove", (e) => {
+					if (!dragArmed) return;
+					const dx = e.clientX - startX;
+					const dy = e.clientY - startY;
+					if (!dragging && Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
+						dragging = true;
+						dragged = true;
+						clearLongPress();
+						modal.classList.remove("show");
+						btn.classList.add("is-dragging");
+						try {
+							btn.setPointerCapture(e.pointerId);
+						} catch (_) {}
+					}
+					if (dragging) {
+						e.preventDefault();
+						applyPos(originLeft + dx, originTop + dy);
+					}
+				});
+
+				const finish = () => {
+					if (!dragArmed && !dragging) return;
+					if (dragging) {
+						dragging = false;
+						btn.classList.remove("is-dragging");
+						try {
+							const left = parseFloat(btn.style.left) || 0;
+							const top = parseFloat(btn.style.top) || 0;
+							localStorage.setItem(POS_KEY, JSON.stringify({ left, top }));
+						} catch (_) {}
+					}
+					dragArmed = false;
+					clearLongPress();
 				};
-				const cancel = () => {
-					if (warnTimer) clearTimeout(warnTimer);
-					if (commitTimer) clearTimeout(commitTimer);
-					warnTimer = commitTimer = null;
-					btn.classList.remove("is-longpress", "is-longpress-warn");
-				};
-				btn.addEventListener("pointerdown", start);
-				btn.addEventListener("pointerup", cancel);
-				btn.addEventListener("pointerleave", cancel);
-				btn.addEventListener("pointercancel", cancel);
-				// 长按触发后，吞掉后续的 click（避免顺带把 modal 打开）
+				window.addEventListener("pointerup", finish);
+				window.addEventListener("pointercancel", finish);
+
+				// 长按触发或拖动结束后，吞掉后续的 click（避免顺带把浮层打开）
 				btn.addEventListener(
 					"click",
 					(e) => {
-						if (fired) {
+						if (longPressFired || dragged) {
 							e.preventDefault();
 							e.stopImmediatePropagation();
-							fired = false;
+							longPressFired = false;
+							dragged = false;
 						}
 					},
 					true,
 				);
+
+				// 视口缩放后把按钮和已展开的浮层重新夹回可视区
+				window.addEventListener("resize", () => {
+					if (!isCustomPos()) return;
+					const left = parseFloat(btn.style.left) || 0;
+					const top = parseFloat(btn.style.top) || 0;
+					applyPos(left, top);
+					if (modal.classList.contains("show")) positionModal();
+				});
 			})();
 
 			// 动态更新字数并控制发送按钮状态
