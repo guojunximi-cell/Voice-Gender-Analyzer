@@ -61,7 +61,16 @@ RUN /build/.venv/bin/python scripts/init_iss_model.py
 
 # Engine C: 预下载 FunASR Paraformer-zh ONNX 模型到 $MODELSCOPE_CACHE，
 # 避免首请求在线下载。Engine C 关闭时运行时也不会加载该模型。
-RUN /build/.venv/bin/python -c "from funasr import AutoModel; AutoModel(model='paraformer-zh', disable_update=True, disable_log=True)"
+#
+# fail-open: Railway 的 build daemon 在 ~40 min 后取消构建，而 ModelScope
+# 在境外 build 节点上可能跑到 ~200 kB/s——944 MB 模型 ~50 min 才能拉完，
+# 撞 daemon timeout。用 timeout(1) 把这一步限到 25 min，超时/网络失败时
+# 清空可能残留的部分缓存并继续构建；engine_c_asr._load_model 自带 lazy
+# fallback，首次 Engine C 请求会在线下载（慢，但不阻塞部署）。
+RUN timeout 1500 /build/.venv/bin/python -c "from funasr import AutoModel; AutoModel(model='paraformer-zh', disable_update=True, disable_log=True)" \
+    || (echo "WARNING: FunASR Paraformer-zh preload skipped (timeout or network failure) — runtime will lazy-download on first Engine C request" \
+        && rm -rf /opt/modelscope \
+        && mkdir -p /opt/modelscope)
 
 
 # ── Stage 3: 运行时镜像 ─────────────────────────────────────────
