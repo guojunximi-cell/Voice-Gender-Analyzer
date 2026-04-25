@@ -2,7 +2,7 @@
 
 # Voice Gender Analyzer
 
-> Browser-based gender, acoustic, and phoneme-level analysis of short voice clips — powered by deep-learning VAD and forced alignment. Upload or record up to 3 minutes of audio and read its gender expression, pitch, formants, and per-phoneme acoustics on a single page.
+> Browser-based gender, acoustic, and phoneme-level analysis of short voice clips — powered by deep-learning VAD and forced alignment. Upload or record an audio clip and read its gender expression, pitch, formants, and per-phoneme acoustics on a single page. The maximum duration is operator-configurable (`MAX_AUDIO_DURATION_SEC`, default 180s).
 
 [![license](https://img.shields.io/badge/license-MPL--2.0-green)](./LICENSE)
 [![python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
@@ -13,8 +13,8 @@
 ## Features
 
 - **Multi-engine analysis pipeline**
-  - **Engine A — k-3** (based on [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter), [k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter)): VAD + male / female / music / noise segmentation
-  - **Engine C** (feature-flagged): ASR → [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) → [Praat](https://www.fon.hum.uva.nl/praat/) formants → per-phoneme z-score
+  - **Engine A — K-3** (based on [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter), [k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter)): VAD + male / female / music / noise segmentation
+  - **Engine C**: ASR → [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) → [Praat](https://www.fon.hum.uva.nl/praat/) formants → per-phoneme z-score
 - **Bilingual ASR (Engine C)**
   - `zh-CN` — [FunASR](https://github.com/modelscope/FunASR) Paraformer-zh
   - `en-US` — [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (`base.en` by default; `tiny / small / medium` selectable)
@@ -33,7 +33,7 @@
 |---|---|
 | Frontend | Vanilla JS · [Vite](https://vitejs.dev/) · [WaveSurfer.js](https://wavesurfer.xyz/) · [uPlot](https://github.com/leeoniya/uPlot) |
 | Backend | Python 3.13 · [FastAPI](https://fastapi.tiangolo.com/) · [Uvicorn](https://www.uvicorn.org/) · [Taskiq](https://taskiq-python.github.io/) · [Redis](https://redis.io/) |
-| Engine A | [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) (Keras 3 / TensorFlow 2), [k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter) |
+| Engine A | [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) (K-3 / TensorFlow 2), [k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter) |
 | Engine C | [FunASR](https://github.com/modelscope/FunASR) · [faster-whisper](https://github.com/SYSTRAN/faster-whisper) · [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) · [Praat](https://www.fon.hum.uva.nl/praat/) · [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) sidecar |
 | Deployment | Docker Compose · [Railway](https://railway.app/) |
 
@@ -73,9 +73,9 @@ python tests/test_chunker.py
 python tests/test_multichunk_merge.py
 ```
 
-## Engine C (optional)
+## Engine C
 
-Engine C runs in a separate sidecar container and is **off by default**.
+Engine C runs in a separate sidecar container alongside the API and worker.
 
 ```bash
 cp .env.example .env              # set ENGINE_C_ENABLED=true
@@ -98,9 +98,9 @@ curl http://localhost:8001/healthz
 
 ```bash
 cp .env.example .env
-docker compose up -d --build                       # Engine A only
-# or, with Engine C:
-docker compose --profile engine-c up -d --build
+docker compose --profile engine-c up -d --build    # full pipeline (A + C)
+# without the Engine C sidecar (Engine A only):
+docker compose up -d --build
 ```
 
 The service listens on `http://localhost:8080`. First build takes 10–15 minutes (TensorFlow + inaSpeechSegmenter weights are large). Configurable fields are in `.env.example`.
@@ -167,7 +167,7 @@ Browser POST /analyze-voice
             └─ worker process  → voiceya/tasks/analyser.py::analyse_voice
                  └─ services/audio_analyser/__init__.py::do_analyse
                       ├─ Engine A: do_segmentation()
-                      └─ Engine C: run_engine_c()  (feature-flagged)
+                      └─ Engine C: run_engine_c()
 
 Browser GET /status/{task_id}  (Accept: text/event-stream)
   └─ subscribe_to_events_and_generate_sse()
@@ -183,7 +183,7 @@ voiceya/                           backend package
 ├── routers/api.py                 FastAPI routes (SSE in services/sse.py)
 ├── services/
 │   ├── audio_analyser/
-│   │   ├── engine_a.py            VAD + gender segmentation (k-3)
+│   │   ├── engine_a.py            VAD + gender segmentation (K-3)
 │   │   ├── engine_c.py            Engine C orchestrator (ASR → sidecar)
 │   │   ├── engine_c_asr.py        FunASR Paraformer-zh (SHA-256 LRU cache)
 │   │   ├── engine_c_asr_en.py     faster-whisper, returns word_timestamps
@@ -221,7 +221,7 @@ railway.toml / railway.sidecar.toml
 ## Acknowledgements
 
 - [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) — Doukhan et al., ICASSP 2018 (MIT)
-- [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) — Keras 3 compatibility fork
+- [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) — K-3 compatibility fork
 - [FunASR](https://github.com/modelscope/FunASR) — Paraformer-zh ASR (Apache-2.0)
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — CTranslate2 Whisper inference (MIT)
 - [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) — forced alignment (MIT)

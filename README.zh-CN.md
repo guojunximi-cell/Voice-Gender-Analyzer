@@ -2,7 +2,7 @@
 
 # 声音分析鸭 · Voice Gender Analyzer
 
-> 浏览器端的短音频性别 / 声学 / 音素级分析工具，背后是深度学习 VAD + 强制对齐。上传 / 录制最长 3 分钟的音频，在一个页面里读懂它的性别表达、基频、共振峰与音素粒度的声学细节。
+> 浏览器端的短音频性别 / 声学 / 音素级分析工具，背后是深度学习 VAD + 强制对齐。上传 / 录制一段音频，在一个页面里读懂它的性别表达、基频、共振峰与音素粒度的声学细节。最大时长由部署方配置（`MAX_AUDIO_DURATION_SEC`，默认 180 秒）。
 
 [![license](https://img.shields.io/badge/license-MPL--2.0-green)](./LICENSE)
 [![python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
@@ -13,8 +13,8 @@
 ## 功能
 
 - **多引擎分析管线**
-  - **Engine A — k-3**（基于 [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter)，[k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter)）：VAD + 男声 / 女声 / 音乐 / 噪声分段
-  - **Engine C**（feature-flagged）：ASR → [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) → [Praat](https://www.fon.hum.uva.nl/praat/) 共振峰 → 音素级 z-score
+  - **Engine A — K-3**（基于 [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter)，[k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter)）：VAD + 男声 / 女声 / 音乐 / 噪声分段
+  - **Engine C**：ASR → [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) → [Praat](https://www.fon.hum.uva.nl/praat/) 共振峰 → 音素级 z-score
 - **双语 ASR（Engine C）**
   - `zh-CN` — [FunASR](https://github.com/modelscope/FunASR) Paraformer-zh
   - `en-US` — [faster-whisper](https://github.com/SYSTRAN/faster-whisper)（默认 `base.en`，可选 `tiny / small / medium`）
@@ -33,7 +33,7 @@
 |---|---|
 | 前端 | Vanilla JS · [Vite](https://vitejs.dev/) · [WaveSurfer.js](https://wavesurfer.xyz/) · [uPlot](https://github.com/leeoniya/uPlot) |
 | 后端 | Python 3.13 · [FastAPI](https://fastapi.tiangolo.com/) · [Uvicorn](https://www.uvicorn.org/) · [Taskiq](https://taskiq-python.github.io/) · [Redis](https://redis.io/) |
-| Engine A | [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter)（Keras 3 / TensorFlow 2），[k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter) |
+| Engine A | [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter)（K-3 / TensorFlow 2），[k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter) |
 | Engine C | [FunASR](https://github.com/modelscope/FunASR) · [faster-whisper](https://github.com/SYSTRAN/faster-whisper) · [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) · [Praat](https://www.fon.hum.uva.nl/praat/) · [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) sidecar |
 | 部署 | Docker Compose · [Railway](https://railway.app/) |
 
@@ -73,9 +73,9 @@ python tests/test_chunker.py
 python tests/test_multichunk_merge.py
 ```
 
-## Engine C（可选）
+## Engine C
 
-Engine C 跑在独立的 sidecar 容器里，**默认关闭**。
+Engine C 跑在独立的 sidecar 容器里，与 API、worker 协同工作。
 
 ```bash
 cp .env.example .env              # 改 ENGINE_C_ENABLED=true
@@ -98,9 +98,9 @@ curl http://localhost:8001/healthz
 
 ```bash
 cp .env.example .env
-docker compose up -d --build                       # 仅 Engine A
-# 或，含 Engine C：
-docker compose --profile engine-c up -d --build
+docker compose --profile engine-c up -d --build    # 完整管线（A + C）
+# 不带 Engine C sidecar（仅 Engine A）：
+docker compose up -d --build
 ```
 
 服务监听 `http://localhost:8080`。首次构建 10 ~ 15 分钟（TensorFlow + inaSpeechSegmenter 模型较大）。可配置字段见 `.env.example`。
@@ -167,7 +167,7 @@ Accept: text/event-stream
             └─ worker 进程     → voiceya/tasks/analyser.py::analyse_voice
                  └─ services/audio_analyser/__init__.py::do_analyse
                       ├─ Engine A: do_segmentation()
-                      └─ Engine C: run_engine_c()  (feature-flagged)
+                      └─ Engine C: run_engine_c()
 
 浏览器 GET /status/{task_id}  (Accept: text/event-stream)
   └─ subscribe_to_events_and_generate_sse()
@@ -183,7 +183,7 @@ voiceya/                           后端主包
 ├── routers/api.py                 FastAPI 路由（SSE 在 services/sse.py）
 ├── services/
 │   ├── audio_analyser/
-│   │   ├── engine_a.py            VAD + 性别分段（k-3）
+│   │   ├── engine_a.py            VAD + 性别分段（K-3）
 │   │   ├── engine_c.py            Engine C 编排（ASR → sidecar）
 │   │   ├── engine_c_asr.py        FunASR Paraformer-zh（带 SHA-256 LRU 缓存）
 │   │   ├── engine_c_asr_en.py     faster-whisper，返回 word_timestamps
@@ -221,7 +221,7 @@ railway.toml / railway.sidecar.toml
 ## 致谢
 
 - [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) —— Doukhan et al., ICASSP 2018（MIT）
-- [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) —— Keras 3 兼容 fork
+- [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) —— K-3 兼容 fork
 - [FunASR](https://github.com/modelscope/FunASR) —— Paraformer-zh ASR（Apache-2.0）
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) —— CTranslate2 Whisper 推理（MIT）
 - [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) —— 强制对齐（MIT）
