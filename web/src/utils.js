@@ -72,9 +72,9 @@ export function resolveCSSVar(varName) {
 // ─── Tier → color (5 discrete levels, 1=masculine → 5=feminine) ──
 const _TIER_COLORS = [
 	"rgba(37,99,235,0.9)", // 1: Deep Blue  — typical masculine
-	"rgba(96,165,250,0.9)", // 2: Light Blue — masculine-leaning
+	"rgba(96,165,250,0.9)", // 2: Light Blue — masculine
 	"rgba(139,92,246,0.9)", // 3: Purple     — neutral / androgynous
-	"rgba(244,114,182,0.9)", // 4: Light Pink  — feminine-leaning
+	"rgba(244,114,182,0.9)", // 4: Light Pink  — feminine
 	"rgba(219,39,119,0.9)", // 5: Deep Pink   — typical feminine
 ];
 export function tierToColor(tier) {

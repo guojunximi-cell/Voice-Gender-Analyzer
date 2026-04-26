@@ -86,7 +86,19 @@
       "Bash(grep -v \"^  \\\\|^help:\\\\|^\\\\s*$\\\\|^-->\")",
       "Bash(git -C /home/yaya/Voice-Gender-Analyzer diff web/src/main.js)",
       "Bash(git -C /home/yaya/Voice-Gender-Analyzer diff web/src/modules/recorder.js web/src/modules/uploader.js)",
-      "Bash(pnpm --filter ./web run lint)"
+      "Bash(pnpm --filter ./web run lint)",
+      "Bash(.venv/bin/python3)",
+      "Bash(.venv/bin/ruff check *)",
+      "Bash(.venv/bin/python -c \"from voiceya.tasks.analyser import analyse_voice; print\\('import OK'\\)\")",
+      "Bash(.venv/bin/python tests/test_chunker.py)",
+      "Bash(.venv/bin/python -m voiceya)",
+      "Bash(tee /tmp/voiceya-api.log)",
+      "Bash(.venv/bin/python -m taskiq worker voiceya.taskiq:broker voiceya.tasks.analyser --workers 1 --log-level INFO)",
+      "Bash(tee /tmp/voiceya-worker.log)",
+      "Bash(curl -sf http://127.0.0.1:8080/api/config)",
+      "Bash(kill 62891 62904)",
+      "Bash(env)",
+      "Bash(.venv/bin/python /tmp/test_fix.py)"
     ]
   }
 }

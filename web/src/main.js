@@ -481,6 +481,7 @@ function setPhase(next) {
 	}
 	if ($("analyze-spinner")) $("analyze-spinner").hidden = !analyzing;
 	if ($("analyze-btn")) {
+		$("analyze-btn").hidden = done;
 		$("analyze-btn").disabled = analyzing || done;
 		const icon = $("analyze-btn").querySelector("svg");
 		if (icon) icon.style.display = analyzing ? "none" : "";

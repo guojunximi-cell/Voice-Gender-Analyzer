@@ -378,7 +378,7 @@ const DICT = {
 		"record.scriptPickerLabel": "Script",
 		"record.scriptPickerAria": "Pick a script to read",
 
-		"stats.title": "Segment distribution",
+		"stats.title": "Distribution",
 		"stats.modeAria": "Classification basis",
 		"stats.modeA": "Neural net",
 		"stats.modePitch": "Pitch",
