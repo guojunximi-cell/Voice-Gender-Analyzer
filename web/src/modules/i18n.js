@@ -242,6 +242,11 @@ const DICT = {
 		"analyzer.backendError": "后端分析出错",
 		"analyzer.noResult": "未收到分析结果",
 
+		"audioGate.clipping": "削波严重（{pct}% 样本饱和），请降低录音音量后重试",
+		"audioGate.tooQuiet": "音量过低（RMS {db} dBFS），请靠近麦克风或调高输入增益",
+		"audioGate.silence": "音频几乎没有声音，请检查麦克风是否被静音",
+		"audioGate.insufficientVoicing": "有效语音占比过低（{pct}%），请录制连续说话的片段",
+
 		"feedback.title": "意见反馈",
 		"feedback.email": "您的邮箱（选填）",
 		"feedback.placeholder": "输入您的反馈或建议…",
@@ -546,6 +551,11 @@ const DICT = {
 		"analyzer.streamFailed": "Could not subscribe to progress ({status})",
 		"analyzer.backendError": "Backend analysis error",
 		"analyzer.noResult": "No result received",
+
+		"audioGate.clipping": "Audio is clipped ({pct}% of samples saturated). Lower the recording volume and try again.",
+		"audioGate.tooQuiet": "Volume too low (RMS {db} dBFS). Move closer to the mic or raise the input gain.",
+		"audioGate.silence": "The clip is nearly silent — check that your mic isn't muted.",
+		"audioGate.insufficientVoicing": "Not enough speech detected ({pct}%). Please record a clip with continuous speaking.",
 
 		"feedback.title": "Feedback",
 		"feedback.email": "Your email (optional)",

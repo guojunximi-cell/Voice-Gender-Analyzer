@@ -63,6 +63,10 @@ class ErrorSSE(SSE):
     type: Literal["error"] = "error"
     code: int | None = None
     msg: str
+    # 与 ProgressSSE 相同的 i18n 协议：前端优先按 msg_key 渲染当前语言版本，
+    # 失败/旧客户端再退回 msg。
+    msg_key: str | None = None
+    msg_params: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
