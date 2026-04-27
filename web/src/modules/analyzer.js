@@ -113,28 +113,37 @@ async function _readSSEStream(response, onProgress) {
 					if (!line.startsWith("data: ")) continue;
 					const payload = JSON.parse(line.slice(6));
 
-					if (payload.type === "progress") {
-						// Backend sends an i18n key + optional params (JSON string,
-						// because Redis XADD rejects nested dicts) so the bar label
-						// follows the UI language; msg is the zh-CN fallback.
+					// 后端约定：msg_key（i18n 键） + msg_params（JSON 字符串，因为 Redis
+					// XADD 不收嵌套 dict）。优先按 UI 语言渲染，msg 只是 zh-CN 兜底。
+					const _localize = (p) => {
 						let params;
-						if (typeof payload.msg_params === "string") {
+						if (typeof p.msg_params === "string") {
 							try {
-								params = JSON.parse(payload.msg_params);
+								params = JSON.parse(p.msg_params);
 							} catch (_) {}
-						} else if (payload.msg_params) {
-							params = payload.msg_params;
+						} else if (p.msg_params) {
+							params = p.msg_params;
 						}
-						const label = payload.msg_key ? t(payload.msg_key, params) : payload.msg;
-						onProgress(payload.pct, label);
+						return p.msg_key ? t(p.msg_key, params) : p.msg;
+					};
+
+					if (payload.type === "progress") {
+						onProgress(payload.pct, _localize(payload));
 					} else if (payload.type === "queue") {
-						const label = payload.msg_key ? t(payload.msg_key) : payload.msg;
+						let label;
+						if (payload.num_to_wait > 0) {
+							label = t("progress.queuedCount", { n: payload.num_to_wait });
+						} else if (payload.num_to_wait === 0) {
+							label = t("progress.queuedNext");
+						} else {
+							label = t("progress.processing");
+						}
 						onProgress(0, label);
 					} else if (payload.type === "result") {
 						onProgress(100, t("duck.done"));
 						resultData = payload.data;
 					} else if (payload.type === "error") {
-						throw new Error(payload.msg || t("analyzer.backendError"));
+						throw new Error(_localize(payload) || t("analyzer.backendError"));
 					}
 				}
 			}

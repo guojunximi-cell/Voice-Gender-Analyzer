@@ -1,134 +1,232 @@
-# 声音分析鸭 — Voice Gender Analyzer
+[简体中文](./README.zh-CN.md) | **English**
 
-基于深度学习 + 声学特征 + 音素级强制对齐的浏览器端中文语音性别分析工具。上传 / 录制一段最长 3 分钟的音频，在一个页面里读懂它的性别表达、基频、共振峰与音素粒度的声学细节。
+# Voice Gender Analyzer
 
-![license](https://img.shields.io/badge/license-MPL--2.0-green) ![python](https://img.shields.io/badge/python-3.13-blue) ![node](https://img.shields.io/badge/node-%E2%89%A520-green)
+> Browser-based gender, acoustic, and phoneme-level analysis of short voice clips — powered by deep-learning VAD and forced alignment. Upload or record an audio clip and read its gender expression, pitch, formants, and per-phoneme acoustics on a single page. The maximum duration is operator-configurable (`MAX_AUDIO_DURATION_SEC`, default 180s).
 
-## 功能
+[![license](https://img.shields.io/badge/license-MPL--2.0-green)](./LICENSE)
+[![python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
+[![node](https://img.shields.io/badge/node-%E2%89%A520-green)](https://nodejs.org/)
 
-* **三引擎并存的分析管线**
-  * Engine A — inaSpeechSegmenter（k3-cat fork）做 VAD 与男声/女声/音乐/噪声分段
-  * Engine B — 仓内自研 LPC 共振峰估计 + 合成性别评分
-  * Engine C — FunASR Paraformer-zh 转写 → MFA 强制对齐 → Praat 共振峰 → 音素级 z-score（可选，默认关）
-* **交互式可视化**
-  * 波形 + 男声/女声色带 + 可点击段片段
-  * 三行 "三明治" 时间线：上行基频热图 / 中行汉字卡拉 OK / 下行共鸣热图，逐字等宽对齐
-  * 基频范围 p5~p95 磨砂胶囊 + 性别谱条，同一视觉语言
-  * 整文件指标面板：均值 / 中位数 / 标准差 / 性别比例
-* **历史会话**
-  * IndexedDB 持久化 50 条会话 + 500 MB 原始音频（LRU），刷新后仍在
-  * 性别比例散点图支持按 Engine A / 基频 / 共鸣 三种标签源切换
+---
 
-## 技术栈
+## Features
 
-| 层次 | 组件 |
-|-|-|
-| 前端 | Vanilla JS · Vite · WaveSurfer.js · uPlot |
-| 后端 | Python 3.13 · FastAPI · Uvicorn · Taskiq · Redis |
-| Engine A | [inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) (K-3 / TensorFlow 2) |
-| Engine B | librosa · scipy|
-| Engine C | [FunASR](https://github.com/modelscope/FunASR) · [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) · [Praat](https://www.fon.hum.uva.nl/praat/) · [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) sidecar |
-| 部署 | Docker Compose · Railway |
+- **Multi-engine analysis pipeline**
+  - **Engine A — K-3** (based on [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter), [k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter)): VAD + male / female / music / noise segmentation
+  - **Engine C**: ASR → [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) → [Praat](https://www.fon.hum.uva.nl/praat/) formants → per-phoneme z-score
+- **Bilingual ASR (Engine C)**
+  - `zh-CN` — [FunASR](https://github.com/modelscope/FunASR) Paraformer-zh
+  - `en-US` — [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (`base.en` by default; `tiny / small / medium` selectable)
+- **Interactive visualization**
+  - Waveform with male / female colored bands and clickable segment slices
+  - Three-row "sandwich" timeline: pitch heatmap on top, karaoke-style transcript in the middle, resonance heatmap on the bottom — character-aligned
+  - Pitch p5–p95 frosted capsule + gender bar in a unified visual language
+  - File-level metrics panel: mean / median / std / gender ratio
+- **Persistent history**
+  - IndexedDB keeps 50 sessions and 500 MB of raw audio (LRU eviction); survives reload
+  - Gender-ratio scatter plot toggles between three label sources: Engine A / pitch / resonance
 
-## 本地开发
+## Tech Stack
 
-需要 **Python 3.13** · [Node.js ≥ 20](https://nodejs.org/)（带 pnpm）· [uv](https://docs.astral.sh/uv/) · 本地 Redis。
+| Layer | Components |
+|---|---|
+| Frontend | Vanilla JS · [Vite](https://vitejs.dev/) · [WaveSurfer.js](https://wavesurfer.xyz/) · [uPlot](https://github.com/leeoniya/uPlot) |
+| Backend | Python 3.13 · [FastAPI](https://fastapi.tiangolo.com/) · [Uvicorn](https://www.uvicorn.org/) · [Taskiq](https://taskiq-python.github.io/) · [Redis](https://redis.io/) |
+| Engine A | [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) (K-3 / TensorFlow 2), [k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter) |
+| Engine C | [FunASR](https://github.com/modelscope/FunASR) · [faster-whisper](https://github.com/SYSTRAN/faster-whisper) · [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) · [Praat](https://www.fon.hum.uva.nl/praat/) · [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) sidecar |
+| Deployment | Docker Compose · [Railway](https://railway.app/) |
+
+## Local Development
+
+Requires **Python 3.13**, [Node.js ≥ 20](https://nodejs.org/) (with pnpm), [uv](https://docs.astral.sh/uv/), and a local Redis.
 
 ```bash
 git clone --recurse-submodules https://github.com/guojunximi-cell/Voice-Gender-Analyzer.git
 cd Voice-Gender-Analyzer
-uv sync                 # 按 uv.lock 装 Python 依赖到 .venv
-pnpm install -C web     # 前端依赖
-python run_app.py       # 一键起 redis + uvicorn + taskiq worker + vite
+uv sync                 # install Python deps from uv.lock into .venv
+pnpm install -C web     # frontend deps
+python run_app.py       # one-shot: redis + uvicorn + taskiq worker + vite
 ```
 
-`run_app.py` 会并发拉起四个进程；默认访问 <http://localhost:5173>（vite 把 API 请求代理到 :8080）。
+`run_app.py` spawns four processes concurrently and opens <http://localhost:5173> in your browser (Vite proxies API requests to `:8080`).
 
-### 启用 Engine C（可选）
-
-Engine C 依赖一个独立的 sidecar 容器，不默认启动。
+### Common commands
 
 ```bash
-cp .env.example .env              # 改 ENGINE_C_ENABLED=true
+# Backend only (no Vite)
+python -m voiceya
+
+# Worker only
+python -m taskiq worker voiceya.taskiq:broker voiceya.tasks.analyser --workers 1 --log-level INFO
+
+# Production frontend build
+pnpm --filter ./web run build
+
+# Lint & format
+ruff check . && ruff format .
+pnpm --filter ./web run lint
+pnpm --filter ./web run fmt:fix
+
+# Tests (no pytest dependency, plain Python)
+python tests/test_chunker.py
+python tests/test_multichunk_merge.py
+```
+
+## Engine C
+
+Engine C runs in a separate sidecar container alongside the API and worker.
+
+```bash
+cp .env.example .env              # set ENGINE_C_ENABLED=true
 docker compose --profile engine-c up -d --build
 ```
 
-首次构建会下载 FunASR + MFA mandarin_mfa 模型 ≈ 2.5 GB，耗时 10 分钟左右；之后启动秒级。失败或 sidecar 不可达时，`summary.engine_c = null`，Engine A/B 结果正常返回。
+The first build downloads FunASR weights and the MFA `mandarin_mfa` model (~2.5 GB, ~10 minutes). Subsequent starts are seconds. If the sidecar is unreachable or fails, `summary.engine_c = null` and Engine A still returns normally.
 
-## Docker 自建（VPS / 自托管）
+The sidecar source is vendored from [guojunximi-cell/gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) under `voiceya/sidecars/visualizer-backend/`. A thin FastAPI wrapper lives in `voiceya/sidecars/wrapper/main.py`. Upstream sync follows the rsync steps in [`voiceya/sidecars/README.md`](./voiceya/sidecars/README.md).
+
+### Standalone sidecar image
+
+```bash
+docker build -f voiceya/sidecars/visualizer-backend.Dockerfile -t voiceya-engine-c:dev .
+docker run --rm -p 8001:8001 voiceya-engine-c:dev
+curl http://localhost:8001/healthz
+```
+
+## Self-Hosting via Docker
 
 ```bash
 cp .env.example .env
-docker compose up -d --build            # 仅 Engine A/B
-# 或
-docker compose --profile engine-c up -d --build   # 含 Engine C sidecar
+docker compose --profile engine-c up -d --build    # full pipeline (A + C)
+# without the Engine C sidecar (Engine A only):
+docker compose up -d --build
 ```
 
-服务监听 `http://localhost:8080`。首次构建约 10 ~ 15 分钟（TensorFlow + inaSpeechSegmenter 模型较大）。可配置字段见 `.env.example`。
+The service listens on `http://localhost:8080`. First build takes 10–15 minutes (TensorFlow + inaSpeechSegmenter weights are large). Configurable fields are in `.env.example`.
 
-## Railway 部署
+## Railway Deployment
 
-两条路径，任选其一，详见 `docs/RAILWAY_DEPLOY.md`：
+Two paths, see [`docs/RAILWAY_DEPLOY.md`](./docs/RAILWAY_DEPLOY.md) for details:
 
-* **CLI bootstrap**：`bash scripts/railway-bootstrap.sh`，脚本幂等地创建 app + worker + Redis（可选 + Engine C sidecar）并接好变量引用。
-* **UI 手动**：Railway → New Project → Deploy from GitHub → 加 Redis → 填 `REDIS_URL = ${{Redis.REDIS_URL}}`。
+- **CLI bootstrap** — `bash scripts/railway-bootstrap.sh`. Idempotently provisions app + worker + Redis (optionally + Engine C sidecar) and wires variable references.
+- **Manual UI** — Railway → New Project → Deploy from GitHub → add Redis → set `REDIS_URL = ${{Redis.REDIS_URL}}`.
 
-> 建议 ≥ 1 GB 内存 / service。Engine C sidecar 单独走 `railway.sidecar.toml`，需要 ≥ 4 GB 才能稳定跑 MFA。
+> Recommend ≥ 1 GB RAM per service. The Engine C sidecar uses `railway.sidecar.toml` and needs ≥ 4 GB to run MFA reliably.
 
-## 核心环境变量
+## API
 
-| 变量 | 默认 | 说明 |
-|-|-|-|
-| `REDIS_URL` | — | Taskiq 任务队列与 SSE 事件总线，必填 |
-| `MAX_FILE_SIZE_MB` | 10 | 单次上传上限 |
-| `MAX_AUDIO_DURATION_SEC` | 180 | 超时音频会 400 拒绝 |
-| `MAX_CONCURRENT` | 2 | Taskiq worker 并发任务数 |
-| `ENGINE_C_ENABLED` | false | 总开关；关闭时连 FunASR 都不会 import |
-| `ENGINE_C_SIDECAR_URL` | `http://visualizer-backend:8001` | worker → sidecar 内网地址 |
-| `ENGINE_C_SIDECAR_TOKEN` | 空 | worker / sidecar 共享 bearer；生产请务必设置 |
-| `ENGINE_C_MFA_BEAM` | 50 | MFA 主 beam（上游 100，narrower = faster） |
-| `ENGINE_C_MFA_RETRY_BEAM` | 200 | MFA 回退 beam（上游 400） |
-| `ENGINE_C_ASR_CACHE_SIZE` | 64 | FunASR 转写结果 LRU 条数（SHA-256 键） |
+```http
+POST /analyze-voice
+Content-Type: multipart/form-data
 
-完整清单见 `.env.example` 与 `voiceya/config.py`。
+file:     <audio blob, ≤ MAX_FILE_SIZE_MB, ≤ MAX_AUDIO_DURATION_SEC seconds>
+language: zh-CN | en-US           # optional, default zh-CN
+script:   <optional reference text — bypasses ASR in Engine C>
+```
 
-## 代码结构
+```http
+GET /status/{task_id}
+Accept: text/event-stream
+```
+
+The `language` field routes Engine C: `zh-CN` selects FunASR Paraformer-zh + `mandarin_mfa` + `stats_zh.json`; `en-US` selects faster-whisper + `english_us_arpa` + `stats.json`. Script mode bypasses ASR for both languages and uses the supplied transcript directly.
+
+The status endpoint streams progress via Redis Streams (not pub/sub), so late clients can replay events from the beginning.
+
+## Configuration
+
+Full list in [`.env.example`](./.env.example) and `voiceya/config.py`.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `REDIS_URL` | — | Taskiq queue + SSE event bus (required) |
+| `MAX_FILE_SIZE_MB` | 10 | Per-upload size limit |
+| `MAX_AUDIO_DURATION_SEC` | 180 | Audio longer than this is rejected with HTTP 400 |
+| `MAX_CONCURRENT` | 2 | Taskiq worker concurrency |
+| `MAX_QUEUE_DEPTH` | 30 | Queue back-pressure threshold |
+| `RATE_LIMIT_CT` | 10 | Requests allowed per window |
+| `RATE_LIMIT_DURATION_SEC` | 60 | Rate-limit window |
+| `TASK_MAX_EXEC_SEC` | 900 | Per-task execution ceiling |
+| `ENGINE_C_ENABLED` | `false` | Master switch; when `false`, FunASR is never imported |
+| `ENGINE_C_SIDECAR_URL` | `http://visualizer-backend:8001` | Worker → sidecar address |
+| `ENGINE_C_SIDECAR_TOKEN` | empty | Shared bearer between worker and sidecar; set this in production |
+| `ENGINE_C_SIDECAR_TIMEOUT_SEC` | 60 | Per-request HTTP timeout |
+| `ENGINE_C_MIN_DURATION_SEC` | 3 | Audio shorter than this skips Engine C |
+| `ENGINE_C_MAX_AUDIO_MB` | 50 | Sidecar per-request audio cap (defense-in-depth) |
+| `ENGINE_C_WHISPER_MODEL` | `base.en` | faster-whisper model id (`tiny.en` / `small.en` / `medium.en`) |
+| `ENGINE_C_WHISPER_DEVICE` | `auto` | `auto` picks CUDA if available, else CPU |
+| `ENGINE_C_WHISPER_COMPUTE_TYPE` | `int8` | CT2 compute type; `int8` balances speed and size on CPU |
+
+## Architecture
 
 ```
-voiceya/                        # 后端主包
-├── routers/api.py              # FastAPI 路由（SSE 事件流在 services/sse.py）
+Browser POST /analyze-voice
+  └─ routers/api.py           → file/duration validation, analyse_voice.kiq()
+       └─ Redis Stream         → taskiq broker (RedisStreamBroker)
+            └─ worker process  → voiceya/tasks/analyser.py::analyse_voice
+                 └─ services/audio_analyser/__init__.py::do_analyse
+                      ├─ Engine A: do_segmentation()
+                      └─ Engine C: run_engine_c()
+
+Browser GET /status/{task_id}  (Accept: text/event-stream)
+  └─ subscribe_to_events_and_generate_sse()
+       └─ Redis XREAD (streamed replay; late clients see every event)
+```
+
+The API process and the worker process are separated: **the API never loads TensorFlow models** (saves ~500 MB). It only dispatches tasks and forwards SSE events. `load_seg()` only fires when `broker.is_worker_process` is true.
+
+## Code Structure
+
+```
+voiceya/                           backend package
+├── routers/api.py                 FastAPI routes (SSE in services/sse.py)
 ├── services/
 │   ├── audio_analyser/
-│   │   ├── engine_a.py         # VAD + 性别分段（inaSpeechSegmenter）
-│   │   ├── acoustic_analyzer.py# Engine B：LPC 共振峰 + 合成评分
-│   │   ├── engine_c.py         # Engine C 编排（ASR → sidecar）
-│   │   └── engine_c_asr.py     # FunASR Paraformer-zh（带 SHA-256 LRU 缓存）
-│   ├── sse.py / events_stream.py
+│   │   ├── engine_a.py            VAD + gender segmentation (K-3)
+│   │   ├── engine_c.py            Engine C orchestrator (ASR → sidecar)
+│   │   ├── engine_c_asr.py        FunASR Paraformer-zh (SHA-256 LRU cache)
+│   │   ├── engine_c_asr_en.py     faster-whisper, returns word_timestamps
+│   │   └── acoustic_analyzer.py   Engine B (deprecated, see below)
+│   ├── sse.py / events_stream.py  SSE event bus
 │   └── ...
 ├── sidecars/
-│   ├── visualizer-backend/     # vendor 自 gender-voice-visualization
-│   ├── wrapper/main.py         # FastAPI 薄壳 + MFA 参数 patch
+│   ├── visualizer-backend/        vendored from gender-voice-visualization
+│   ├── wrapper/main.py            FastAPI wrapper + MFA parameter shim
 │   └── visualizer-backend.Dockerfile
-├── inaSpeechSegmenter/         # git submodule → k3-cat/inaSpeechSegmenter
-├── taskiq.py                   # Worker broker
-└── config.py                   # Pydantic Settings
+├── inaSpeechSegmenter/            git submodule → k3-cat/inaSpeechSegmenter
+├── taskiq.py                      worker broker
+└── config.py                      Pydantic Settings
 web/
 ├── src/
-│   ├── main.js                 # 入口，IndexedDB + SSE + 整体编排
-│   └── modules/                # UI 组件（heatmap-band, metrics-panel, waveform…）
+│   ├── main.js                    entry: IndexedDB + SSE + orchestration
+│   └── modules/                   UI components (heatmap-band, metrics-panel, waveform, ...)
 └── ...
-docker-compose.yml              # app + worker + redis (+ engine-c profile)
+docker-compose.yml                 app + worker + redis (+ engine-c profile)
 railway.toml / railway.sidecar.toml
 ```
 
-## 规范
+## Deprecated
 
-* Python — Ruff（`.ruff.toml`：py313、双引号、snake_case、LF）
-* 前端 — oxlint + Prettier（tabs、120 列、camelCase、import 排序）
-* EditorConfig 覆盖全语言缩进 / 换行
-* vendor 目录（`voiceya/inaSpeechSegmenter/`、`voiceya/sidecars/visualizer-backend/`）不接受替换或重置，上游同步走 `voiceya/sidecars/README.md` 的 rsync 步骤
+**Engine B** — LPC-formant + composite gender score (`voiceya/services/audio_analyser/acoustic_analyzer.py`). Outputs are no longer surfaced to the client as of **2026-04-07**, but the code remains in the repository for reference and to keep the multi-engine option open.
 
-## 致谢
+## Conventions
+
+- **Python** — Ruff (`.ruff.toml`: py313, double quotes, snake_case, LF)
+- **Frontend** — oxlint + Prettier (tabs, 120-column, camelCase, sorted imports)
+- **EditorConfig** — covers indent / line-ending across all languages
+- **Vendor directories** (`voiceya/inaSpeechSegmenter/`, `voiceya/sidecars/visualizer-backend/`) are not to be replaced or reset; upstream sync follows the rsync steps in [`voiceya/sidecars/README.md`](./voiceya/sidecars/README.md)
+- **Branches** — `dev-en` for English-language work; merging to `main` only on explicit authorization, no cross-branch cherry-picks
+
+## Acknowledgements
+
+- [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) — Doukhan et al., ICASSP 2018 (MIT)
+- [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) — K-3 compatibility fork
+- [FunASR](https://github.com/modelscope/FunASR) — Paraformer-zh ASR (Apache-2.0)
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — CTranslate2 Whisper inference (MIT)
+- [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) — forced alignment (MIT)
+- [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) — Engine C sidecar source
+- [WaveSurfer.js](https://wavesurfer.xyz/) · [uPlot](https://github.com/leeoniya/uPlot)
 
 * [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) — Doukhan et al., ICASSP 2018（MIT）
 * [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) — K-3 兼容 fork
@@ -137,6 +235,6 @@ railway.toml / railway.sidecar.toml
 * [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) — Engine C sidecar 源
 * [WaveSurfer.js](https://wavesurfer.xyz/) · [uPlot](https://github.com/leeoniya/uPlot)
 
-## 协议 & 声明
+Source code is released under **MPL-2.0**. See [`LICENSE`](./LICENSE).
 
-源码采用 **MPL-2.0**。本工具仅用于学术研究与语音技术学习目的；性别分析结果基于统计声学模型，**不代表对个体性别身份的判断**。
+This tool is intended for academic research and voice-technology learning. Gender analysis results are derived from statistical acoustic models and **do not constitute a judgment about an individual's gender identity**.

@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from taskiq_redis.exceptions import ResultIsMissingError
 
 from voiceya.services.events_stream import PayloadT, subscribe_to_events
+from voiceya.services.queue_position import get_position
 from voiceya.taskiq import TaskStage, broker
 
 if TYPE_CHECKING:
@@ -62,6 +63,10 @@ class ErrorSSE(SSE):
     type: Literal["error"] = "error"
     code: int | None = None
     msg: str
+    # 与 ProgressSSE 相同的 i18n 协议：前端优先按 msg_key 渲染当前语言版本，
+    # 失败/旧客户端再退回 msg。
+    msg_key: str | None = None
+    msg_params: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -80,7 +85,11 @@ EVENT_BLOCK_MS = 500
 
 async def subscribe_to_events_and_generate_sse(task_id: str, progress: TaskProgress[Any]):
     while progress.state == TaskStage.PENDING:
-        yield f"data: {json.dumps(QueueSSE(num_to_wait=-1, msg='排队等候中', msg_key='progress.queued').to_dict())}\n\n"
+        pos = await get_position(task_id)
+        if pos > 0:
+            yield f"data: {json.dumps(QueueSSE(num_to_wait=pos, msg='排队等候中', msg_key='progress.queued').to_dict())}\n\n"
+        else:
+            yield f"data: {json.dumps(ProgressSSE(pct=0, msg='鸭鸭正在准备…', msg_key='progress.processing').to_dict())}\n\n"
 
         await asyncio.sleep(TICK_STEP_MS / 5 / 1000)
 

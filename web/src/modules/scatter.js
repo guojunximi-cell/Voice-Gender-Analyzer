@@ -9,8 +9,8 @@
  */
 
 import { scoreToColor as _scoreToColorUtil, resolveCSSVar } from "../utils.js";
-import { classifyForMode, dominantForMode } from "./classify.js";
 import { getMode } from "./classify-mode.js";
+import { classifyForMode, dominantForMode } from "./classify.js";
 import { t } from "./i18n.js";
 
 // ─── Layout constants ────────────────────────────────────────
@@ -96,9 +96,7 @@ function _h() {
 function _getScore(s) {
 	const mode = getMode();
 	const { label, confidence } =
-		mode === "engineA"
-			? { label: s.label, confidence: s.confidence }
-			: dominantForMode(s, mode);
+		mode === "engineA" ? { label: s.label, confidence: s.confidence } : dominantForMode(s, mode);
 	if (label !== "female" && label !== "male") return 50;
 	const conf = confidence != null ? confidence : s.gender_score != null ? s.gender_score / 100 : 0.5;
 	return label === "female" ? 50 + Math.min(conf, 1) * 50 : 50 - Math.min(conf, 1) * 50;
@@ -263,7 +261,6 @@ function _draw() {
 				ctx.restore();
 			}
 		}
-
 	}
 }
 
