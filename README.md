@@ -228,13 +228,6 @@ railway.toml / railway.sidecar.toml
 - [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) — Engine C sidecar source
 - [WaveSurfer.js](https://wavesurfer.xyz/) · [uPlot](https://github.com/leeoniya/uPlot)
 
-* [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) — Doukhan et al., ICASSP 2018（MIT）
-* [k3-cat/inaSpeechSegmenter](https://github.com/k3-cat/inaSpeechSegmenter) — K-3 兼容 fork
-* [FunASR](https://github.com/modelscope/FunASR) — Paraformer-zh ASR（Apache-2.0）
-* [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/) — 强制对齐（MIT）
-* [gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization) — Engine C sidecar 源
-* [WaveSurfer.js](https://wavesurfer.xyz/) · [uPlot](https://github.com/leeoniya/uPlot)
-
 Source code is released under **MPL-2.0**. See [`LICENSE`](./LICENSE).
 
 This tool is intended for academic research and voice-technology learning. Gender analysis results are derived from statistical acoustic models and **do not constitute a judgment about an individual's gender identity**.
