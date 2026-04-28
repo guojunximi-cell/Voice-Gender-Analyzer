@@ -47,6 +47,7 @@ export class GenderLegend {
 			`<p>${t("legend.sci1", { res: THRESHOLDS.resonance })}</p>` +
 			`<p>${t("legend.sci2")}</p>` +
 			`<p>${t("legend.sci3", { neutral: THRESHOLDS.pitchNeutralHz, fem: THRESHOLDS.pitchFemHz })}</p>` +
+			`<p>${t("legend.sci4")}</p>` +
 			`<p class="vga-gender-legend__note">${t("legend.sciNote")}</p>` +
 			`</div>`;
 
