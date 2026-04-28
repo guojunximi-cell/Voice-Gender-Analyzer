@@ -9,7 +9,7 @@
  * is null (Engine C disabled or failed), the panel shows a static notice.
  */
 
-import { certaintTag, fmt, LABEL_META } from "../utils.js";
+import { certaintTag, fmt } from "../utils.js";
 import { t } from "./i18n.js";
 
 function animNum(el, target, suffix = "", duration = 600) {
@@ -210,22 +210,17 @@ export function clearMetricsPanel() {
 }
 
 // ─── Advice v2 panel ─────────────────────────────────────────
-// Renders summary.advice. Two surfaces:
-//   1. #advice-panel (always available): one-sentence summary + gating warning.
-//      Independent of Engine C — visible whenever summary.advice exists.
-//   2. #mc-f0-zone (inside the Engine-C pitch card): zone label chip
-//      ("中低基频" / "声学中性区间" …) sourced from f0_panel.range_zone_key.
+// Renders summary.advice as a gating warning. The summary text is
+// suppressed because the F0 card + advice panels already convey the
+// same numbers and tendency.
 // See docs/plans/v2_redesign_measurement.md §1, §3.
 export function renderAdvicePanel(advice) {
 	const panel = document.getElementById("advice-panel");
-	const zoneEl = document.getElementById("mc-f0-zone");
 	if (!panel) return;
 	if (!advice) {
 		panel.hidden = true;
-		if (zoneEl) zoneEl.hidden = true;
 		return;
 	}
-	panel.hidden = false;
 
 	const warnEl = document.getElementById("advice-warning");
 	const warnText = document.getElementById("advice-warning-text");
@@ -233,35 +228,22 @@ export function renderAdvicePanel(advice) {
 	if (warnEl && warnText && firstWarn) {
 		warnText.textContent = t(firstWarn.key, firstWarn.params || {});
 		warnEl.hidden = false;
+		const closeBtn = document.getElementById("advice-warning-close");
+		if (closeBtn && !closeBtn.dataset.bound) {
+			closeBtn.dataset.bound = "1";
+			closeBtn.addEventListener("click", () => {
+				warnEl.hidden = true;
+				panel.hidden = true;
+			});
+		}
 	} else if (warnEl) {
 		warnEl.hidden = true;
 	}
 
-	const summaryEl = document.getElementById("advice-summary");
-	if (summaryEl) {
-		if (advice.summary_panel) {
-			summaryEl.textContent = t(advice.summary_panel.text_key, advice.summary_panel.text_params || {});
-			summaryEl.hidden = false;
-		} else {
-			summaryEl.hidden = true;
-		}
-	}
-
-	const zoneKey = advice.f0_panel?.range_zone_key;
-	if (zoneEl) {
-		if (zoneKey) {
-			zoneEl.textContent = t(`advice.zone.${zoneKey}`);
-			zoneEl.dataset.zone = zoneKey;
-			zoneEl.hidden = false;
-		} else {
-			zoneEl.hidden = true;
-		}
-	}
+	panel.hidden = !firstWarn;
 }
 
 export function clearAdvicePanel() {
 	const panel = document.getElementById("advice-panel");
 	if (panel) panel.hidden = true;
-	const zoneEl = document.getElementById("mc-f0-zone");
-	if (zoneEl) zoneEl.hidden = true;
 }

@@ -276,6 +276,11 @@
 								支持 MP3 · WAV · OGG · M4A · FLAC · 最大 5 MB / 3 分钟
 							</p>
 						</div>
+						<div class="upload-import-row">
+							<button class="btn-secondary small" id="import-result-btn" type="button" data-i18n="import.button">
+								导入分析结果
+							</button>
+						</div>
 					</div>
 
 					<!-- ── Analysis mode + script picker (record tab only) ──────
@@ -328,8 +333,24 @@
 								</label>
 							</div>
 							<p id="record-script-text" class="record-script-text">—</p>
-							<p class="record-script-hint" data-i18n="record.hint">
+							<textarea
+								id="record-script-custom"
+								class="record-script-custom"
+								rows="4"
+								data-i18n-placeholder="record.scriptCustomPlaceholder"
+								placeholder="在这里写下你想朗读的稿子……"
+								hidden
+							></textarea>
+							<p id="record-script-hint" class="record-script-hint" data-i18n="record.hint">
 								朗读上方文字；鸭鸭会直接按这段稿子对齐，不再跑语音识别。
+							</p>
+							<p
+								id="record-script-custom-hint"
+								class="record-script-hint"
+								data-i18n="record.customHint"
+								hidden
+							>
+								这段文字会直接喂给对齐器；请确保和「分析语言」一致，否则对不齐。
 							</p>
 						</div>
 					</div>
@@ -402,7 +423,56 @@
 						</svg>
 						<span data-i18n="upload.privacy"> 服务器不留存音频与分析结果；历史记录保存在您本地浏览器，可随时清空 </span>
 					</p>
+
+					<input type="file" id="import-input" accept=".json,application/json" hidden />
 				</section>
+
+				<!-- Export options dialog: range (current/all) + content (audio/engine_c).
+				     Opened from the player toolbar's "Export result" button. -->
+				<dialog id="export-dialog" class="export-dialog">
+					<form method="dialog" class="export-dialog-form">
+						<h3 class="export-dialog-title" data-i18n="export.dialogTitle">导出分析结果</h3>
+
+						<fieldset class="export-dialog-group">
+							<legend data-i18n="export.scopeLabel">范围</legend>
+							<label class="export-dialog-option">
+								<input type="radio" name="export-scope" value="current" checked />
+								<span data-i18n="export.scopeCurrent">当前结果</span>
+							</label>
+							<label class="export-dialog-option">
+								<input type="radio" name="export-scope" value="all" />
+								<span>
+									<span data-i18n="export.scopeAll">全部历史</span>
+									<span class="hint-muted" id="export-history-count"></span>
+								</span>
+							</label>
+						</fieldset>
+
+						<fieldset class="export-dialog-group">
+							<legend data-i18n="export.contentLabel">内容</legend>
+							<label class="export-dialog-option">
+								<input type="checkbox" id="export-include-audio" checked />
+								<span>
+									<span data-i18n="export.includeAudio">包含原音频</span>
+									<span class="hint-muted" id="export-audio-size"></span>
+								</span>
+							</label>
+							<label class="export-dialog-option">
+								<input type="checkbox" id="export-include-engine-c" checked />
+								<span data-i18n="export.includeEngineC">包含 Engine C 音素数据</span>
+							</label>
+						</fieldset>
+
+						<div class="export-dialog-actions">
+							<button type="button" class="btn-secondary" id="export-dialog-cancel" data-i18n="action.cancel">
+								取消
+							</button>
+							<button type="button" class="btn-primary" id="export-dialog-confirm" data-i18n="export.confirm">
+								导出
+							</button>
+						</div>
+					</form>
+				</dialog>
 
 				<!-- Player (shown after file is loaded) -->
 				<section id="player-section" class="card player-card" hidden>
@@ -424,7 +494,26 @@
 						<span id="audio-unavailable-hint" class="hint-muted" data-i18n="upload.audioUnavailable" hidden>
 							原音频不可用（页面刷新后丢失）
 						</span>
-						<button id="change-file-btn" class="link-btn small" data-i18n="action.changeFile">更换文件</button>
+						<button id="export-result-btn" class="btn-secondary small export-result-btn" type="button" hidden>
+							<svg
+								width="12"
+								height="12"
+								viewBox="0 0 16 16"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M8 2v8M5 7l3 3 3-3" />
+								<path d="M2 13h12" />
+							</svg>
+							<span data-i18n="export.button">导出</span>
+						</button>
+						<button id="change-file-btn" class="btn-secondary small" type="button" data-i18n="action.changeFile">
+							更换文件
+						</button>
 					</div>
 					<div id="waveform-container" class="waveform-container">
 						<div id="waveform"></div>
@@ -597,8 +686,29 @@
 							<line x1="12" y1="17" x2="12.01" y2="17" />
 						</svg>
 						<span id="advice-warning-text">—</span>
+						<button
+							type="button"
+							id="advice-warning-close"
+							class="advice-warning-close"
+							data-i18n-aria-label="advice.warning.dismiss"
+							aria-label="Dismiss"
+						>
+							<svg
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
 					</div>
-					<p id="advice-summary" class="advice-summary" hidden></p>
 				</div>
 
 				<div id="metrics-empty" class="metrics-placeholder">
@@ -639,10 +749,7 @@
 					<div class="mc-cards-row">
 						<div class="mc-card">
 							<div class="mc-card-title" data-i18n="metrics.cardPitch">基频 PITCH</div>
-							<div class="mc-card-big-line">
-								<span class="mc-card-big" id="mc-f0-median">— Hz</span>
-								<span class="mc-card-zone-tag" id="mc-f0-zone" hidden></span>
-							</div>
+							<div class="mc-card-big" id="mc-f0-median">— Hz</div>
 							<div class="mc-card-sub" id="mc-f0-std">±— Hz</div>
 						</div>
 						<div class="mc-card">
@@ -754,13 +861,13 @@
 					</p>
 				</section>
 
-
-
 				<section class="vga-help-section">
 					<h4 data-i18n="help.heatmap.h">热力图中</h4>
 					<dl>
 						<dt data-i18n="help.heatmap.resonanceDT">共鸣</dt>
-						<dd data-i18n="help.heatmap.resonanceDD">音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。大于 50% 即意味着女性化。</dd>
+						<dd data-i18n="help.heatmap.resonanceDD">
+							音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。大于 50% 即意味着女性化。
+						</dd>
 						<dt data-i18n="help.heatmap.pitchDT">音高</dt>
 						<dd data-i18n="help.heatmap.pitchDD">音素内的 F0。被认为是男女性化声音的主要边界。</dd>
 					</dl>
@@ -771,7 +878,10 @@
 					<p data-i18n="help.overall.note">基频，共鸣和共振峰采用有效数据的平均值。</p>
 					<dl>
 						<dt data-i18n="help.overall.nnDT">NN / Engine A</dt>
-						<dd data-i18n="help.overall.nnDD">来自 inaSpeechSegmenter 的 CNN 分类器，数据源以法语为主。输出性别标签，设计目的是区分 cis 人群在语音中的分布。仅作为 tone 参考。</dd>
+						<dd data-i18n="help.overall.nnDD">
+							来自 inaSpeechSegmenter 的 CNN 分类器，数据源以法语为主。输出性别标签，设计目的是区分 cis
+							人群在语音中的分布。仅作为 tone 参考。
+						</dd>
 					</dl>
 				</section>
 
@@ -780,11 +890,19 @@
 					<div class="vga-help-qa">
 						<details>
 							<summary data-i18n="help.qa.q1">先看哪里？</summary>
-							<p data-i18n="help.qa.a1">看 resonance 和 pitch 的热力图，不要看 Neural Net 那个百分比。Neural Net 不准。我正在把它降级成「音色参考」。Resonance 和 pitch 是直接测量出来的，时间分辨率细到每个音素，这才是能指导练习的东西。</p>
+							<p data-i18n="help.qa.a1">
+								看 resonance 和 pitch 的热力图，不要看 Neural Net 那个百分比。Neural Net
+								不准。我正在把它降级成「音色参考」。Resonance 和 pitch
+								是直接测量出来的，时间分辨率细到每个音素，这才是能指导练习的东西。
+							</p>
 						</details>
 						<details>
 							<summary data-i18n="help.qa.q2">三个引擎分歧？</summary>
-							<p data-i18n="help.qa.a2">信 resonance 和 pitch。它们对不上 NN 是正常的。它们测的不是同一个东西。更有用的问法是「resonance 和 pitch 自己之间对得上吗」。如果 pitch 已经上去了但 resonance 还偏低，说明抬了音高但共鸣腔还没改，这就是下一步的方向。</p>
+							<p data-i18n="help.qa.a2">
+								信 resonance 和 pitch。它们对不上 NN 是正常的。它们测的不是同一个东西。更有用的问法是「resonance 和
+								pitch 自己之间对得上吗」。如果 pitch 已经上去了但 resonance
+								还偏低，说明抬了音高但共鸣腔还没改，这就是下一步的方向。
+							</p>
 						</details>
 						<details>
 							<summary data-i18n="help.qa.q3">"Other" 是什么？</summary>
@@ -796,7 +914,10 @@
 						</details>
 						<details>
 							<summary data-i18n="help.qa.q5">那这工具到底有什么用？</summary>
-							<p data-i18n="help.qa.a5">看每个元音的 resonance 和 pitch 在时间轴上的变化。「这个 a 很亮，那个 a 塌回去了」。这种细节耳朵很难抓到，但热力图能看出来。</p>
+							<p data-i18n="help.qa.a5">
+								看每个元音的 resonance 和 pitch 在时间轴上的变化。「这个 a 很亮，那个 a
+								塌回去了」。这种细节耳朵很难抓到，但热力图能看出来。
+							</p>
 						</details>
 						<details>
 							<summary data-i18n="help.qa.q6">音频限制？</summary>
@@ -912,44 +1033,44 @@
 				</section>
 				<section class="vga-help-section">
 					<details class="vga-help-flow-details">
-					<summary class="vga-help-flow-summary" data-i18n="help.flow.h">分析流程</summary>
-					<div class="vga-help-flow">
-						<div class="vga-help-flow-step">
-							<div class="vga-help-flow-step-h" data-i18n="help.flow.s1.h">上传 / 录音</div>
-							<div class="vga-help-flow-step-note" data-i18n="help.flow.s1.note" data-i18n-params='{"mb":5,"min":3}'>
-								拖拽音频、选择文件，或调用麦克风（≤ 5 MB，&lt; 3 分钟，中文 zh-CN 或英文 en-US）
+						<summary class="vga-help-flow-summary" data-i18n="help.flow.h">分析流程</summary>
+						<div class="vga-help-flow">
+							<div class="vga-help-flow-step">
+								<div class="vga-help-flow-step-h" data-i18n="help.flow.s1.h">上传 / 录音</div>
+								<div class="vga-help-flow-step-note" data-i18n="help.flow.s1.note" data-i18n-params='{"mb":5,"min":3}'>
+									拖拽音频、选择文件，或调用麦克风（≤ 5 MB，&lt; 3 分钟，中文 zh-CN 或英文 en-US）
+								</div>
+							</div>
+							<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
+							<div class="vga-help-flow-step">
+								<div class="vga-help-flow-step-h" data-i18n="help.flow.s2.h">VAD 分段</div>
+								<div class="vga-help-flow-step-note" data-i18n="help.flow.s2.note">
+									Engine A · inaSpeechSegmenter K-3 神经网络分出语音 / 音乐 / 静音
+								</div>
+							</div>
+							<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
+							<div class="vga-help-flow-step">
+								<div class="vga-help-flow-step-h" data-i18n="help.flow.s3.h">文本对齐</div>
+								<div class="vga-help-flow-step-note" data-i18n="help.flow.s3.note">
+									Engine C · 自由模式跑 ASR（FunASR / faster-whisper），跟稿模式直接用您的稿子；Montreal Forced Aligner
+									对齐到音素
+								</div>
+							</div>
+							<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
+							<div class="vga-help-flow-step">
+								<div class="vga-help-flow-step-h" data-i18n="help.flow.s4.h">共振峰 + z-score</div>
+								<div class="vga-help-flow-step-note" data-i18n="help.flow.s4.note">
+									Praat 提 F1 / F2 / F3 → z-score 合成共鸣值
+								</div>
+							</div>
+							<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
+							<div class="vga-help-flow-step">
+								<div class="vga-help-flow-step-h" data-i18n="help.flow.s5.h">三面板渲染</div>
+								<div class="vga-help-flow-step-note" data-i18n="help.flow.s5.note">
+									波形 · 中央三明治时间轴 · 右侧整段均值
+								</div>
 							</div>
 						</div>
-						<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
-						<div class="vga-help-flow-step">
-							<div class="vga-help-flow-step-h" data-i18n="help.flow.s2.h">VAD 分段</div>
-							<div class="vga-help-flow-step-note" data-i18n="help.flow.s2.note">
-								Engine A · inaSpeechSegmenter K-3 神经网络分出语音 / 音乐 / 静音
-							</div>
-						</div>
-						<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
-						<div class="vga-help-flow-step">
-							<div class="vga-help-flow-step-h" data-i18n="help.flow.s3.h">文本对齐</div>
-							<div class="vga-help-flow-step-note" data-i18n="help.flow.s3.note">
-								Engine C · 自由模式跑 ASR（FunASR / faster-whisper），跟稿模式直接用您的稿子；Montreal Forced Aligner
-								对齐到音素
-							</div>
-						</div>
-						<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
-						<div class="vga-help-flow-step">
-							<div class="vga-help-flow-step-h" data-i18n="help.flow.s4.h">共振峰 + z-score</div>
-							<div class="vga-help-flow-step-note" data-i18n="help.flow.s4.note">
-								Praat 提 F1 / F2 / F3 → z-score 合成共鸣值
-							</div>
-						</div>
-						<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
-						<div class="vga-help-flow-step">
-							<div class="vga-help-flow-step-h" data-i18n="help.flow.s5.h">三面板渲染</div>
-							<div class="vga-help-flow-step-note" data-i18n="help.flow.s5.note">
-								波形 · 中央三明治时间轴 · 右侧整段均值
-							</div>
-						</div>
-					</div>
 					</details>
 				</section>
 			</div>

@@ -152,7 +152,8 @@
       "Bash([ -f /home/yaya/Voice-Gender-Analyzer/tests/reports/category_eval_*.md ])",
       "Bash(2>/dev/null)",
       "Bash(curl -sL --max-time 30 \"https://huggingface.co/api/datasets?search=vctk&full=true&limit=10\")",
-      "Bash(.venv/bin/python *)"
+      "Bash(.venv/bin/python *)",
+      "Bash(pnpm run *)"
     ]
   }
 }

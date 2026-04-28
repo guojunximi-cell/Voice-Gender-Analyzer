@@ -18,18 +18,16 @@ function animateCounter(el, target, suffix = "%", duration = 700) {
 // ─── Compute stats from analysis array ───────────────────────
 function computeStats(analysis) {
 	const totals = {};
-	let total = 0;
 	for (const seg of analysis) {
 		const d = seg.end_time - seg.start_time;
 		totals[seg.label] = (totals[seg.label] || 0) + d;
-		total += d;
 	}
-	return { totals, total };
+	return { totals };
 }
 
 // ─── Stats cards ─────────────────────────────────────────────
 export function renderStats(analysis) {
-	const { totals, total } = computeStats(analysis);
+	const { totals } = computeStats(analysis);
 	const maleDur = totals["male"] || 0;
 	const femaleDur = totals["female"] || 0;
 

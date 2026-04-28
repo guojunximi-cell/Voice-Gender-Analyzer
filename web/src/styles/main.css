@@ -389,6 +389,122 @@ body {
 	font-weight: normal;
 }
 
+/* Import-result row sits below the upload dropzone — secondary entry,
+   centered so it reads as a quiet alternative to the main CTA. */
+.upload-import-row {
+	display: flex;
+	justify-content: center;
+	margin-top: 12px;
+}
+
+/* Secondary action button — paired with btn-primary in toolbars / dialogs. */
+.btn-secondary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: var(--surface);
+	color: var(--text-primary);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	padding: 6px 12px;
+	font: inherit;
+	font-size: 0.85rem;
+	font-weight: 500;
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		background var(--transition),
+		border-color var(--transition);
+}
+.btn-secondary:hover:not(:disabled) {
+	background: var(--accent-subtle);
+	border-color: var(--accent-border);
+}
+.btn-secondary:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+/* Small modifier — used in file-info row so Export / Change-file line up
+   with the historical link-btn.small font size. */
+.btn-secondary.small {
+	font-size: 0.78rem;
+	padding: 4px 10px;
+	gap: 5px;
+}
+
+/* Export dialog (range + content options). Uses native <dialog>.
+   --bg-primary 不存在，必须用 --surface（白）；UA 默认居中，再加
+   margin:auto 防外层 transform 影响。 */
+.export-dialog {
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-md);
+	background: var(--surface);
+	color: var(--text-primary);
+	padding: 0;
+	max-width: 440px;
+	width: calc(100% - 32px);
+	box-shadow: var(--shadow-md);
+	margin: auto;
+}
+.export-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.35);
+}
+.export-dialog-form {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 20px 22px;
+}
+.export-dialog-title {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+.export-dialog-group {
+	border: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.export-dialog-group legend {
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	padding: 0 0 4px;
+}
+.export-dialog-option {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	font-size: 0.9rem;
+	color: var(--text-primary);
+	cursor: pointer;
+	padding: 4px 6px;
+	border-radius: var(--radius-sm);
+}
+.export-dialog-option:hover {
+	background: var(--accent-subtle);
+}
+.export-dialog-option input {
+	margin-top: 3px;
+	accent-color: var(--accent);
+}
+.export-dialog-option .hint-muted {
+	display: inline-block;
+	margin-left: 6px;
+}
+.export-dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-top: 4px;
+}
+
 .btn-primary {
 	display: inline-flex;
 	align-items: center;
@@ -1074,9 +1190,7 @@ body {
 }
 
 /* ── Advice v2 panel ──────────────────────────────────────────
-   One-sentence summary + gating warning. The zone label chip
-   ("中低基频" / "声学中性区间" …) lives inside the existing PITCH
-   card — see .mc-card-zone-tag below. */
+   One-sentence summary + gating warning. */
 .advice-panel {
 	padding: 14px 14px 8px;
 	display: flex;
@@ -1103,40 +1217,38 @@ body {
 	color: var(--accent);
 }
 
-.advice-summary {
-	margin: 0;
-	padding: 10px 12px;
-	background: var(--surface);
-	border: 1px solid var(--border-strong);
-	border-radius: var(--radius-md);
-	font-size: 0.9rem;
-	line-height: 1.5;
-	color: var(--text-primary);
+.advice-warning-text,
+#advice-warning-text {
+	flex: 1;
 }
 
-/* Zone label chip injected into the PITCH card. Highlights
-   mid_neutral specifically because that is the F0 range where
-   the ina classifier is unreliable. */
-.mc-card-big-line {
-	display: flex;
-	align-items: baseline;
-	gap: 8px;
-	flex-wrap: wrap;
-}
-
-.mc-card-zone-tag {
-	display: inline-block;
-	padding: 2px 8px;
-	border-radius: 99px;
-	background: var(--border-strong);
+.advice-warning-close {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	margin-left: 4px;
+	padding: 0;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
 	color: var(--text-secondary);
-	font-size: 0.72rem;
-	font-weight: 500;
+	cursor: pointer;
+	opacity: 0.7;
+	transition:
+		background-color 120ms ease,
+		opacity 120ms ease,
+		color 120ms ease;
 }
 
-.mc-card-zone-tag[data-zone="mid_neutral"] {
-	background: color-mix(in srgb, var(--accent) 14%, transparent);
+.advice-warning-close:hover,
+.advice-warning-close:focus-visible {
+	background: color-mix(in srgb, var(--accent) 18%, transparent);
 	color: var(--accent);
+	opacity: 1;
+	outline: none;
 }
 
 #metrics-content {
@@ -1904,6 +2016,34 @@ body {
 	color: var(--text-primary);
 	margin: 0 0 6px;
 	letter-spacing: 0.02em;
+}
+.record-script-custom {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	font: inherit;
+	font-size: 1rem;
+	line-height: 1.65;
+	letter-spacing: 0.02em;
+	color: var(--text-primary);
+	background-color: var(--surface);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	padding: 8px 10px;
+	margin: 0 0 6px;
+	resize: vertical;
+	min-height: 88px;
+	transition:
+		border-color var(--transition),
+		box-shadow var(--transition);
+}
+.record-script-custom:hover {
+	border-color: var(--accent-border);
+}
+.record-script-custom:focus-visible {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 .record-script-hint {
 	font-size: 0.72rem;

@@ -4,6 +4,10 @@
 // EN：通用朗读材料，优先选择语音训练社区熟悉的文本（Rainbow Passage 等）——
 //     覆盖全部英语元音与常见辅音组合，长度约 30-60 s，适合做 Engine C 对齐。
 
+// "自定义" 槽位用这个 id；不在 PRESET_* 列表里 —— 文本由用户输入，
+// main.js 在 dropdown 末尾单独追加这个选项。
+export const CUSTOM_SCRIPT_ID = "custom";
+
 export const PRESET_SCRIPTS_ZH = [
 	{
 		id: "mountain-hut",

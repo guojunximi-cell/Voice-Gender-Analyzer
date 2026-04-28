@@ -13,7 +13,6 @@ const ACCEPTED_TYPES = [
 ];
 const ACCEPTED_EXTS = [".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac", ".opus", ".aiff", ".au", ".caf", ".webm"];
 export const DEFAULT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-export const RESTRICTED_MAX_BYTES = 5 * 1024 * 1024; // 5 MB（非并发模式）
 
 export function validateFile(file, maxBytes = DEFAULT_MAX_BYTES) {
 	if (!file) return t("upload.errNoFile");
