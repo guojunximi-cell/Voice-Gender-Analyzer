@@ -93,19 +93,14 @@ export function scoreToColor(score) {
 }
 
 // ─── Certainty tag for a voiced segment ──────────────────────
-// Uses only Engine A (inaSpeechSegmenter) confidence + label.
-// Returns i18n-resolved text in the current UI language.
+// 3-tier tone tendency mapper (advice v2 §5). Single threshold 0.78 on the
+// C1 margin (Engine A T=2.0 calibrated). No "Strong/Clear/Boundary" gradations
+// — confidence numbers must not appear adjacent to the tendency text.
+// See docs/plans/v2_redesign_measurement.md §5.
+const TONE_THRESHOLD = 0.78;
 export function certaintTag(seg) {
 	if (!seg || (seg.label !== "female" && seg.label !== "male")) return "";
-	const c = seg.confidence ?? 0.5;
-	const composite = seg.label === "female" ? 50 + c * 50 : 50 - c * 50;
-
-	if (c < 0.4) return t("certainty.low");
-	if (composite >= 42 && composite <= 58) return t("certainty.boundary");
-	if (c > 0.8) {
-		if (seg.label === "female") return t(composite > 82 ? "certainty.femaleStrong" : "certainty.femaleClear");
-		return t(composite < 18 ? "certainty.maleStrong" : "certainty.maleClear");
-	}
-	if (seg.label === "female") return t(composite > 70 ? "certainty.femaleLean" : "certainty.female");
-	return t(composite < 30 ? "certainty.maleLean" : "certainty.male");
+	const margin = seg.confidence ?? 0;
+	if (margin < TONE_THRESHOLD) return t("advice.tone.not_clearly_leaning");
+	return t(seg.label === "female" ? "advice.tone.leans_feminine" : "advice.tone.leans_masculine");
 }

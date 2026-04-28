@@ -51,6 +51,17 @@ def do_statics(analyse_results: list[AnalyseResultItem]):
     if confidences:
         narr = np.array(confidences)
         overall_confidence = float(np.average(narr[:, 0], weights=narr[:, 1]))
+        logger.info(
+            "confidence dist — n=%d mean=%.3f std=%.3f p10/p50/p90=[%.2f,%.2f,%.2f] hi(>0.9)=%d lo(<0.1)=%d",
+            len(narr),
+            narr[:, 0].mean(),
+            narr[:, 0].std(),
+            float(np.percentile(narr[:, 0], 10)),
+            float(np.percentile(narr[:, 0], 50)),
+            float(np.percentile(narr[:, 0], 90)),
+            int(np.sum(narr[:, 0] > 0.9)),
+            int(np.sum(narr[:, 0] < 0.1)),
+        )
 
     # F0 / gender_score: 按时长 / voiced_frames 加权
     if acoustics:

@@ -753,6 +753,23 @@ body {
 	margin-bottom: 12px;
 }
 
+#segments-details > summary {
+	list-style: none;
+	cursor: pointer;
+}
+#segments-details > summary::-webkit-details-marker {
+	display: none;
+}
+#segments-details > summary .section-title::after {
+	content: " ▸";
+	font-size: 0.7em;
+	color: var(--text-muted);
+	margin-left: 4px;
+}
+#segments-details[open] > summary .section-title::after {
+	content: " ▾";
+}
+
 .section-title {
 	font-size: 0.9rem;
 	font-weight: 600;
@@ -1047,6 +1064,72 @@ body {
 	padding: 24px;
 }
 
+/* ── Advice v2 panel ──────────────────────────────────────────
+   One-sentence summary + gating warning. The zone label chip
+   ("中低基频" / "声学中性区间" …) lives inside the existing PITCH
+   card — see .mc-card-zone-tag below. */
+.advice-panel {
+	padding: 14px 14px 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	border-bottom: 1px solid var(--border-strong);
+}
+
+.advice-warning {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: color-mix(in srgb, var(--accent) 10%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+	border-radius: var(--radius-sm);
+	color: var(--text-secondary);
+	font-size: 0.76rem;
+	line-height: 1.4;
+}
+
+.advice-warning svg {
+	flex-shrink: 0;
+	color: var(--accent);
+}
+
+.advice-summary {
+	margin: 0;
+	padding: 10px 12px;
+	background: var(--surface);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-md);
+	font-size: 0.9rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+}
+
+/* Zone label chip injected into the PITCH card. Highlights
+   mid_neutral specifically because that is the F0 range where
+   the ina classifier is unreliable. */
+.mc-card-big-line {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.mc-card-zone-tag {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 99px;
+	background: var(--border-strong);
+	color: var(--text-secondary);
+	font-size: 0.72rem;
+	font-weight: 500;
+}
+
+.mc-card-zone-tag[data-zone="mid_neutral"] {
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+	color: var(--accent);
+}
+
 #metrics-content {
 	padding: 14px 14px 32px;
 	display: flex;
@@ -1284,65 +1367,6 @@ body {
 
 /* Gender spectrum bar — visually aligned with the pitch-range bar:
    soft gray base + low-alpha gradient overlay + frosted-glass indicator. */
-.gender-spectrum {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
-.gender-track {
-	position: relative;
-	height: 10px;
-	border-radius: 99px;
-	background: var(--border-strong);
-	overflow: visible;
-}
-
-.gender-track::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	background: linear-gradient(
-		to right,
-		rgba(91, 141, 239, 0.45) 0%,
-		rgba(160, 120, 210, 0.35) 50%,
-		rgba(224, 122, 170, 0.45) 100%
-	);
-	pointer-events: none;
-}
-
-.gender-thumb {
-	position: absolute;
-	top: 50%;
-	transform: translate(-50%, -50%);
-	width: 4px;
-	height: 20px;
-	border-radius: 2px;
-	left: 50%;
-	background: rgba(255, 255, 255, 0.5);
-	backdrop-filter: blur(4px) saturate(1.2);
-	-webkit-backdrop-filter: blur(4px) saturate(1.2);
-	box-shadow:
-		0 1px 3px rgba(0, 0, 0, 0.14),
-		inset 0 0 0 1px rgba(255, 255, 255, 0.7);
-	transition: left 600ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-[data-theme="dark"] .gender-thumb {
-	background: rgba(255, 255, 255, 0.18);
-	box-shadow:
-		0 1px 3px rgba(0, 0, 0, 0.4),
-		inset 0 0 0 1px rgba(255, 255, 255, 0.32);
-}
-
-.gender-labels {
-	display: flex;
-	justify-content: space-between;
-	font-size: 0.68rem;
-	color: var(--text-muted);
-}
-
 .gender-score-display {
 	font-size: 1.1rem;
 	font-weight: 600;
@@ -1395,17 +1419,19 @@ body {
 	transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Certainty tag badge in metrics panel */
+/* Certainty tag — primary signal of the NN section, no spectrum bar */
 .certainty-tag {
+	display: block;
 	text-align: center;
-	font-size: 11px;
-	padding: 3px 10px;
-	border-radius: 99px;
-	background: var(--bg-secondary);
-	color: var(--text-muted);
+	font-size: 1.05rem;
+	font-weight: 600;
+	padding: 14px 16px;
+	border-radius: 12px;
+	background: var(--surface-hover);
+	color: var(--text-primary);
 	border: 1px solid var(--border);
-	margin-top: 6px;
-	letter-spacing: 0.03em;
+	margin-top: 4px;
+	line-height: 1.3;
 }
 
 /* Segment label in right panel header */

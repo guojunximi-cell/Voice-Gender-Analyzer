@@ -4,7 +4,7 @@ import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
 import { applyStaticDom, getLang, onLangChange, setLang, t } from "./modules/i18n.js";
-import { clearMetricsPanel, renderMetricsPanel } from "./modules/metrics-panel.js";
+import { clearMetricsPanel, renderAdvicePanel, renderMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
 import { highlightActiveSegment, renderSegments, renderStats, resetResults } from "./modules/results.js";
@@ -730,6 +730,10 @@ $("analyze-btn")?.addEventListener("click", async () => {
 		// Rendered once here — no per-segment updates.
 		renderMetricsPanel(data.summary, data.analysis);
 
+		// Advice v2 panel — independent of Engine C; renders f0/tone/summary
+		// based on summary.advice (gating + caveat). See docs/plans/v2_redesign_measurement.md.
+		renderAdvicePanel(data.summary?.advice);
+
 		// Feed Engine C data to phone timeline
 		if (_phoneTimeline && data.summary?.engine_c) {
 			_phoneTimeline.setData(data.summary.engine_c);
@@ -803,6 +807,7 @@ async function onScatterDotClick(session) {
 	renderStats(_segs);
 	renderSegments(session.analysis);
 	renderMetricsPanel(session.summary, session.analysis);
+	renderAdvicePanel(session.summary?.advice);
 
 	const tlRoot = $("phone-timeline-root");
 	const cachedFile = await audioCache.get(session.id);
@@ -913,7 +918,7 @@ async function initScatterFromStorage() {
 	if (!tabBar || !rightPanel) return;
 
 	const tabs = tabBar.querySelectorAll(".mobile-tab");
-	let activeTab = "segments";
+	let activeTab = "metrics";
 
 	function applyTab(tab) {
 		activeTab = tab;
@@ -978,6 +983,7 @@ function _updateLangToggleLabel() {
 
 $("lang-toggle")?.addEventListener("click", () => {
 	setLang(getLang() === "zh-CN" ? "en-US" : "zh-CN");
+	location.reload();
 });
 
 onLangChange(() => {
@@ -990,6 +996,7 @@ onLangChange(() => {
 		renderStats(segs);
 		renderSegments(analysisData.analysis);
 		renderMetricsPanel(analysisData.summary, analysisData.analysis);
+		renderAdvicePanel(analysisData.summary?.advice);
 	}
 	scatterRedraw();
 });

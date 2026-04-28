@@ -5,7 +5,6 @@ import os
 import sys
 
 import numpy as np
-
 from inaSpeechSegmenter.segmenter import Segmenter
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,6 @@ def _patch_segmenter_for_frame_confidence():
         return
 
     import keras
-
     from inaSpeechSegmenter import segmenter as _iss_seg
     from inaSpeechSegmenter.segmenter import (
         DnnSegmenter,
@@ -45,8 +43,8 @@ def _patch_segmenter_for_frame_confidence():
 
     # iSS 的 media2sig16kmono 在 ffmpeg=None 分支会对 medianame 做 startswith("http://")
     # 检查，阻止我们直接喂 BytesIO。这里直接替换为"file-like / 路径都接受"的版本。
-    from inaSpeechSegmenter import io as _iss_io
     import soundfile as _sf
+    from inaSpeechSegmenter import io as _iss_io
 
     def _media2sig16kmono(medianame, start_sec=None, stop_sec=None, ffmpeg="ffmpeg", dtype="float64"):
         if ffmpeg is None:

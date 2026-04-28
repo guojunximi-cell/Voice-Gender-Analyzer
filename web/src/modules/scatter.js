@@ -8,13 +8,12 @@
  * Click a bar → fires onDotClick(session).
  */
 
-import { scoreToColor as _scoreToColorUtil, resolveCSSVar } from "../utils.js";
+import { scoreToColor as _scoreToColorUtil } from "../utils.js";
 import { getMode } from "./classify-mode.js";
 import { classifyForMode, dominantForMode } from "./classify.js";
-import { t } from "./i18n.js";
 
 // ─── Layout constants ────────────────────────────────────────
-const PAD = { top: 36, right: 44, bottom: 24, left: 48 };
+const PAD = { top: 14, right: 14, bottom: 14, left: 14 };
 const BAR_MAX_W = 56;
 const BAR_MIN_W = 8;
 const BAR_GAP_RATIO = 0.35; // gap / slot width
@@ -140,12 +139,8 @@ function _layout() {
 function _draw() {
 	if (!canvas || !ctx) return;
 
-	const { W, H, plotLeft, plotRight, plotTop, plotBottom, plotW, slotW, barW } = _layout();
+	const { W, H, plotLeft, plotRight, plotTop, plotBottom, plotW } = _layout();
 	ctx.clearRect(0, 0, W, H);
-
-	const textColor = resolveCSSVar("--text-muted") || "#888";
-	const lineColor = resolveCSSVar("--border") || "rgba(128,128,128,0.15)";
-	const isSmall = W < 260;
 
 	// ── Background gradient (male=blue bottom → female=pink top) ──
 	const bg = ctx.createLinearGradient(0, plotBottom, 0, plotTop);
@@ -155,59 +150,16 @@ function _draw() {
 	ctx.fillStyle = bg;
 	ctx.fillRect(plotLeft, plotTop, plotW, plotBottom - plotTop);
 
-	// ── Center line (neutral / 50%) ───────────────────────────────
+	// ── Center neutral reference line (no labels) ────────────────
 	const centerY = _scoreToY(50, plotTop, plotBottom);
-
-	// ── Y-axis grid lines & tick labels (± format) ────────────────
-	const ticks = [0, 25, 50, 75, 100];
-	ctx.font = `${isSmall ? 9 : 10}px Inter, sans-serif`;
-	for (const pct of ticks) {
-		const y = _scoreToY(pct, plotTop, plotBottom);
-		const isNeutral = pct === 50;
-
-		ctx.save();
-		ctx.strokeStyle = isNeutral ? "rgba(128,128,128,0.45)" : lineColor;
-		ctx.lineWidth = isNeutral ? 1.5 : 1;
-		ctx.setLineDash(isNeutral ? [] : [3, 5]);
-		ctx.beginPath();
-		ctx.moveTo(plotLeft, y);
-		ctx.lineTo(plotRight, y);
-		ctx.stroke();
-		ctx.restore();
-
-		// Map score 0-100 → display -100 to +100
-		const dev = (pct - 50) * 2;
-		const label = dev === 0 ? "0" : dev > 0 ? `+${dev}` : `${dev}`;
-		ctx.fillStyle = dev > 0 ? "rgba(236,72,153,0.7)" : dev < 0 ? "rgba(59,130,246,0.7)" : textColor;
-		ctx.textAlign = "right";
-		ctx.fillText(`${label}%`, plotLeft - 4, y + 3.5);
-	}
-
-	// ── Zone labels (inside plot area) ────────────────────────────
-	ctx.font = `${isSmall ? 9 : 10}px Inter, sans-serif`;
-	ctx.fillStyle = "rgba(59,130,246,0.45)";
-	ctx.textAlign = "left";
-	ctx.fillText(t("scatter.male"), plotLeft + 4, plotBottom - 5);
-
-	ctx.fillStyle = "rgba(128,128,128,0.4)";
-	ctx.textAlign = "left";
-	ctx.fillText(t("scatter.neutral"), plotLeft + 4, centerY - 4);
-
-	ctx.fillStyle = "rgba(236,72,153,0.5)";
-	ctx.textAlign = "left";
-	ctx.fillText(t("scatter.female"), plotLeft + 4, plotTop + 12);
-
-	// ── Y-axis title (rotated) ─────────────────────────────────────
-	if (!isSmall) {
-		ctx.save();
-		ctx.translate(12, (plotTop + plotBottom) / 2);
-		ctx.rotate(-Math.PI / 2);
-		ctx.textAlign = "center";
-		ctx.fillStyle = textColor;
-		ctx.font = "10px Inter, sans-serif";
-		ctx.fillText(t("scatter.yaxis"), 0, 0);
-		ctx.restore();
-	}
+	ctx.save();
+	ctx.strokeStyle = "rgba(128,128,128,0.35)";
+	ctx.lineWidth = 1;
+	ctx.beginPath();
+	ctx.moveTo(plotLeft, centerY);
+	ctx.lineTo(plotRight, centerY);
+	ctx.stroke();
+	ctx.restore();
 
 	// ── Bars: single-column thin strips at score position ────────
 	const STRIP_H = 8;

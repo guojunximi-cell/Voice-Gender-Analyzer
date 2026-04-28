@@ -143,7 +143,8 @@ export function setupRecorder({ onFile, onError, onTabActivate }) {
 		const freqData = new Uint8Array(_analyser.frequencyBinCount);
 		const smoothed = new Float32Array(BAR_COUNT);
 		const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#c96442";
-		let lastW = 0, lastH = 0;
+		let lastW = 0,
+			lastH = 0;
 
 		function draw() {
 			_raf = requestAnimationFrame(draw);
@@ -155,7 +156,8 @@ export function setupRecorder({ onFile, onError, onTabActivate }) {
 				lastW = cssW;
 				lastH = cssH;
 			}
-			const cw = canvas.width, ch = canvas.height;
+			const cw = canvas.width,
+				ch = canvas.height;
 			if (cw === 0 || ch === 0) return;
 
 			_analyser.getByteFrequencyData(freqData);
@@ -186,8 +188,14 @@ export function setupRecorder({ onFile, onError, onTabActivate }) {
 	}
 
 	function _stopViz() {
-		if (_raf) { cancelAnimationFrame(_raf); _raf = null; }
-		if (_vizCtx) { _vizCtx.close().catch(() => {}); _vizCtx = null; }
+		if (_raf) {
+			cancelAnimationFrame(_raf);
+			_raf = null;
+		}
+		if (_vizCtx) {
+			_vizCtx.close().catch(() => {});
+			_vizCtx = null;
+		}
 		_analyser = null;
 		const canvas = document.getElementById("recorder-waveform");
 		if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);

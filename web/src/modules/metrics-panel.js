@@ -73,18 +73,6 @@ function _weightedEngineA(analysis) {
 	return { label, confidence: Math.min(1, Math.max(0, conf)), speechSec: mDur + fDur };
 }
 
-// ─── Gender spectrum bar ──────────────────────────────────────
-function renderGenderBar(confidence, label) {
-	const thumb = document.getElementById("mc-gender-thumb");
-	if (!thumb) return;
-	const scaledConf = Math.min(confidence, 1);
-	const pct = label === "female" ? 50 + scaledConf * 50 : 50 - scaledConf * 50;
-	requestAnimationFrame(() => {
-		thumb.style.left = `${pct}%`;
-	});
-	thumb.dataset.gender = label;
-}
-
 // ─── Public: render whole-file averages ──────────────────────
 export function renderMetricsPanel(summary, analysis) {
 	const empty = document.getElementById("metrics-empty");
@@ -188,11 +176,8 @@ export function renderMetricsPanel(summary, analysis) {
 		});
 	}
 
-	// ── Duration-weighted Engine A bar ──────────────────────
+	// ── Duration-weighted Engine A summary ──────────────────
 	const weighted = _weightedEngineA(analysis);
-	if (weighted) {
-		renderGenderBar(weighted.confidence, weighted.label);
-	}
 
 	// ── Header label: overall speech duration ───────────────
 	const headerLabel = document.getElementById("mc-segment-label");
@@ -221,4 +206,62 @@ export function clearMetricsPanel() {
 	if (content) content.hidden = true;
 	const warnEl = document.getElementById("mc-align-warning");
 	if (warnEl) warnEl.hidden = true;
+	clearAdvicePanel();
+}
+
+// ─── Advice v2 panel ─────────────────────────────────────────
+// Renders summary.advice. Two surfaces:
+//   1. #advice-panel (always available): one-sentence summary + gating warning.
+//      Independent of Engine C — visible whenever summary.advice exists.
+//   2. #mc-f0-zone (inside the Engine-C pitch card): zone label chip
+//      ("中低基频" / "声学中性区间" …) sourced from f0_panel.range_zone_key.
+// See docs/plans/v2_redesign_measurement.md §1, §3.
+export function renderAdvicePanel(advice) {
+	const panel = document.getElementById("advice-panel");
+	const zoneEl = document.getElementById("mc-f0-zone");
+	if (!panel) return;
+	if (!advice) {
+		panel.hidden = true;
+		if (zoneEl) zoneEl.hidden = true;
+		return;
+	}
+	panel.hidden = false;
+
+	const warnEl = document.getElementById("advice-warning");
+	const warnText = document.getElementById("advice-warning-text");
+	const firstWarn = advice.warnings?.[0];
+	if (warnEl && warnText && firstWarn) {
+		warnText.textContent = t(firstWarn.key, firstWarn.params || {});
+		warnEl.hidden = false;
+	} else if (warnEl) {
+		warnEl.hidden = true;
+	}
+
+	const summaryEl = document.getElementById("advice-summary");
+	if (summaryEl) {
+		if (advice.summary_panel) {
+			summaryEl.textContent = t(advice.summary_panel.text_key, advice.summary_panel.text_params || {});
+			summaryEl.hidden = false;
+		} else {
+			summaryEl.hidden = true;
+		}
+	}
+
+	const zoneKey = advice.f0_panel?.range_zone_key;
+	if (zoneEl) {
+		if (zoneKey) {
+			zoneEl.textContent = t(`advice.zone.${zoneKey}`);
+			zoneEl.dataset.zone = zoneKey;
+			zoneEl.hidden = false;
+		} else {
+			zoneEl.hidden = true;
+		}
+	}
+}
+
+export function clearAdvicePanel() {
+	const panel = document.getElementById("advice-panel");
+	if (panel) panel.hidden = true;
+	const zoneEl = document.getElementById("mc-f0-zone");
+	if (zoneEl) zoneEl.hidden = true;
 }

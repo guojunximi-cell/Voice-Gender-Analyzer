@@ -76,6 +76,17 @@ API 进程与 worker 进程是分离的：**API 不加载 TF 模型**（省 ~500
 Engine C 默认关闭（`ENGINE_C_ENABLED=false`）；开启需同时起 sidecar：
 `docker compose --profile engine-c up -d --build`。失败/不可达时 `summary.engine_c = null`，不影响 A/B 结果。
 
+## Advice v2 输出 schema
+
+`summary.advice` 是测量 + 倾向并列展示，不出 verdict。来源：`voiceya/services/audio_analyser/advice_v2.py`（纯函数）+ `f0_panel.py`（pyin[60-250] + voiced_flag）。结构：
+
+- `f0_panel`：F0 中位数、p25/p75、voiced_duration_sec、`range_zone_key`（5 档：low / mid_lower / mid_neutral / mid_upper / high）、reliability。
+- `tone_panel`：ina 三档倾向（`leans_feminine` / `leans_masculine` / `not_clearly_leaning`，单阈值 0.78），帧标签分布，永久 `caveat_key`。
+- `summary_panel`：< 50 字模板文案，按 `{zone}_{tendency}` 派生 i18n key。
+- `gating_tier`：`minimal` (<10s) / `standard` (10–30s) / `full` (≥30s)。minimal 不出 tone/summary。
+
+设计与决策依据见 `docs/plans/v2_redesign_measurement.md`；`tests/reports/advice_v2_render_<date>.md` 为 95 样本回归基线。
+
 ## Engine C 详细流程
 
 ```
