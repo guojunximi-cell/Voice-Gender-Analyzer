@@ -26,7 +26,7 @@ import {
 	saveSession,
 	removeSession as storeRemoveSession,
 } from "./modules/session-store.js";
-import { setupUploader, validateFile } from "./modules/uploader.js";
+import { setupUploader } from "./modules/uploader.js";
 import {
 	destroyWaveform,
 	drawTimeline,
@@ -705,23 +705,6 @@ async function initUploaders() {
 		} catch (err) {
 			showToast(err.message, "error");
 		}
-	});
-
-	// Scatter panel upload button (always available, single file only)
-	$("scatter-file-input")?.addEventListener("change", (e) => {
-		const file = e.target.files?.[0];
-		if (!file) {
-			e.target.value = "";
-			return;
-		}
-		const err = validateFile(file, maxBytes);
-		if (err) {
-			showToast(err, "error");
-			e.target.value = "";
-			return;
-		}
-		onFileSelected(file);
-		e.target.value = "";
 	});
 }
 

@@ -34,7 +34,6 @@ const DICT = {
 		"panel.history": "历史分析",
 		"panel.metrics": "综合声学特征",
 
-		"action.upload": "上传新文件",
 		"action.delete": "删除此记录",
 		"action.clear": "清空历史",
 		"action.changeFile": "更换文件",
@@ -375,7 +374,6 @@ const DICT = {
 		"panel.history": "Past sessions",
 		"panel.metrics": "Acoustic summary",
 
-		"action.upload": "Upload new file",
 		"action.delete": "Remove this session",
 		"action.clear": "Clear history",
 		"action.changeFile": "Choose another file",
