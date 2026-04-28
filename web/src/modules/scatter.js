@@ -1,11 +1,13 @@
 /**
- * scatter.js — Gender expression bar chart (Canvas 2D)
+ * scatter.js — Gender expression strip chart (Canvas 2D)
  *
  * Y-axis: Comprehensive gender score (0~100%)
  *         0% = ♂ 男性化, 50% = 中性, 100% = ♀ 女性化
- * X-axis: Each session as a vertical bar
+ * Each session renders as a horizontal strip at its score Y. Strip thickness
+ * adapts to the canvas height; sessions whose Y values would collide get
+ * grouped into a cluster and split the plot width so each stays clickable.
  *
- * Click a bar → fires onDotClick(session).
+ * Click a strip → fires onDotClick(session).
  */
 
 import { scoreToColor as _scoreToColorUtil } from "../utils.js";
@@ -14,9 +16,10 @@ import { classifyForMode, dominantForMode } from "./classify.js";
 
 // ─── Layout constants ────────────────────────────────────────
 const PAD = { top: 14, right: 14, bottom: 14, left: 14 };
-const BAR_MAX_W = 56;
-const BAR_MIN_W = 8;
-const BAR_GAP_RATIO = 0.35; // gap / slot width
+const STRIP_H_MIN = 4;
+const STRIP_H_MAX = 10;
+const HIT_PAD_Y = 4; // vertical click leeway around each strip
+const SEG_GAP = 2; // horizontal gap between cluster segments
 
 // ─── Module state ─────────────────────────────────────────────
 let canvas,
@@ -120,7 +123,10 @@ function _scoreToY(score, plotTop, plotBottom) {
 	return plotBottom - ratio * (plotBottom - plotTop);
 }
 
-/** Compute bar layout from current canvas size. */
+/** Compute layout: canvas geometry, adaptive strip thickness, and the
+ *  per-session horizontal segment. Sessions whose score Y values fall within
+ *  CLUSTER_GAP of one another form a cluster and split the plot width equally,
+ *  so overlapping bands stay individually clickable instead of stacking. */
 function _layout() {
 	const W = _w(),
 		H = _h();
@@ -129,17 +135,53 @@ function _layout() {
 	const plotTop = PAD.top;
 	const plotBottom = H - PAD.bottom;
 	const plotW = plotRight - plotLeft;
-	const n = Math.max(1, sessions.length);
-	const slotW = plotW / n;
-	const barW = Math.max(BAR_MIN_W, Math.min(BAR_MAX_W, slotW * (1 - BAR_GAP_RATIO)));
-	return { W, H, plotLeft, plotRight, plotTop, plotBottom, plotW, slotW, barW };
+	const plotH = plotBottom - plotTop;
+
+	const STRIP_H = Math.max(STRIP_H_MIN, Math.min(STRIP_H_MAX, Math.round(plotH / 35)));
+	const CLUSTER_GAP = STRIP_H + 2 * HIT_PAD_Y + 4;
+
+	const geom = sessions.map((s, idx) => ({
+		s,
+		idx,
+		y: _scoreToY(_getScore(s), plotTop, plotBottom),
+	}));
+
+	const sorted = geom.slice().sort((a, b) => a.y - b.y);
+	const clusters = [];
+	for (const g of sorted) {
+		const last = clusters[clusters.length - 1];
+		if (last && g.y - last.maxY < CLUSTER_GAP) {
+			last.members.push(g);
+			last.maxY = Math.max(last.maxY, g.y);
+		} else {
+			clusters.push({ members: [g], maxY: g.y });
+		}
+	}
+
+	const segments = new Map();
+	for (const cluster of clusters) {
+		cluster.members.sort((a, b) => a.idx - b.idx);
+		const N = cluster.members.length;
+		const segW = plotW / N;
+		for (let ci = 0; ci < N; ci++) {
+			const m = cluster.members[ci];
+			segments.set(m.s.id, {
+				x: plotLeft + ci * segW,
+				w: segW,
+				y: m.y,
+				clusterSize: N,
+			});
+		}
+	}
+
+	return { W, H, plotLeft, plotRight, plotTop, plotBottom, plotW, plotH, STRIP_H, segments };
 }
 
 // ─── Draw ─────────────────────────────────────────────────────
 function _draw() {
 	if (!canvas || !ctx) return;
 
-	const { W, H, plotLeft, plotRight, plotTop, plotBottom, plotW } = _layout();
+	const { W, H, plotLeft, plotRight, plotTop, plotBottom, plotW, STRIP_H, segments } = _layout();
 	ctx.clearRect(0, 0, W, H);
 
 	// ── Background gradient (male=blue bottom → female=pink top) ──
@@ -161,16 +203,18 @@ function _draw() {
 	ctx.stroke();
 	ctx.restore();
 
-	// ── Bars: single-column thin strips at score position ────────
-	const STRIP_H = 8;
+	// ── Bars: thin strips at score position; clustered ones share a row ──
 	for (let i = 0; i < sessions.length; i++) {
 		const s = sessions[i];
+		const seg = segments.get(s.id);
+		if (!seg) continue;
 		const score = _getScore(s);
 		const isSelected = s.id === selectedId;
 		const isHovered = s.id === hoveredId;
 		const color = _scoreToColor(score);
-		const scoreY = _scoreToY(score, plotTop, plotBottom);
-		const sy = scoreY - STRIP_H / 2;
+		const sy = seg.y - STRIP_H / 2;
+		const drawX = seg.clusterSize > 1 ? seg.x + SEG_GAP / 2 : seg.x;
+		const drawW = seg.clusterSize > 1 ? Math.max(2, seg.w - SEG_GAP) : seg.w;
 
 		if (isSelected || isHovered) {
 			ctx.save();
@@ -179,12 +223,12 @@ function _draw() {
 		}
 
 		ctx.fillStyle = _withAlpha(color, isSelected ? 1 : isHovered ? 0.9 : 0.65);
-		ctx.fillRect(plotLeft, sy, plotW, STRIP_H);
+		ctx.fillRect(drawX, sy, drawW, STRIP_H);
 
 		if (isSelected) {
 			ctx.strokeStyle = "rgba(255,255,255,0.85)";
 			ctx.lineWidth = 1.5;
-			ctx.strokeRect(plotLeft, sy, plotW, STRIP_H);
+			ctx.strokeRect(drawX, sy, drawW, STRIP_H);
 		}
 
 		if (isSelected || isHovered) ctx.restore();
@@ -193,15 +237,15 @@ function _draw() {
 		if (isSelected && s.analysis) {
 			const segs = classifyForMode(s, getMode());
 			const voicedScores = segs
-				.filter((seg) => seg.label === "male" || seg.label === "female")
-				.map((seg) => {
-					const c = seg.confidence ?? 0.5;
-					return seg.label === "female" ? 50 + c * 50 : 50 - c * 50;
+				.filter((seg2) => seg2.label === "male" || seg2.label === "female")
+				.map((seg2) => {
+					const c = seg2.confidence ?? 0.5;
+					return seg2.label === "female" ? 50 + c * 50 : 50 - c * 50;
 				});
 			if (voicedScores.length > 1) {
 				const yTop = _scoreToY(Math.max(...voicedScores), plotTop, plotBottom);
 				const yBottom = _scoreToY(Math.min(...voicedScores), plotTop, plotBottom);
-				const cx = (plotLeft + plotRight) / 2;
+				const cx = drawX + drawW / 2;
 				ctx.save();
 				ctx.strokeStyle = _withAlpha(color, 0.35);
 				ctx.lineWidth = 1;
@@ -218,14 +262,16 @@ function _draw() {
 
 // ─── Hit test (strips) ────────────────────────────────────────
 function _hitTest(ex, ey) {
-	const { plotLeft, plotRight, plotTop, plotBottom } = _layout();
-	const HIT_PAD = 8;
+	const { plotLeft, plotRight, segments, STRIP_H } = _layout();
 	if (ex < plotLeft || ex > plotRight) return null;
+	const halfH = STRIP_H / 2 + HIT_PAD_Y;
 	for (let i = 0; i < sessions.length; i++) {
 		const s = sessions[i];
-		const score = _getScore(s);
-		const scoreY = _scoreToY(score, plotTop, plotBottom);
-		if (ey >= scoreY - HIT_PAD && ey <= scoreY + HIT_PAD) return s;
+		const seg = segments.get(s.id);
+		if (!seg) continue;
+		if (ex < seg.x || ex > seg.x + seg.w) continue;
+		if (ey < seg.y - halfH || ey > seg.y + halfH) continue;
+		return s;
 	}
 	return null;
 }
