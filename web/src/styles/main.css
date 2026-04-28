@@ -646,6 +646,15 @@ body {
 .stats-section {
 }
 
+/* Caption above the male/female bars, calls out that the % denominator is
+   voiced speech (not full audio) — see results.js renderStats. */
+.stats-caption {
+	padding: 0 12px 6px;
+	font-size: 11px;
+	line-height: 1.3;
+	color: var(--text-muted);
+}
+
 /* Stats list mirrors .segments-list visual language: a column of transparent
    grid rows inside a single .card wrapper (no per-row borders / shadows / left
    accent stripes).  Per-type dominance is conveyed by a subtle tinted

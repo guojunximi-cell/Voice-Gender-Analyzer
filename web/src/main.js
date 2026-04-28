@@ -33,7 +33,7 @@ import {
 	togglePlay,
 	updateWaveformTheme,
 } from "./modules/waveform.js";
-import { nextSessionColor } from "./utils.js";
+import { nextSessionColor, setToneThreshold } from "./utils.js";
 
 // Expose i18n utilities so inline scripts in index.html (feedback modal) and
 // other non-ESM consumers can reach t() / setLang without extra plumbing.
@@ -607,6 +607,7 @@ async function initUploaders() {
 		maxFileSizeMb = cfg.max_file_size_mb ?? 5;
 		maxDurationSec = cfg.max_audio_duration_sec ?? 180;
 		engineCEnabled = !!cfg.engine_c_enabled;
+		if (cfg.tone_threshold != null) setToneThreshold(cfg.tone_threshold);
 	} catch (_) {}
 
 	_initRecordMode(engineCEnabled);
@@ -983,7 +984,6 @@ function _updateLangToggleLabel() {
 
 $("lang-toggle")?.addEventListener("click", () => {
 	setLang(getLang() === "zh-CN" ? "en-US" : "zh-CN");
-	location.reload();
 });
 
 onLangChange(() => {

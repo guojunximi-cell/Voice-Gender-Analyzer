@@ -122,6 +122,7 @@ async def do_analyse(
         analyse_results,
         duration_sec,
         summary.get("dominant_label"),
+        weighted_margin=summary.get("dominant_confidence", 0.0),
     )
 
     logger.info(

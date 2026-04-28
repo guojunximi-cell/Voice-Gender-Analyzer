@@ -76,6 +76,7 @@ const DICT = {
 		"record.scriptPickerAria": "选择跟读稿件",
 
 		"stats.title": "声音占比",
+		"stats.subtitle": "仅人声片段（音乐 / 静音不计入）",
 		"stats.modeAria": "占比依据",
 		"stats.modeA": "神经网络",
 		"stats.modePitch": "音高",
@@ -387,6 +388,7 @@ const DICT = {
 		"record.scriptPickerAria": "Pick a script to read",
 
 		"stats.title": "Distribution",
+		"stats.subtitle": "Within voiced speech only — music / silence excluded",
 		"stats.modeAria": "Classification basis",
 		"stats.modeA": "Neural net",
 		"stats.modePitch": "Pitch",

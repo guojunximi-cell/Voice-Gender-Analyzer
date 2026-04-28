@@ -93,14 +93,21 @@ export function scoreToColor(score) {
 }
 
 // ─── Certainty tag for a voiced segment ──────────────────────
-// 3-tier tone tendency mapper (advice v2 §5). Single threshold 0.78 on the
-// C1 margin (Engine A T=2.0 calibrated). No "Strong/Clear/Boundary" gradations
-// — confidence numbers must not appear adjacent to the tendency text.
+// 3-tier tone tendency mapper (advice v2 §5). Single threshold on the C1
+// margin (Engine A T=2.0 calibrated). The threshold is owned by the backend
+// (advice_v2.TONE_THRESHOLD) and pushed in via /api/config; setToneThreshold()
+// is wired from main.js after the config fetch. The 0.78 default below is a
+// fallback for the brief window before /api/config returns and for tests /
+// offline use — it must mirror advice_v2.TONE_THRESHOLD if the source ever
+// changes.
 // See docs/plans/v2_redesign_measurement.md §5.
-const TONE_THRESHOLD = 0.78;
+let _toneThreshold = 0.78;
+export function setToneThreshold(v) {
+	if (typeof v === "number" && v > 0 && v < 1) _toneThreshold = v;
+}
 export function certaintTag(seg) {
 	if (!seg || (seg.label !== "female" && seg.label !== "male")) return "";
 	const margin = seg.confidence ?? 0;
-	if (margin < TONE_THRESHOLD) return t("advice.tone.not_clearly_leaning");
+	if (margin < _toneThreshold) return t("advice.tone.not_clearly_leaning");
 	return t(seg.label === "female" ? "advice.tone.leans_feminine" : "advice.tone.leans_masculine");
 }

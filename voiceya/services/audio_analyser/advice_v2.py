@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from voiceya.services.audio_analyser.f0_panel import compute_f0_panel
+from voiceya.services.audio_analyser.statics import weighted_confidence
 
 if TYPE_CHECKING:
     from voiceya.services.audio_analyser.seg_analyser import AnalyseResultItem
@@ -65,26 +66,6 @@ def _tone_tendency(dominant_label: str | None, weighted_margin: float) -> str:
     return "leans_feminine" if dominant_label == "female" else "leans_masculine"
 
 
-def _weighted_margin(analyse_results: list, dominant_label: str | None) -> float:
-    """Duration-weighted C1 margin over segments matching the dominant label.
-
-    Mirrors statics.do_statics so tone_tendency aligns with `overall_confidence`,
-    but recomputed locally so advice is a pure function of inputs.
-    """
-    if dominant_label not in ("female", "male"):
-        return 0.0
-    total_dur = 0.0
-    total_conf_dur = 0.0
-    for r in analyse_results:
-        if r.label != dominant_label or r.confidence is None:
-            continue
-        total_dur += r.duration
-        total_conf_dur += r.confidence * r.duration
-    if total_dur == 0:
-        return 0.0
-    return total_conf_dur / total_dur
-
-
 def _summary_text_key(zone_key: str | None, tendency_key: str) -> str | None:
     if zone_key is None:
         return None
@@ -97,18 +78,28 @@ def compute_advice(
     analyse_results: list[AnalyseResultItem],
     duration_sec: float,
     dominant_label: str | None,
+    *,
+    weighted_margin: float | None = None,
 ) -> dict:
     """Build the summary.advice panel.
 
     See docs/plans/v2_redesign_measurement.md §1 for the schema. Output is
     JSON-safe (plain dict / list / float / int / str / None).
+
+    `weighted_margin` is the duration-weighted C1 margin restricted to
+    `dominant_label`'s segments. The pipeline (`do_analyse`) passes
+    `summary.dominant_confidence` from `statics.do_statics` so a single
+    helper (`statics.weighted_confidence`) owns the weighting formula. When
+    None (tests / standalone use), it is recomputed via the same helper —
+    no parallel implementation here.
     """
     duration_sec = round(float(duration_sec), 2)
     tier = _gating_tier(duration_sec)
 
     f0_panel = compute_f0_panel(y, sr, duration_sec)
     distribution = _label_distribution(analyse_results, duration_sec)
-    weighted_margin = _weighted_margin(analyse_results, dominant_label)
+    if weighted_margin is None:
+        weighted_margin = weighted_confidence(analyse_results, label_filter=dominant_label)
     tendency_key = _tone_tendency(dominant_label, weighted_margin)
 
     advice: dict = {
