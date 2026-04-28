@@ -154,8 +154,41 @@
 						</button>
 					</div>
 				</div>
+				<div
+					id="scatter-mode-switcher"
+					class="scatter-mode-switcher"
+					role="radiogroup"
+					data-i18n-aria-label="scatter.modeAria"
+					aria-label="历史排布"
+				>
+					<button
+						class="scatter-mode-btn is-active"
+						data-mode="score"
+						role="radio"
+						aria-checked="true"
+						data-i18n-title="scatter.mode.scoreTip"
+						title="按性别倾向排布"
+					>
+						<span data-i18n="scatter.mode.score">倾向</span>
+					</button>
+					<button
+						class="scatter-mode-btn"
+						data-mode="time"
+						role="radio"
+						aria-checked="false"
+						data-i18n-title="scatter.mode.timeTip"
+						title="按创建时间排布"
+					>
+						<span data-i18n="scatter.mode.time">时间</span>
+					</button>
+				</div>
 				<div class="scatter-wrap">
 					<canvas id="scatter-canvas"></canvas>
+					<div id="scatter-tooltip" class="scatter-tooltip" aria-hidden="true">
+						<div class="scatter-tooltip-line scatter-tooltip-time"></div>
+						<div class="scatter-tooltip-line scatter-tooltip-name"></div>
+						<div class="scatter-tooltip-line scatter-tooltip-score"></div>
+					</div>
 				</div>
 			</aside>
 
@@ -323,12 +356,7 @@
 							<p id="record-script-hint" class="record-script-hint" data-i18n="record.hint">
 								朗读上方文字；鸭鸭会直接按这段稿子对齐，不再跑语音识别。
 							</p>
-							<p
-								id="record-script-custom-hint"
-								class="record-script-hint"
-								data-i18n="record.customHint"
-								hidden
-							>
+							<p id="record-script-custom-hint" class="record-script-hint" data-i18n="record.customHint" hidden>
 								这段文字会直接喂给对齐器；请确保和「分析语言」一致，否则对不齐。
 							</p>
 						</div>

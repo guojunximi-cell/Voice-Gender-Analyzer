@@ -10,6 +10,7 @@ import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
 import { renderFromSummary } from "./modules/results-render.js";
 import { highlightActiveSegment, renderStats, resetResults } from "./modules/results.js";
+import { getScatterMode, onScatterModeChange, setScatterMode } from "./modules/scatter-mode.js";
 import {
 	addSession,
 	clearAllSessions,
@@ -287,6 +288,31 @@ function _initClassifyModeSwitcher() {
 		_renderClassifiedForCurrent();
 		scatterRedraw();
 	});
+}
+
+// ─── Scatter mode (history panel layout-axis: score vs time) ──
+function _updateScatterModeSwitcher() {
+	const switcher = $("scatter-mode-switcher");
+	if (!switcher) return;
+	const mode = getScatterMode();
+	switcher.querySelectorAll(".scatter-mode-btn").forEach((btn) => {
+		const isActive = btn.dataset.mode === mode;
+		btn.classList.toggle("is-active", isActive);
+		btn.setAttribute("aria-checked", isActive ? "true" : "false");
+	});
+}
+
+function _initScatterModeSwitcher() {
+	const switcher = $("scatter-mode-switcher");
+	if (!switcher) return;
+	switcher.addEventListener("click", (e) => {
+		const btn = e.target.closest(".scatter-mode-btn");
+		if (!btn || btn.disabled) return;
+		setScatterMode(btn.dataset.mode);
+	});
+	// scatter.js subscribes to mode changes itself to drive the cross-fade —
+	// we only need to keep the switcher's active state in sync here.
+	onScatterModeChange(() => _updateScatterModeSwitcher());
 }
 
 // ─── Toast ────────────────────────────────────────────────────
@@ -1305,4 +1331,6 @@ setPhase("idle");
 _initInputMethodTabs();
 _initClassifyModeSwitcher();
 _updateClassifyModeSwitcher();
+_initScatterModeSwitcher();
+_updateScatterModeSwitcher();
 initScatterFromStorage();
