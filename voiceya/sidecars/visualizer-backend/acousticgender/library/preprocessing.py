@@ -84,7 +84,8 @@ def process(uploaded_file, transcript, tmp_dir, lang='en'):
 	with open(corpus_dir + '/recording.txt', 'w', encoding='utf-8') as f:
 		f.write(transcript_out)
 
-	mfa_model = 'mandarin_mfa' if lang == 'zh' else 'english_mfa'
+	# voiceya patch: 3-way map; fr added 2026-04-28.  See voiceya/sidecars/README.md.
+	mfa_model = {'zh': 'mandarin_mfa', 'fr': 'french_mfa'}.get(lang, 'english_mfa')
 
 	scripts_dir = os.path.dirname(settings['mfa'])
 	env_dir     = os.path.dirname(scripts_dir)

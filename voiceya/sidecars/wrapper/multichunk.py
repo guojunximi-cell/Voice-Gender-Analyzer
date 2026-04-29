@@ -167,12 +167,16 @@ def run_mfa(
     "en" → english_us_arpa for both (NOT english_mfa — that one emits IPA,
     incompatible with the ARPABET stats.json/cmudict.txt this sidecar
     ships; same mapping the wrapper's fast-mode shim applies for the
-    single-block path).  See visualizer-backend.Dockerfile for why zh's
-    acoustic and dict names diverge — pairing the legacy mandarin_mfa
-    dict with the v3 acoustic model leaves common hanzi as ``<unk>``.
+    single-block path).  "fr" → french_mfa for both (acoustic + dict
+    share the registry name, IPA phoneset).  See visualizer-backend.Dockerfile
+    for why zh's acoustic and dict names diverge — pairing the legacy
+    mandarin_mfa dict with the v3 acoustic model leaves common hanzi as
+    ``<unk>``.
     """
     if lang == "zh":
         mfa_acoustic, mfa_dict = "mandarin_mfa", "mandarin_china_mfa"
+    elif lang == "fr":
+        mfa_acoustic = mfa_dict = "french_mfa"
     else:
         mfa_acoustic = mfa_dict = "english_us_arpa"
     args = mfa_cmd + [

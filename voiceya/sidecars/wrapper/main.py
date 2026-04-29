@@ -113,10 +113,26 @@ _LANG_ALIASES: dict[str, str] = {
     "en-us": "en",
     "en_us": "en",
     "english": "en",
+    "fr": "fr",
+    "fr-fr": "fr",
+    "fr_fr": "fr",
+    "french": "fr",
 }
-_LANG_WEIGHTS_FILE: dict[str, str] = {"zh": "weights_zh.json", "en": "weights.json"}
-_LANG_STATS_FILE: dict[str, str] = {"zh": "stats_zh.json", "en": "stats.json"}
-_LANG_DICT_FILE: dict[str, str] = {"zh": "mandarin_dict.txt", "en": "cmudict.txt"}
+_LANG_WEIGHTS_FILE: dict[str, str] = {
+    "zh": "weights_zh.json",
+    "en": "weights.json",
+    "fr": "weights_fr.json",
+}
+_LANG_STATS_FILE: dict[str, str] = {
+    "zh": "stats_zh.json",
+    "en": "stats.json",
+    "fr": "stats_fr.json",
+}
+_LANG_DICT_FILE: dict[str, str] = {
+    "zh": "mandarin_dict.txt",
+    "en": "cmudict.txt",
+    "fr": "french_mfa_dict.txt",
+}
 
 
 def _normalize_lang(raw: str | None) -> str:
@@ -141,7 +157,7 @@ def _lang_available(lang: str) -> bool:
     )
 
 
-_SUPPORTED_LANGS: list[str] = [lang for lang in ("zh", "en") if _lang_available(lang)]
+_SUPPORTED_LANGS: list[str] = [lang for lang in ("zh", "en", "fr") if _lang_available(lang)]
 _WEIGHTS_BY_LANG: dict[str, list[float]] = {lang: _load_weights(lang) for lang in _SUPPORTED_LANGS}
 if not _SUPPORTED_LANGS:
     logger.error(
@@ -176,10 +192,12 @@ _PRELOAD_ENABLED = os.environ.get(
 _ACOUSTIC_NAME_BY_LANG: dict[str, str] = {
     "en": "english_us_arpa",
     "zh": "mandarin_mfa",
+    "fr": "french_mfa",
 }
 _DICT_NAME_BY_LANG: dict[str, str] = {
     "en": "english_us_arpa",
     "zh": "mandarin_china_mfa",
+    "fr": "french_mfa",
 }
 
 _PRELOADED_ALIGNERS: dict[str, PreloadedAligner] = {}
