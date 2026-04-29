@@ -49,6 +49,86 @@ cp /path/to/gender-voice-visualization/cmudict.txt \
 
 然后跑 `task 7` 验证套件。
 
+### Vendor patches（必须在 rsync 后手动 reapply）
+
+`acousticgender/library/*.py` 在 vendor 之上加了 voiceya 自己的法语分支
+（grep `voiceya patch` 可以找到全部锚点）。每次 rsync 升级 upstream 后，
+必须把以下 3 处 diff 重新打回：
+
+| 文件 | 行（升级前位置） | 改动 |
+|------|------------------|------|
+| `preprocessing.py` | L87 `mfa_model = ...` | 改成 3-way map：`{'zh':'mandarin_mfa','fr':'french_mfa'}.get(lang,'english_mfa')` |
+| `phones.py` | L25-44 `pronunciation_dict` 装载块 | 加 `elif lang == 'fr'` 分支，`french_mfa_dict.txt` UTF-8；`if lang == 'zh':` 解析判断扩成 `lang in ('zh', 'fr')`；`word_key` 的 upper 例外同步扩 fr |
+| `resonance.py` | L14-16 `ZH_VOWELS` 旁 / L43 `stats_file` / L66 `isVowel` | 加 `FR_VOWELS = {a,ɑ,e,ɛ,i,o,ɔ,u,y,ø,œ,ə,ɛ̃,ɑ̃,ɔ̃,œ̃}`；`stats_file` 改 3-way map；`isVowel` 加 `elif lang == 'fr'` 直查 FR_VOWELS |
+
+法语资源（与中英文并列堆 `visualizer-backend/`）：
+- `stats_fr.json`：voiceya 自训 baseline，由 `scripts/train_stats_fr.py` 跑
+  Common Voice fr v17 的 ~10k 段产出，schema 与 `stats.json` 一致。
+- `weights_fr.json`：抄 ZH v0.2.1 `[0.762, 0.236, 0.002]`，不单独训。EN `[0.732, 0.268, 0.0]` 与 ZH v0.2.1 在 spk-disjoint holdout 上验证过 F1+F2 主导的物理关系跨语言一致。重训必须 `--weights-spk-cv --weights-min-f2 0.20`（utt-level CV 会把 F2 砍掉、spk-CV 但 floor 太松又会偏向 F1-only，都是坑）。
+- `french_mfa_dict.txt`：`mfa model download dictionary french_mfa` 后从
+  `~/Documents/MFA/pretrained_models/dictionary/` 拷出来。
+
+### 法语 baseline 训练（一次性，手动）
+
+`stats_fr.json` 是 voiceya 自己训的，不在仓库里。Dockerfile 已经把
+`french_mfa` 声学模型 + 字典烤进镜像；缺 `stats_fr.json` 时 sidecar
+不会把 `fr` 放进 `/healthz` 的 `languages`，worker 请求 fr-FR 会优雅
+降级到 `summary.engine_c = null`。
+
+#### 数据集
+
+下载 [Common Voice fr v17](https://commonvoice.mozilla.org/zh-CN/datasets)
+（fr 子集，~15 GB 解压），目录结构是 `cv-corpus-17.0-XXXX/fr/{clips/,validated.tsv,...}`。
+
+#### 训练流程
+
+脚本必须**进 sidecar 容器跑**——不走 HTTP，直接调 vendored library。
+没 stats_fr.json 时 `resonance.compute_resonance` 会在
+`statistics.mean([])` 上炸；脚本绕开它，只用
+`preprocessing.process` + `phones.parse` 拿原始 F-vectors。
+
+```bash
+# 1) 起 sidecar（构建会下载 french_mfa，首次约 +5 min、+500 MB）
+docker compose --profile engine-c up -d --build
+
+# 2) 把 CV fr 语料挂进容器（host 路径 → /mnt/cv-fr）
+docker cp ~/datasets/cv-corpus-17.0-XXXX visualizer-backend:/mnt/cv-fr
+# 或者：在 docker-compose.yml 给 visualizer-backend 加 volumes:
+#   - ~/datasets/cv-corpus-17.0-XXXX:/mnt/cv-fr:ro
+
+# 3) 把训练脚本 cp 进去
+docker cp scripts/train_stats_fr.py visualizer-backend:/tmp/
+
+# 4) 跑训练（10k 段，~5 h CPU；checkpoint 保留在 /tmp，可断点续跑）
+docker exec -it visualizer-backend python /tmp/train_stats_fr.py \
+    --corpus /mnt/cv-fr/cv-corpus-17.0-XXXX/fr \
+    --out /app/stats_fr.json \
+    --n-segments 10000
+
+# 5) 拿出 stats_fr.json 提交到 vendor 目录、重新打镜像
+docker cp visualizer-backend:/app/stats_fr.json \
+          voiceya/sidecars/visualizer-backend/stats_fr.json
+docker compose --profile engine-c up -d --build
+```
+
+#### 冒烟测试
+
+```bash
+# 验证 sidecar 上线了 fr
+curl http://localhost:8001/healthz
+# 期望: {"ok": true, "languages": ["zh", "en", "fr"]}
+
+# 端到端：fr-FR 跟读模式（最稳，绕开 ASR）
+curl -F audio=@fr_sample.wav -F mode=script \
+     -F script="bonjour je voudrais commander un café" \
+     -F language=fr-FR \
+     http://localhost:8080/analyze-voice
+# 然后 GET /status/<task_id> with Accept: text/event-stream
+```
+
+断言：`summary.engine_c.language == "fr-FR"`，`phones[]` 非空，
+`alignment_confidence.low_quality == false`。
+
 ### 本地构建 & 冒烟测试
 
 ```bash
