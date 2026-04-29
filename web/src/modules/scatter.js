@@ -268,15 +268,19 @@ function _layoutTime() {
 	const now = Date.now();
 	const landscape = W > H;
 
+	// Mirror the gutter on the opposite side so the dot region (and therefore
+	// the score=50% reference line) sits at the geometric center of the plot,
+	// aligned with the bg gradient's midpoint.  The "balance" pad on the
+	// opposite side stays empty visually but the gradient fills it.
 	let dotLeft, dotRight, dotTop, dotBottom;
 	if (landscape) {
 		dotLeft = plotLeft + TIME_DOT_EDGE_PAD;
 		dotRight = plotRight - TIME_DOT_EDGE_PAD;
-		dotTop = plotTop + TIME_DOT_EDGE_PAD;
+		dotTop = plotTop + TIME_BOTTOM_GUTTER + TIME_DOT_EDGE_PAD;
 		dotBottom = plotBottom - TIME_BOTTOM_GUTTER - TIME_DOT_EDGE_PAD;
 	} else {
 		dotLeft = plotLeft + TIME_LEFT_GUTTER + TIME_DOT_EDGE_PAD;
-		dotRight = plotRight - TIME_DOT_EDGE_PAD;
+		dotRight = plotRight - TIME_LEFT_GUTTER - TIME_DOT_EDGE_PAD;
 		dotTop = plotTop;
 		dotBottom = plotBottom;
 	}
@@ -349,7 +353,8 @@ function _getTimeTicks(spanMs) {
 function _drawTimeMode(alpha) {
 	if (!canvas || !ctx || alpha <= 0) return;
 
-	const { plotLeft, plotBottom, dotLeft, dotRight, dotTop, dotBottom, now, landscape, dots } = _layoutTime();
+	const { plotLeft, plotRight, plotTop, plotBottom, dotLeft, dotRight, dotTop, dotBottom, now, landscape, dots } =
+		_layoutTime();
 	const dW = dotRight - dotLeft;
 	const dH = dotBottom - dotTop;
 
@@ -357,14 +362,20 @@ function _drawTimeMode(alpha) {
 	ctx.globalAlpha = alpha;
 
 	// ── Background gradient — score axis runs ♂ blue → ♀ pink ──
+	// Spans the full plot (not just the dot region) so the gutter / edge pads
+	// participate in the wash instead of staying blank.  Middle stop is held
+	// near the end-stop opacity — score mode can drop the middle to ~0.02
+	// because its full-width strips dominate visually, but time mode's tiny
+	// dots leave the bg as the main fill, and a low-opacity middle reads as
+	// two disconnected bars.
 	const bg = landscape
-		? ctx.createLinearGradient(0, dotBottom, 0, dotTop) // vertical: bottom→top
-		: ctx.createLinearGradient(dotLeft, 0, dotRight, 0); // horizontal: left→right
-	bg.addColorStop(0, "rgba(59,130,246,0.09)");
-	bg.addColorStop(0.5, "rgba(167,139,250,0.02)");
-	bg.addColorStop(1, "rgba(244,63,94,0.09)");
+		? ctx.createLinearGradient(0, plotBottom, 0, plotTop)
+		: ctx.createLinearGradient(plotLeft, 0, plotRight, 0);
+	bg.addColorStop(0, "rgba(59,130,246,0.10)");
+	bg.addColorStop(0.5, "rgba(167,139,250,0.08)");
+	bg.addColorStop(1, "rgba(244,63,94,0.10)");
 	ctx.fillStyle = bg;
-	ctx.fillRect(dotLeft, dotTop, dW, dH);
+	ctx.fillRect(plotLeft, plotTop, plotRight - plotLeft, plotBottom - plotTop);
 
 	// ── Neutral reference line at score=50%, perpendicular to score axis ──
 	ctx.save();
