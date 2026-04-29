@@ -1,6 +1,6 @@
 [简体中文](./README.zh-CN.md) | **English**
 
-# Voice Gender Analyzer
+# Voiceduck
 
 > Browser-based gender, acoustic, and phoneme-level analysis of short voice clips — powered by deep-learning VAD and forced alignment. Upload or record an audio clip and read its gender expression, pitch, formants, and per-phoneme acoustics on a single page. The maximum duration is operator-configurable (`MAX_AUDIO_DURATION_SEC`, default 180s).
 

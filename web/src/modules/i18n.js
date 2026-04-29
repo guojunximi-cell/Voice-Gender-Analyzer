@@ -376,9 +376,9 @@ const DICT = {
 	},
 
 	"en-US": {
-		"app.title": "Voiceya — voice analysis for gender-affirming training",
-		"app.logoAria": "Voiceya GitHub repository",
-		"app.name": "Voiceya",
+		"app.title": "Voiceduck — voice analysis for gender-affirming training",
+		"app.logoAria": "Voiceduck GitHub repository",
+		"app.name": "Voiceduck",
 		"header.help": "Help",
 		"header.theme": "Toggle theme",
 		"header.lang": "Switch language / 切换语言",
@@ -675,7 +675,7 @@ const DICT = {
 		"feedback.btnTitle": "Long-press to hide this button",
 		"feedback.close": "Close",
 
-		"help.title": "🦆 Voiceya · How to use",
+		"help.title": "🦆 Voiceduck · How to use",
 		"help.what.h": "What is this?",
 		"help.what.p":
 			"A dual-engine cross-referencing site for evaluating how acoustic stereotypes shape perceived gender. It covers phone-level analysis and whole-file analysis. Powered primarily by upstream projects gender-voice-visualization and inaSpeechSegmenter (K-3 fork). It's in beta and iterating. The author hopes it can assist with voice training.",
