@@ -29,10 +29,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Mandarin 每个汉字≈2 音素（声母+韵母），英文每个词≈3-4 个 ARPABET 音素。
+# Mandarin 每个汉字≈2 音素（声母+韵母），英文每个词≈3-4 个 ARPABET 音素，
+# 法语每个词≈2.5-3 个 IPA 音素（联诵 + 不发音尾辅音让平均值偏低）。
 # phone_ratio 低于阈值表示 MFA 只对齐到零星几个音素，多半是用户漏读/跑题。
 _LOW_PHONE_RATIO_ZH = 0.8  # phones / hanzi
 _LOW_PHONE_RATIO_EN = 1.5  # phones / word token
+_LOW_PHONE_RATIO_FR = 1.5  # phones / word token — 起步同英文，跑通 baseline 后再调
 # 对齐的音素区间 / 音频总时长；低于 30% 一般意味着用户只读了开头几秒就停了。
 _LOW_COVERAGE_THRESHOLD = 0.3
 # 匹配单个汉字（BMP 范围够用；扩展 A/B 区等生僻字几乎不会进日常脚本）。
@@ -44,6 +46,8 @@ _LANG_SHORT: dict[str, str] = {
     "zh": "zh",
     "en-US": "en",
     "en": "en",
+    "fr-FR": "fr",
+    "fr": "fr",
 }
 
 
@@ -110,6 +114,10 @@ async def run_engine_c(
                 from voiceya.services.audio_analyser.engine_c_asr_en import (  # noqa: PLC0415
                     transcribe_en,
                 )
+            elif lang_short == "fr":
+                from voiceya.services.audio_analyser.engine_c_asr_fr import (  # noqa: PLC0415
+                    transcribe_fr,
+                )
             else:
                 from voiceya.services.audio_analyser.engine_c_asr import (  # noqa: PLC0415
                     transcribe_zh,
@@ -121,6 +129,8 @@ async def run_engine_c(
         try:
             if lang_short == "en":
                 transcript, word_timestamps = await transcribe_en(audio_bytes)
+            elif lang_short == "fr":
+                transcript, word_timestamps = await transcribe_fr(audio_bytes)
             else:
                 transcript = await transcribe_zh(audio_bytes)
         except Exception as exc:  # defensive — _transcribe itself swallows errors
@@ -244,6 +254,9 @@ def _alignment_confidence(
     if lang_short == "en":
         token_count = len(transcript.split())
         low_ratio_threshold = _LOW_PHONE_RATIO_EN
+    elif lang_short == "fr":
+        token_count = len(transcript.split())
+        low_ratio_threshold = _LOW_PHONE_RATIO_FR
     else:
         token_count = len(_HAN_CHAR_RE.findall(transcript))
         low_ratio_threshold = _LOW_PHONE_RATIO_ZH
