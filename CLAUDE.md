@@ -104,10 +104,12 @@ run_engine_c()                              # engine_c.py
                  └─ phones.parse() → resonance.compute_resonance()
 ```
 
-**双语支持**：请求在 `POST /analyze-voice` 带 `language` 字段（`zh-CN` | `en-US`，默认 `zh-CN`）。
+**多语支持**：请求在 `POST /analyze-voice` 带 `language` 字段（`zh-CN` | `en-US` | `fr-FR`，默认 `zh-CN`）。
 - `zh-CN`：free mode 走 FunASR Paraformer-zh；sidecar 用 `mandarin_mfa` + `stats_zh.json`。
 - `en-US`：free mode 走 faster-whisper（默认 `base.en`，env `ENGINE_C_WHISPER_MODEL` 可切 tiny/small/medium）；sidecar 用 `english_us_arpa` + `stats.json`。
-- script mode 两种语言通用：绕开 ASR，直接用前端稿子；`language` 仅决定 sidecar 端的 MFA/参考表路由。
+- `fr-FR`：free mode 走 faster-whisper multilingual（默认 `base`，env `ENGINE_C_WHISPER_MODEL_FR`，`language="fr"` pin decode）；sidecar 用 `french_mfa` + `stats_fr.json` + `weights_fr.json`。fr 上线由 sidecar 启动时检测 `stats_fr.json` 是否存在决定——缺则 `/healthz` 不广告 `fr`，worker 收 503 → `engine_c=null` 优雅降级，Engine A 仍正常。
+- script mode 三种语言通用：绕开 ASR，直接用前端稿子；`language` 仅决定 sidecar 端的 MFA/参考表路由。
+- 前端 i18n：`web/src/modules/i18n.js` 的 `SUPPORTED` 是所有 lang code 的唯一源，`analyzer.js` / `main.js` 里有显式 sync reminder 注释；DICT 三表（zh/en/fr）必须键集相等，dev build 在 i18n.js 模块加载时跑 drift guard，失败抛错。
 
 Sidecar 源码 vendor 自 [guojunximi-cell/gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization.git)（working-chinese-version，同步 2026-04-16 @ 446f124），放在 `voiceya/sidecars/visualizer-backend/`，FastAPI 薄壳在 `voiceya/sidecars/wrapper/main.py`。英文资源 `cmudict.txt` 从 upstream master 分支单独补入 vendor 目录（详见 `voiceya/sidecars/README.md`）。
 

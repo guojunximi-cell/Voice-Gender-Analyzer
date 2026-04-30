@@ -700,7 +700,7 @@ function _showTooltip(session) {
 	const dot = dots.get(session.id);
 	if (!dot) return;
 
-	// `getLang()` already returns BCP 47 ("zh-CN" / "en-US"), pass straight in.
+	// `getLang()` already returns BCP 47 ("zh-CN" / "en-US" / "fr-FR"), pass straight in.
 	const fmt = new Intl.DateTimeFormat(getLang(), {
 		year: "numeric",
 		month: "2-digit",

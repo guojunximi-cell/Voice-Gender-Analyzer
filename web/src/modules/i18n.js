@@ -1,13 +1,13 @@
 /**
  * i18n.js — UI 语言 + 分析管线语言。
  *
- * 一个简单的键值字典：zh-CN 是原版 UI，en-US 的表述遵循
- * `notes/english-localization.md` 术语表（masculine/feminine、perceived、
- * gender-affirming、避免 pass/passing）。
+ * 一个简单的键值字典：zh-CN 是原版 UI，en-US / fr-FR 沿用同一套
+ * gender-affirming 口吻：masculine/feminine、perceived、避免 pass/passing；
+ * 法语 féminin / masculin / androgyne / neutre，避免 « passer »。
  *
  * 对外：
  *   t(key, params?) — 取当前语言下的字符串；`{name}` 占位由 params 注入。
- *   getLang() / setLang(code) — "zh-CN" | "en-US"
+ *   getLang() / setLang(code) — "zh-CN" | "en-US" | "fr-FR"
  *   onLangChange(cb) — 订阅变化（cb 收到新语言）
  *   applyStaticDom(root?) — 按 data-i18n* 属性刷新 root 下的文本；不传则整页。
  *
@@ -18,7 +18,7 @@
  */
 
 const LS_KEY = "vga.lang";
-export const SUPPORTED = ["zh-CN", "en-US"];
+export const SUPPORTED = ["zh-CN", "en-US", "fr-FR"];
 
 const DICT = {
 	"zh-CN": {
@@ -27,9 +27,10 @@ const DICT = {
 		"app.name": "声音分析鸭",
 		"header.help": "使用帮助",
 		"header.theme": "切换主题",
-		"header.lang": "切换语言 / Language",
+		"header.lang": "切换语言 / Language / Langue",
 		"header.langShort.zh": "中",
 		"header.langShort.en": "EN",
+		"header.langShort.fr": "FR",
 
 		"panel.history": "历史分析",
 		"panel.metrics": "综合声学特征",
@@ -315,7 +316,8 @@ const DICT = {
 			"这是一个双引擎互相参考的，对声音刻板影响性别的评估网站。它分为音素级分析和整段分析。主要由上游项目 gender-voice-visualization 和 inaSpeechSegmenter（K-3 fork）驱动。它处于 beta 版本，在迭代中。作者希望它能辅助练声过程。",
 		"help.flow.h": "分析流程",
 		"help.flow.s1.h": "上传 / 录音",
-		"help.flow.s1.note": "拖拽音频、选择文件，或调用麦克风（≤ {mb} MB，< {min} 分钟，中文 zh-CN 或英文 en-US）",
+		"help.flow.s1.note":
+			"拖拽音频、选择文件，或调用麦克风（≤ {mb} MB，< {min} 分钟，中文 zh-CN / 英文 en-US / 法文 fr-FR）",
 		"help.flow.s2.h": "VAD 分段",
 		"help.flow.s2.note": "Engine A · inaSpeechSegmenter K-3 神经网络分出语音 / 音乐 / 静音",
 		"help.flow.s3.h": "文本对齐",
@@ -357,7 +359,7 @@ const DICT = {
 		"help.qa.q6": "音频限制？",
 		"help.qa.a6": "≤ 5 MB，< 3 分钟。30 秒以上、安静、单人录音效果最好。",
 		"help.qa.q7": "语言切换？",
-		"help.qa.a7": "右上角切 zh-CN / en-US。",
+		"help.qa.a7": "右上角依次切换 zh-CN / en-US / fr-FR。",
 		"help.qa.q8": "数据会留吗？",
 		"help.qa.a8": "服务器不保存任何东西。",
 		"help.qa.q9": "手机能用吗？",
@@ -381,9 +383,10 @@ const DICT = {
 		"app.name": "Voiceduck",
 		"header.help": "Help",
 		"header.theme": "Toggle theme",
-		"header.lang": "Switch language / 切换语言",
+		"header.lang": "Switch language / 切换语言 / Langue",
 		"header.langShort.zh": "中",
 		"header.langShort.en": "EN",
+		"header.langShort.fr": "FR",
 
 		"panel.history": "Past sessions",
 		"panel.metrics": "Acoustic summary",
@@ -681,7 +684,7 @@ const DICT = {
 			"A dual-engine cross-referencing site for evaluating how acoustic stereotypes shape perceived gender. It covers phone-level analysis and whole-file analysis. Powered primarily by upstream projects gender-voice-visualization and inaSpeechSegmenter (K-3 fork). It's in beta and iterating. The author hopes it can assist with voice training.",
 		"help.flow.h": "Pipeline",
 		"help.flow.s1.h": "Upload / record",
-		"help.flow.s1.note": "Drop a file, pick one, or use the mic (≤ {mb} MB, < {min} min, zh-CN or en-US).",
+		"help.flow.s1.note": "Drop a file, pick one, or use the mic (≤ {mb} MB, < {min} min; zh-CN / en-US / fr-FR).",
 		"help.flow.s2.h": "VAD segmentation",
 		"help.flow.s2.note": "Engine A · inaSpeechSegmenter K-3 splits speech / music / silence.",
 		"help.flow.s3.h": "Text alignment",
@@ -724,7 +727,7 @@ const DICT = {
 		"help.qa.q6": "Audio limits?",
 		"help.qa.a6": "≤ 5 MB, < 3 minutes. Best results: 30+ seconds, quiet room, single speaker.",
 		"help.qa.q7": "How do I switch language?",
-		"help.qa.a7": "Use the toggle in the top-right corner to switch between zh-CN and en-US.",
+		"help.qa.a7": "Use the toggle in the top-right corner to cycle between zh-CN, en-US, and fr-FR.",
 		"help.qa.q8": "Is my data kept?",
 		"help.qa.a8": "The server saves nothing.",
 		"help.qa.q9": "Does it work on mobile?",
@@ -741,6 +744,380 @@ const DICT = {
 		"help.links.funasr": "FunASR",
 		"help.links.whisper": "faster-whisper",
 	},
+
+	"fr-FR": {
+		"app.title": "Voiceduck — analyse vocale pour le travail de la voix",
+		"app.logoAria": "Dépôt GitHub de Voiceduck",
+		"app.name": "Voiceduck",
+		"header.help": "Aide",
+		"header.theme": "Changer de thème",
+		"header.lang": "Changer de langue / Switch language / 切换语言",
+		"header.langShort.zh": "中",
+		"header.langShort.en": "EN",
+		"header.langShort.fr": "FR",
+
+		"panel.history": "Sessions précédentes",
+		"panel.metrics": "Récapitulatif acoustique",
+
+		"scatter.modeAria": "Disposition de l'historique",
+		"scatter.mode.score": "Tendance",
+		"scatter.mode.time": "Temps",
+		"scatter.mode.scoreTip": "Disposer par tendance vocale (par défaut)",
+		"scatter.mode.timeTip": "Disposer par date (les plus récentes en haut)",
+		"scatter.tick.justNow": "Maintenant",
+		"scatter.tick.minutesAgoFmt": "{n} min",
+		"scatter.tick.hoursAgoFmt": "{n} h",
+		"scatter.tick.dayAgo": "1 j",
+		"scatter.tick.daysAgoFmt": "{n} j",
+		"scatter.tick.weekAgo": "1 sem.",
+		"scatter.tick.monthAgo": "1 mois",
+		"scatter.tooltip.scoreFmt": "Score {n} %",
+
+		"action.delete": "Supprimer cette session",
+		"action.clear": "Vider l'historique",
+		"action.changeFile": "Choisir un autre fichier",
+		"action.browse": "parcourir un fichier",
+		"action.analyze": "Analyser",
+		"action.analyzing": "Analyse en cours…",
+		"action.analyzed": "Analysé",
+		"action.play": "Lecture",
+		"action.pause": "Pause",
+		"action.seekAria": "Position de lecture",
+		"action.recordStart": "Démarrer l'enregistrement",
+		"action.recordStartBig": "Démarrer l'enregistrement",
+		"action.recordStop": "Arrêter l'enregistrement",
+		"action.stop": "Arrêter",
+		"action.next": "Texte suivant",
+		"action.send": "Envoyer",
+		"action.sending": "Envoi…",
+		"action.sendOK": "Envoyé",
+		"action.sendFail": "Échec de l'envoi",
+
+		"upload.title": "Déposez un fichier audio ici",
+		"upload.or": "ou",
+		"upload.hint": "MP3 · WAV · OGG · M4A · FLAC — jusqu'à {mb} Mo / {min} min",
+		"upload.privacy":
+			"Aucun audio ni résultat n'est conservé sur le serveur. L'historique reste dans votre navigateur et peut être vidé à tout moment.",
+		"upload.audioUnavailable": "L'audio d'origine n'est plus disponible (perdu après actualisation)",
+
+		"action.cancel": "Annuler",
+
+		"import.button": "Importer un résultat d'analyse",
+		"import.successFmt": "{name} importé",
+		"import.successMultiFmt": "{n} session(s) importée(s) dans l'historique",
+		"import.errParse": "Impossible d'analyser le fichier en JSON.",
+		"import.errSchemaFmt": "Version d'export incompatible (fichier {version}, courante 1).",
+		"import.errMalformed": "Le fichier exporté manque de champs obligatoires.",
+		"export.button": "Exporter",
+		"export.confirm": "Exporter",
+		"export.dialogTitle": "Exporter le résultat d'analyse",
+		"export.scopeLabel": "Portée",
+		"export.scopeCurrent": "Résultat courant",
+		"export.scopeAll": "Tout l'historique",
+		"export.scopeAllCountFmt": "({n} sessions)",
+		"export.contentLabel": "Contenu",
+		"export.includeAudio": "Inclure l'audio d'origine",
+		"export.includeEngineC": "Inclure les données phone-level d'Engine C",
+		"export.audioSizeFmt": "~{size}",
+		"export.audioSizeMultiFmt": "~{n} extraits, {size}",
+		"export.audioSizeNone": "(aucun audio)",
+		"export.successFmt": "{name} exporté ({size})",
+		"export.errNoData": "Aucun résultat disponible à exporter.",
+		"export.errEmptyHistory": "L'historique est vide.",
+
+		"input.tabsAria": "Choisir la source",
+		"input.tabUpload": "Téléverser un fichier",
+		"input.tabRecord": "Enregistrer au micro",
+
+		"record.modeLabel": "Mode d'analyse",
+		"record.modeAria": "Mode d'analyse",
+		"record.modeScript": "Lire un texte",
+		"record.modeFree": "Parole libre",
+		"record.scriptTip":
+			"Lisez le texte ci-dessous — pas de reconnaissance vocale, alignement plus rapide et plus stable.",
+		"record.freeTip": "Parlez librement, transcription automatique (plus lent, plus de ressources).",
+		"record.hint":
+			"Lisez le texte ci-dessus. Nous le transmettons directement à l'aligneur — pas d'étape de reconnaissance vocale.",
+		"record.scriptPickerLabel": "Texte",
+		"record.scriptPickerAria": "Choisir un texte à lire",
+		"record.scriptCustom": "Texte personnalisé",
+		"record.scriptCustomPlaceholder": "Saisissez le texte que vous souhaitez lire à voix haute…",
+		"record.customHint":
+			"Ce texte est transmis tel quel à l'aligneur — assurez-vous qu'il correspond à la langue d'analyse, sinon l'alignement échouera.",
+		"record.scriptCustomEmpty": "Saisissez d'abord du texte dans le champ personnalisé.",
+
+		"stats.title": "Répartition",
+		"stats.subtitle": "Uniquement segments parlés — musique / silence exclus",
+		"stats.modeAria": "Critère de classification",
+		"stats.modeA": "Réseau de neurones",
+		"stats.modePitch": "Hauteur",
+		"stats.modeResonance": "Résonance",
+		"stats.modeATip": "Étiquettes du classificateur neuronal inaSpeechSegmenter.",
+		"stats.modePitchTip": "F0 par phonème — 165 Hz est la médiane neutre.",
+		"stats.modeResonanceTip": "Indice de résonance par phonème — 0,5 est la médiane neutre.",
+		"stats.lockedTip": "Aucune donnée Engine C pour ce fichier (Engine C désactivé ou en échec).",
+		"label.male": "Masc",
+		"label.female": "Fém",
+		"label.other": "Autre",
+		"label.music": "Musique",
+		"label.noise": "Bruit",
+		"label.silence": "Silence",
+
+		"segments.title": "Segments",
+		"segments.countSuffix": "segs",
+		"segments.acousticDot": "Inclut une analyse acoustique",
+		"segments.confTitle": "Confiance du classificateur {pct} %",
+
+		"mobile.tabSegments": "Segments",
+		"mobile.tabMetrics": "Acoustique",
+
+		"metrics.emptyClick": "Cliquez un segment<br/>pour voir son détail acoustique",
+		"metrics.emptyUpload": "Téléversez et analysez un audio<br/>pour voir les moyennes globales",
+		"metrics.noEngineC": "Engine C est désactivé<br/>aucune moyenne globale à afficher",
+		"metrics.alignWarning": "La qualité d'alignement est faible — résultats à titre indicatif seulement.",
+		"metrics.alignHintScript": "Texte peut-être sauté ou mal lu — refaire une prise aide souvent.",
+		"metrics.alignHintFree": "Bruit ou rythme ont pu affaiblir l'alignement.",
+		"metrics.alignPhoneRatio": "phonèmes/caractères {ratio}",
+		"metrics.alignCoverage": "couverture {pct} %",
+		"metrics.cardPitch": "Hauteur (F0)",
+		"metrics.cardResonance": "Résonance",
+		"metrics.pitchRangeTitle": "Plage de hauteur (80–320 Hz)",
+		"metrics.zoneMale": "Masculin typique 85–155 Hz",
+		"metrics.zoneOverlap": "Zone de chevauchement 145–185 Hz",
+		"metrics.zoneFemale": "Féminin typique 175–255 Hz",
+		"metrics.legendMale": "Masc 85–155 Hz",
+		"metrics.legendNeutral": "Mixte 145–185 Hz",
+		"metrics.legendFemale": "Fém 175–255 Hz",
+		"metrics.formantsTitle": "Formants",
+		"metrics.nnTitle": "Estimation par réseau de neurones",
+		"metrics.nnDisclaimer":
+			"Cette estimation provient d'inaSpeechSegmenter, un classificateur open-source entraîné principalement sur de l'audio de radiodiffusion français. Elle reflète comment ce classificateur, entraîné sur ce jeu de données précis, étiquette cet échantillon. Pas votre identité, pas une note de « passing ».",
+		"metrics.nnSegmentNote":
+			"* Moyenne pondérée par durée sur tout le fichier. L'alternance masculin/féminin dans la liste des segments est normale : le classificateur est bruité près de la frontière, il ne suit pas plusieurs locuteur·ices.",
+		"metrics.headerOverall": "Fichier complet",
+		"metrics.headerOverallSpeech": "Fichier complet · parole {dur}",
+		"metrics.disclaimer.prefix": "Construit sur deux projets open-source : le classificateur neuronal vient d'",
+		"metrics.disclaimer.mid": ". Le pipeline de z-score formant phonème par phonème est un ",
+		"metrics.disclaimer.forkLabel": "fork",
+
+		// Abrégés en en-tête de colonne pour garder la gouttière étroite ; la
+		// ligne de readout au-dessus écrit « Hauteur » / « Résonance » en entier.
+		"timeline.pitch": "H.",
+		"timeline.resonance": "R.",
+		"timeline.prevAria": "Ligne précédente",
+		"timeline.nextAria": "Ligne suivante",
+		"timeline.pagerAria": "Pagination des lignes",
+		"timeline.readoutPitch": "Hauteur",
+		"timeline.readoutResonance": "Résonance",
+		"timeline.pitchTitle": "{char} {phone} · hauteur {raw}",
+		"timeline.pitchTitleInterp": "{char} {phone} · hauteur {raw} (mot {interp} Hz)",
+		"timeline.resonanceTitle": "{char} {phone} · résonance {res}",
+		"timeline.ariaPitch":
+			"Carte thermique de la hauteur ; couleur par caractère (les consonnes non voisées héritent de la couleur de la voyelle).",
+		"timeline.ariaPitchDesc": "Carte thermique de hauteur pour la page courante",
+		"timeline.ariaResonance": "Carte thermique de résonance ; chaque cellule = un phonème, valeur 0–1.",
+		"timeline.ariaResonanceDesc": "Carte thermique de résonance pour la page courante. Médiane palette = 0,5.",
+		"timeline.announceReady": "Analyse terminée, {n} caractères affichés",
+		"timeline.returnToCurrent": "Revenir au moment présent",
+
+		"fallback.noTimelineTitle": "Impossible de construire la timeline phonème par phonème",
+		"fallback.noTimelineLead": "L'audio a été reçu mais l'alignement phonème n'a pas pu aboutir.",
+		"fallback.commonReasons": "Causes fréquentes",
+		"fallback.reasonTooShort": "Enregistrement trop court (visez 5 s ou plus)",
+		"fallback.reasonWrongLang":
+			"Langue incorrecte — changez la langue dans la barre du haut pour qu'elle corresponde à l'audio, puis réessayez",
+		"fallback.reasonNoise": "Trop de bruit de fond",
+		"fallback.reasonNoSpeech": "Pas de parole claire dans l'enregistrement",
+		"fallback.tips": "Conseils",
+		"fallback.tipQuiet": "Réenregistrez dans une pièce calme",
+		"fallback.tipRead": "Lisez un passage d'environ 10 à 30 secondes",
+		"fallback.tipMicDist": "Gardez le micro à 15–25 cm (6–10 in) de la bouche",
+		"fallback.stillVisible": "La forme d'onde et l'estimation neuronale ci-dessous restent disponibles.",
+		"fallback.lowPhone":
+			"Seuls {n} phonèmes détectés — les statistiques peuvent être instables. Enregistrez au moins 10 s de parole continue pour des chiffres plus fiables.",
+		"fallback.noSpeechTitle": "Aucune parole détectée",
+		"fallback.noSpeechLead": "Rien d'analysable dans l'audio. Est-ce de la musique ou un bruit ambiant ?",
+		"fallback.noSpeechHint": "Enregistrez un extrait avec parole claire et réessayez.",
+
+		"legend.azimuthAria": "Légende de couleur de résonance",
+		"legend.scienceAria": "Comment la palette a été calibrée",
+		"legend.male": "Tendance masculine",
+		"legend.neutral": "Androgyne",
+		"legend.female": "Tendance féminine",
+		"legend.infoAria": "Info palette",
+		"legend.sci1":
+			"<strong>La palette de résonance</strong> est centrée sur 0,5 par construction — la médiane du corpus de référence entre masculin-froid et féminin-chaud.",
+		"legend.sci2":
+			"Le calibrage utilise le corpus d'entraînement vocal acousticgender.space en anglais ; les z-scores phonème par phonème de F₂/F₃/F₄ sont combinés avec des poids déterminés par recherche exhaustive sur des locuteur·ices étiqueté·es.",
+		"legend.sci3":
+			"<strong>Référence de hauteur :</strong> {neutral} Hz est la frontière typique masculin-haut / féminin-bas ; {fem} Hz est un seuil perceptuel commun en travail de la voix.",
+		"legend.sci4":
+			"Les plages de hauteur viennent de populations cisgenres anglophones de référence — ce ne sont pas des objectifs d'entraînement. Beaucoup de femmes cis parlent sous 175 Hz et sont perçues comme femmes sans souci. La résonance compte autant que la hauteur.",
+		"legend.sciNote": "Les couleurs sont une indication directionnelle, pas un verdict de genre.",
+
+		// Advice v2 — voir docs/plans/v2_redesign_measurement.md
+		"advice.tone.leans_feminine": "Tendance féminine",
+		"advice.tone.leans_masculine": "Tendance masculine",
+		"advice.tone.not_clearly_leaning": "Tendance peu marquée",
+		"advice.zone.low": "Basse",
+		"advice.zone.mid_lower": "Médium-bas",
+		"advice.zone.mid_neutral": "Acoustiquement neutre",
+		"advice.zone.mid_upper": "Médium-haut",
+		"advice.zone.high": "Haute",
+		"advice.warning.short_recording_minimal":
+			"Enregistrement de moins de 10 secondes ; seules les mesures brutes sont affichées. La tendance tonale demande 10 s ou plus.",
+		"advice.warning.short_recording_standard":
+			"Enregistrement court ({duration} s) ; stabilité limitée. 30 s ou plus recommandé pour un résultat stable.",
+		"advice.warning.dismiss": "Masquer l'avertissement",
+		"advice.summary.low_leans_feminine": "F0 médiane {f0} Hz, plage basse. Tendance féminine.",
+		"advice.summary.low_leans_masculine": "F0 médiane {f0} Hz, plage basse. Tendance masculine.",
+		"advice.summary.low_not_clearly_leaning": "F0 médiane {f0} Hz, plage basse. Tendance peu marquée.",
+		"advice.summary.mid_lower_leans_feminine": "F0 médiane {f0} Hz, plage médium-basse. Tendance féminine.",
+		"advice.summary.mid_lower_leans_masculine": "F0 médiane {f0} Hz, plage médium-basse. Tendance masculine.",
+		"advice.summary.mid_lower_not_clearly_leaning": "F0 médiane {f0} Hz, plage médium-basse. Tendance peu marquée.",
+		"advice.summary.mid_neutral_leans_feminine": "F0 médiane {f0} Hz, plage acoustiquement neutre. Tendance féminine.",
+		"advice.summary.mid_neutral_leans_masculine":
+			"F0 médiane {f0} Hz, plage acoustiquement neutre. Tendance masculine.",
+		"advice.summary.mid_neutral_not_clearly_leaning":
+			"F0 médiane {f0} Hz, plage acoustiquement neutre. Tendance peu marquée.",
+		"advice.summary.mid_upper_leans_feminine": "F0 médiane {f0} Hz, plage médium-haute. Tendance féminine.",
+		"advice.summary.mid_upper_leans_masculine": "F0 médiane {f0} Hz, plage médium-haute. Tendance masculine.",
+		"advice.summary.mid_upper_not_clearly_leaning": "F0 médiane {f0} Hz, plage médium-haute. Tendance peu marquée.",
+		"advice.summary.high_leans_feminine": "F0 médiane {f0} Hz, plage haute. Tendance féminine.",
+		"advice.summary.high_leans_masculine": "F0 médiane {f0} Hz, plage haute. Tendance masculine.",
+		"advice.summary.high_not_clearly_leaning": "F0 médiane {f0} Hz, plage haute. Tendance peu marquée.",
+
+		"duck.msg1": "Le canard écoute la voix…",
+		"duck.msg2": "Le canard travaille fort…",
+		"duck.msg3": "Le canard tend l'oreille…",
+		"duck.msg4": "Mesure des contours de hauteur…",
+		"duck.msg5": "Calcul des formants…",
+		"duck.msg6": "Presque fini…",
+		"duck.done": "Analyse terminée 🎉",
+		"duck.running": "Analyse en cours…",
+
+		"toast.cancelled": "Délai d'analyse dépassé — essayez un extrait plus court.",
+		"toast.failedFmt": "Échec de l'analyse : {msg}",
+		"toast.batchFmt": "Lot terminé : {ok} / {total} réussis",
+		"toast.batchItemFmt": "{name} a échoué : {msg}",
+		"toast.confirmClear": "Effacer toutes les sessions enregistrées ?",
+		"toast.processing": "Traitement…",
+		"toast.hideFeedback": "Bouton de retour masqué (ajoutez ?feedback=1 à l'URL pour le restaurer).",
+
+		"progress.queued": "En file d'attente, en attente d'un worker…",
+		"progress.queuedNext": "Bientôt votre tour…",
+		"progress.queuedCount": "En file d'attente — {n} devant vous",
+		"progress.processing": "Préparation de l'audio…",
+		"progress.listening": "Écoute de la voix… (étape lente)",
+		"progress.organizing": "Écoute terminée — organisation des notes…",
+		"progress.loadAudio": "Chargement de l'audio…",
+		"progress.analyseSegment": "Analyse du segment {i} sur {total}…",
+		"progress.engineCScript": "Alignement du texte mot par mot…",
+		"progress.engineCFree": "Analyse phonème par phonème en cours…",
+		"progress.almostDone": "Presque terminé…",
+
+		"recorder.noPermission": "Veuillez autoriser l'accès au micro et réessayer.",
+		"recorder.noDevice": "Aucun micro détecté.",
+		"recorder.noAccess": "Accès au micro impossible.",
+		"recorder.recordError": "Erreur d'enregistrement : {msg}",
+		"recorder.empty": "Rien n'a été enregistré — réessayez.",
+		"recorder.filenamePrefix": "enregistrement",
+		"recorder.idleHint": "Jusqu'à 3 minutes ; l'analyse démarre dès l'arrêt.",
+
+		"upload.errEmpty": "Le fichier est vide — choisissez-en un autre.",
+		"upload.errUnsupported": "Format non pris en charge : {fmt}. Téléversez un fichier audio.",
+		"upload.errUnknown": "inconnu",
+		"upload.errTooLarge": "Fichier trop volumineux ({mb} Mo). Limite actuelle : {limit} Mo.",
+		"upload.errNoFile": "Aucun fichier sélectionné",
+		"analyzer.noTaskId": "Le backend n'a pas renvoyé de task_id.",
+		"analyzer.needOnProgress": "analyzeAudio nécessite un callback onProgress pour s'abonner au flux de progression.",
+		"analyzer.submitFailed": "Échec de la requête ({status})",
+		"analyzer.streamFailed": "Impossible de s'abonner à la progression ({status})",
+		"analyzer.backendError": "Erreur d'analyse côté backend",
+		"analyzer.noResult": "Aucun résultat reçu",
+
+		"audioGate.clipping":
+			"Audio écrêté ({pct} % d'échantillons saturés). Baissez le volume d'enregistrement et réessayez.",
+		"audioGate.tooQuiet": "Volume trop bas (RMS {db} dBFS). Rapprochez-vous du micro ou augmentez le gain d'entrée.",
+		"audioGate.silence": "Le clip est presque silencieux — vérifiez que votre micro n'est pas coupé.",
+		"audioGate.insufficientVoicing":
+			"Pas assez de parole détectée ({pct} %). Enregistrez un extrait avec parole continue.",
+
+		"feedback.title": "Retour",
+		"feedback.email": "Votre e-mail (facultatif)",
+		"feedback.placeholder": "Dites-nous ce que vous en pensez…",
+		"feedback.btnAria": "Retour (appui long pour masquer)",
+		"feedback.btnTitle": "Appui long pour masquer ce bouton",
+		"feedback.close": "Fermer",
+
+		"help.title": "🦆 Voiceduck · Mode d'emploi",
+		"help.what.h": "C'est quoi ?",
+		"help.what.p":
+			"Un site à double moteur croisé pour évaluer comment les stéréotypes acoustiques influencent la perception du genre. Couvre l'analyse phonème par phonème et l'analyse globale du fichier. Principalement propulsé par les projets en amont gender-voice-visualization et inaSpeechSegmenter (fork K-3). En version bêta, en itération. L'auteur espère que ce sera utile au travail de la voix.",
+		"help.flow.h": "Pipeline",
+		"help.flow.s1.h": "Téléverser / enregistrer",
+		"help.flow.s1.note":
+			"Déposez un fichier, choisissez-en un, ou utilisez le micro (≤ {mb} Mo, < {min} min ; zh-CN / en-US / fr-FR).",
+		"help.flow.s2.h": "Segmentation VAD",
+		"help.flow.s2.note": "Engine A · inaSpeechSegmenter K-3 sépare parole / musique / silence.",
+		"help.flow.s3.h": "Alignement texte",
+		"help.flow.s3.note":
+			"Engine C · le mode libre lance une ASR (FunASR / faster-whisper) ; le mode lecture utilise votre texte tel quel. Montreal Forced Aligner aligne au phonème.",
+		"help.flow.s4.h": "Formants + z-score",
+		"help.flow.s4.note": "Praat extrait F1 / F2 / F3 → z-score combiné en valeur de résonance.",
+		"help.flow.s5.h": "Rendu trois panneaux",
+		"help.flow.s5.note": "Forme d'onde · timeline sandwich centrale · moyennes globales à droite.",
+		"help.how.h": "Comment l'utiliser",
+		"help.how.1": "Glissez un fichier, choisissez-en un, ou enregistrez (≤ {mb} Mo, < {min} min).",
+		"help.how.2": "Cliquez Analyser et attendez la barre de progression du canard.",
+		"help.how.3": "Les trois panneaux se remplissent automatiquement, sans clic supplémentaire.",
+		"help.heatmap.h": "Dans la carte thermique",
+		"help.heatmap.resonanceDT": "Résonance",
+		"help.heatmap.resonanceDD":
+			"Résonance à l'intérieur de chaque phonème. Voyelles uniquement. Issue d'une combinaison pondérée de F1, F2 et F3. Ligne de base calibrée sur un corpus de voix cis de référence. Au-dessus de 50 % indique une tendance féminine.",
+		"help.heatmap.pitchDT": "Hauteur",
+		"help.heatmap.pitchDD":
+			"F0 à l'intérieur de chaque phonème. Considérée comme la frontière acoustique principale entre la perception masculine et féminine de la voix.",
+		"help.overall.h": "Analyse globale",
+		"help.overall.note": "F0, résonance et formants sont des moyennes sur les segments voisés.",
+		"help.overall.nnDT": "NN / Engine A",
+		"help.overall.nnDD":
+			"Un classificateur CNN d'inaSpeechSegmenter, entraîné principalement sur de l'audio de radiodiffusion français. Émet une étiquette de genre conçue pour distinguer les distributions de voix cis dans les segments parlés. À traiter comme une référence tonale approximative seulement.",
+		"help.qa.h": "FAQ",
+		"help.qa.q1": "Où regarder en premier ?",
+		"help.qa.a1":
+			"Regardez les cartes thermiques de résonance et de hauteur, pas le pourcentage du réseau de neurones. Le NN n'est pas précis. Je suis en train de le rétrograder en « référence tonale ». Résonance et hauteur sont des mesures directes avec une résolution temporelle au phonème — c'est ça qui peut guider la pratique.",
+		"help.qa.q2": "Les trois moteurs ne sont pas d'accord ?",
+		"help.qa.a2":
+			"Faites confiance à la résonance et à la hauteur. C'est normal qu'elles divergent du NN — elles ne mesurent pas la même chose. Question plus utile : la résonance et la hauteur sont-elles d'accord entre elles ? Si la hauteur est montée mais la résonance reste basse, c'est que la hauteur vocale est montée mais la cavité résonante n'a pas encore changé — voilà la prochaine direction.",
+		"help.qa.q3": "C'est quoi « Other » ?",
+		"help.qa.a3": "Pauses, sons de respiration, ou segments que le moteur n'a pas pu classer.",
+		"help.qa.q4":
+			"Je suis perçu·e comme femme dans la vie, mais l'outil dit que je suis masc — qu'est-ce qui se passe ?",
+		"help.qa.a4": "L'outil se trompe ; tout va bien.",
+		"help.qa.q5": "Alors à quoi sert vraiment cet outil ?",
+		"help.qa.a5":
+			"À observer comment la résonance et la hauteur de chaque voyelle évoluent dans le temps. « Ce ‹a› sonne lumineux ; cet autre ‹a› s'effondre. » L'oreille capte rarement ce détail, mais la carte thermique le rend visible.",
+		"help.qa.q6": "Limites audio ?",
+		"help.qa.a6": "≤ 5 Mo, < 3 minutes. Meilleurs résultats : 30 s+, pièce calme, un·e seul·e locuteur·ice.",
+		"help.qa.q7": "Comment changer de langue ?",
+		"help.qa.a7": "Utilisez le bouton en haut à droite pour passer entre zh-CN, en-US et fr-FR.",
+		"help.qa.q8": "Mes données sont-elles conservées ?",
+		"help.qa.a8": "Le serveur ne garde rien.",
+		"help.qa.q9": "Ça marche sur mobile ?",
+		"help.qa.a9": "Oui, mais l'orientation paysage est recommandée pour la timeline.",
+		"help.links.h": "Liens",
+		"help.links.projGroup": "Ce projet",
+		"help.links.creditsGroup": "Crédits techniques",
+		"help.links.repo": "Dépôt GitHub",
+		"help.links.issues": "Signaler un problème",
+		"help.links.ina": "inaSpeechSegmenter (fork K-3)",
+		"help.links.gvv": "gender-voice-visualization",
+		"help.links.mfa": "Montreal Forced Aligner",
+		"help.links.praat": "Praat",
+		"help.links.funasr": "FunASR",
+		"help.links.whisper": "faster-whisper",
+	},
 };
 
 // ─── Runtime state ───────────────────────────────────────────
@@ -751,7 +1128,10 @@ let _lang = (() => {
 		if (stored && SUPPORTED.includes(stored)) return stored;
 	} catch (_) {}
 	const nav = typeof navigator !== "undefined" ? navigator.language || "" : "";
-	return nav.toLowerCase().startsWith("zh") ? "zh-CN" : "en-US";
+	const lc = nav.toLowerCase();
+	if (lc.startsWith("zh")) return "zh-CN";
+	if (lc.startsWith("fr")) return "fr-FR";
+	return "en-US";
 })();
 
 const _listeners = new Set();
@@ -845,6 +1225,29 @@ export function applyStaticDom(root) {
 
 	const titleNode = document.querySelector("title[data-i18n]");
 	if (titleNode) document.title = titleNode.textContent;
+}
+
+// ─── Dev-only drift guard ────────────────────────────────────
+// Fires the moment a developer reloads the page after editing DICT — earlier
+// than any CI test would catch it. Tree-shaken in `vite build` (NODE_ENV=production
+// makes import.meta.env.DEV a literal `false`, the whole block becomes dead code).
+// Equality, not just superset: an extra key in fr-FR that en-US lacks would make
+// English users fall back to French — a reverse bug.
+if (import.meta.env?.DEV) {
+	const canon = "en-US";
+	const canonKeys = Object.keys(DICT[canon]);
+	for (const lang of SUPPORTED) {
+		if (lang === canon) continue;
+		const langSet = new Set(Object.keys(DICT[lang]));
+		const canonSet = new Set(canonKeys);
+		const missing = canonKeys.filter((k) => !langSet.has(k));
+		const extra = [...langSet].filter((k) => !canonSet.has(k));
+		if (missing.length || extra.length) {
+			throw new Error(
+				`[i18n] DICT drift in ${lang}: missing=${JSON.stringify(missing)} extra=${JSON.stringify(extra)}`,
+			);
+		}
+	}
 }
 
 // Boot once: ensure <html lang="..."> matches the chosen language even before

@@ -223,9 +223,12 @@ export class PhoneTimeline {
 		const pitchBand = this.root.querySelector(".vga-timeline__band--pitch");
 		const rowsEl = this.root.querySelector(".vga-timeline__rows");
 		const w = pitchBand?.clientWidth || rowsEl?.clientWidth || this.root.clientWidth || 320;
-		const isEn = getLang() === "en-US";
-		const pxPer = isEn ? PX_PER_UNIT_EN : PX_PER_UNIT_CJK;
-		const minUnits = isEn ? MIN_UNITS_PER_PAGE_EN : MIN_UNITS_PER_PAGE_CJK;
+		// Latin scripts (en-US, fr-FR) share word-spaced layout; zh-CN uses CJK packing.
+		// Positive list rather than `!== "zh-CN"` so a future CJK locale (ja-JP, ko-KR)
+		// doesn't silently inherit Latin layout.
+		const isLatin = ["en-US", "fr-FR"].includes(getLang());
+		const pxPer = isLatin ? PX_PER_UNIT_EN : PX_PER_UNIT_CJK;
+		const minUnits = isLatin ? MIN_UNITS_PER_PAGE_EN : MIN_UNITS_PER_PAGE_CJK;
 		return Math.max(minUnits, Math.floor(w / pxPer));
 	}
 

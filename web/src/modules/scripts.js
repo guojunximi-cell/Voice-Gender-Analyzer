@@ -3,6 +3,8 @@
 //     长度 ~130-150 字，覆盖四声 + 前后鼻音 + 主要韵母空间，朗读约 50-80 s。
 // EN：通用朗读材料，优先选择语音训练社区熟悉的文本（Rainbow Passage 等）——
 //     覆盖全部英语元音与常见辅音组合，长度约 30-60 s，适合做 Engine C 对齐。
+// FR：公版文学 + IPA 经典朗读样本（La bise et le soleil），覆盖 12 oral
+//     元音 + 4 鼻元音（ɛ̃ ɑ̃ ɔ̃ œ̃）+ 前圆唇 (y ø œ)，朗读约 30-60 s。
 
 // "自定义" 槽位用这个 id；不在 PRESET_* 列表里 —— 文本由用户输入，
 // main.js 在 dropdown 末尾单独追加这个选项。
@@ -54,12 +56,37 @@ export const PRESET_SCRIPTS_EN = [
 	},
 ];
 
+export const PRESET_SCRIPTS_FR = [
+	{
+		id: "bise-et-soleil",
+		title: "La bise et le soleil (IPA Handbook)",
+		text: "La bise et le soleil se disputaient, chacun assurant qu'il était le plus fort, quand ils ont vu un voyageur qui s'avançait, enveloppé dans son manteau. Ils sont tombés d'accord que celui qui arriverait le premier à faire ôter son manteau au voyageur serait regardé comme le plus fort. Alors, la bise s'est mise à souffler de toute sa force, mais plus elle soufflait, plus le voyageur serrait son manteau autour de lui ; et à la fin, la bise a renoncé à le lui faire ôter.",
+	},
+	{
+		id: "hugo-cosette",
+		title: "Hugo · Les Misérables (Cosette)",
+		text: "Cosette marchait sans se rendre compte de rien. Elle était toute petite et toute seule dans cette immense nuit noire. Elle traversait des rues vides, où il n'y avait personne, où les boutiques étaient fermées, où l'on n'entendait pas un bruit. La forêt était devant elle comme une grande chose noire. Elle entra dans le bois, le seau à la main, et elle se mit à courir, parce qu'elle avait peur.",
+	},
+	{
+		id: "proust-madeleine",
+		title: "Proust · La madeleine",
+		text: "Et tout d'un coup le souvenir m'est apparu. Ce goût, c'était celui du petit morceau de madeleine que le dimanche matin à Combray, ma tante Léonie m'offrait après l'avoir trempé dans son infusion de thé ou de tilleul. La vue de la petite madeleine ne m'avait rien rappelé avant que je n'y eusse goûté ; peut-être parce que, en ayant souvent aperçu depuis, sans en manger, sur les tablettes des pâtissiers, leur image avait quitté ces jours de Combray.",
+	},
+	{
+		id: "flaubert-yonville",
+		title: "Flaubert · Madame Bovary (Yonville)",
+		text: "On est, il faut le dire, sur les confins de la Normandie, de la Picardie et de l'Île-de-France, contrée bâtarde où le langage est sans accentuation, comme le paysage sans caractère. C'est là que l'on fait les pires fromages de Neufchâtel de tout l'arrondissement, et, d'autre part, la culture y est coûteuse, parce qu'il faut beaucoup de fumier pour engraisser ces terres friables, pleines de sable et de cailloux.",
+	},
+];
+
 // Back-compat: old callers import PRESET_SCRIPTS directly. Keep it pointing at
 // the zh-CN list so anything not yet language-aware still behaves.
 export const PRESET_SCRIPTS = PRESET_SCRIPTS_ZH;
 
 export function scriptsForLang(lang) {
-	return lang === "en-US" ? PRESET_SCRIPTS_EN : PRESET_SCRIPTS_ZH;
+	if (lang === "en-US") return PRESET_SCRIPTS_EN;
+	if (lang === "fr-FR") return PRESET_SCRIPTS_FR;
+	return PRESET_SCRIPTS_ZH;
 }
 
 export function getDefaultScript(lang) {

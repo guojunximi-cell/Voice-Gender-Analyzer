@@ -6,14 +6,17 @@
 			(function () {
 				var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
 				document.documentElement.setAttribute("data-theme", t);
-				var SUPPORTED = ["zh-CN", "en-US"];
+				var SUPPORTED = ["zh-CN", "en-US", "fr-FR"];
 				var storedLang = localStorage.getItem("vga.lang");
+				var navLang = (navigator.language || "").toLowerCase();
 				var lang =
 					storedLang && SUPPORTED.indexOf(storedLang) !== -1
 						? storedLang
-						: (navigator.language || "").toLowerCase().indexOf("zh") === 0
+						: navLang.indexOf("zh") === 0
 							? "zh-CN"
-							: "en-US";
+							: navLang.indexOf("fr") === 0
+								? "fr-FR"
+								: "en-US";
 				document.documentElement.setAttribute("lang", lang);
 			})();
 		</script>

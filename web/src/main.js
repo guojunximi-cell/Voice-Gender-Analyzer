@@ -1301,15 +1301,26 @@ async function initScatterFromStorage() {
 // ─── Language toggle ──────────────────────────────────────────
 // 顶部按钮既切 UI 又切管线：同一语言决定 DICT、示例稿件库以及 POST
 // /api/analyze-voice 的 `language` 字段（见 analyzer.js）。
+// 三态轮转：zh-CN → en-US → fr-FR → zh-CN。按钮 label 显示「下一个」语言的短名。
+// keep in sync with SUPPORTED in i18n.js
+const _LANG_ORDER = ["zh-CN", "en-US", "fr-FR"];
+const _LANG_SHORT_KEY = {
+	"zh-CN": "header.langShort.zh",
+	"en-US": "header.langShort.en",
+	"fr-FR": "header.langShort.fr",
+};
+function _nextLang(cur) {
+	const i = _LANG_ORDER.indexOf(cur);
+	return _LANG_ORDER[(i + 1) % _LANG_ORDER.length];
+}
 function _updateLangToggleLabel() {
 	const lbl = $("lang-toggle-label");
 	if (!lbl) return;
-	// 显示"去切到的语言"的首字——EN 按钮在中文态显示，中 按钮在英文态显示。
-	lbl.textContent = getLang() === "zh-CN" ? t("header.langShort.en") : t("header.langShort.zh");
+	lbl.textContent = t(_LANG_SHORT_KEY[_nextLang(getLang())]);
 }
 
 $("lang-toggle")?.addEventListener("click", () => {
-	setLang(getLang() === "zh-CN" ? "en-US" : "zh-CN");
+	setLang(_nextLang(getLang()));
 });
 
 onLangChange(() => {
