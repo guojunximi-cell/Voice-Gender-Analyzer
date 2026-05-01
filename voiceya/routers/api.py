@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from fastapi_limiter.depends import RateLimiter
 
 from voiceya.config import CFG
-from voiceya.services.audio_analyser.advice_v2 import TONE_THRESHOLD
+from voiceya.services.audio_analyser.advice_v2 import TONE_THRESHOLD, WEAK_TONE_THRESHOLD
 from voiceya.services.audio_analyser.audio_tools import get_duraton_sec
 from voiceya.services.sse import subscribe_to_events_and_generate_sse
 from voiceya.taskiq import broker
@@ -30,6 +30,7 @@ API_CONFIGS = {
     "max_audio_duration_sec": CFG.max_audio_duration_sec,
     "engine_c_enabled": CFG.engine_c_enabled,
     "tone_threshold": TONE_THRESHOLD,
+    "weak_tone_threshold": WEAK_TONE_THRESHOLD,
 }
 
 

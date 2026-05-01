@@ -47,6 +47,8 @@ ZONE_LABELS = {
 TONE_LABELS = {
     "leans_feminine": ("倾向偏女", "Leans feminine"),
     "leans_masculine": ("倾向偏男", "Leans masculine"),
+    "weakly_feminine": ("轻微偏女", "Slightly feminine"),
+    "weakly_masculine": ("轻微偏男", "Slightly masculine"),
     "not_clearly_leaning": ("倾向不明显", "Not clearly leaning"),
 }
 
@@ -101,11 +103,15 @@ ZONE_CLAUSES_EN = {
 TONE_TEXT_ZH = {
     "leans_feminine": "声学倾向偏女。",
     "leans_masculine": "声学倾向偏男。",
+    "weakly_feminine": "声学轻微偏女。",
+    "weakly_masculine": "声学轻微偏男。",
     "not_clearly_leaning": "倾向不明显。",
 }
 TONE_TEXT_EN = {
     "leans_feminine": "Leans feminine",
     "leans_masculine": "Leans masculine",
+    "weakly_feminine": "Slightly feminine",
+    "weakly_masculine": "Slightly masculine",
     "not_clearly_leaning": "Not clearly leaning",
 }
 
@@ -117,7 +123,13 @@ def _render_summary(advice: dict) -> tuple[str, str]:
     f0 = sp["text_params"]["f0"]
     # Parse "advice.summary.<zone>_<tendency>"
     parts = sp["text_key"].split(".")[-1]  # "<zone>_<tendency>"
-    for tend in ("leans_feminine", "leans_masculine", "not_clearly_leaning"):
+    for tend in (
+        "leans_feminine",
+        "leans_masculine",
+        "weakly_feminine",
+        "weakly_masculine",
+        "not_clearly_leaning",
+    ):
         if parts.endswith("_" + tend):
             zone = parts[: -(len(tend) + 1)]
             zh = f"F0 中位数 {f0} Hz，{ZONE_CLAUSES_ZH[zone]}。{TONE_TEXT_ZH[tend]}"

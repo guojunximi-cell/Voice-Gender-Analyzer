@@ -93,21 +93,32 @@ export function scoreToColor(score) {
 }
 
 // ─── Certainty tag for a voiced segment ──────────────────────
-// 3-tier tone tendency mapper (advice v2 §5). Single threshold on the C1
-// margin (Engine A T=2.0 calibrated). The threshold is owned by the backend
-// (advice_v2.TONE_THRESHOLD) and pushed in via /api/config; setToneThreshold()
-// is wired from main.js after the config fetch. The 0.78 default below is a
-// fallback for the brief window before /api/config returns and for tests /
-// offline use — it must mirror advice_v2.TONE_THRESHOLD if the source ever
-// changes.
+// 5-tier tone tendency mapper. Two thresholds on the C1 margin (Engine A
+// T=2.0 calibrated):
+//   margin >= _toneThreshold (0.78)      → leans_*       (confident)
+//   margin >= _weakToneThreshold (0.50)  → weakly_*      (directional but soft)
+//   else                                  → not_clearly_leaning
+// Both thresholds are owned by the backend (advice_v2.TONE_THRESHOLD,
+// WEAK_TONE_THRESHOLD) and pushed in via /api/config; setters are wired from
+// main.js after the config fetch. Defaults below are a fallback for the brief
+// window before /api/config returns and for tests / offline use — they must
+// mirror the backend constants.
 // See docs/plans/v2_redesign_measurement.md §5.
 let _toneThreshold = 0.78;
+let _weakToneThreshold = 0.5;
 export function setToneThreshold(v) {
 	if (typeof v === "number" && v > 0 && v < 1) _toneThreshold = v;
+}
+export function setWeakToneThreshold(v) {
+	if (typeof v === "number" && v > 0 && v < 1) _weakToneThreshold = v;
 }
 export function certaintTag(seg) {
 	if (!seg || (seg.label !== "female" && seg.label !== "male")) return "";
 	const margin = seg.confidence ?? 0;
-	if (margin < _toneThreshold) return t("advice.tone.not_clearly_leaning");
-	return t(seg.label === "female" ? "advice.tone.leans_feminine" : "advice.tone.leans_masculine");
+	const fem = seg.label === "female";
+	if (margin >= _toneThreshold)
+		return t(fem ? "advice.tone.leans_feminine" : "advice.tone.leans_masculine");
+	if (margin >= _weakToneThreshold)
+		return t(fem ? "advice.tone.weakly_feminine" : "advice.tone.weakly_masculine");
+	return t("advice.tone.not_clearly_leaning");
 }

@@ -24,6 +24,11 @@ if TYPE_CHECKING:
 
 SCHEMA_VERSION = "v2"
 TONE_THRESHOLD = 0.78  # see §5; cis_female margin p10 = 0.784 in 95-sample eval
+# Below TONE_THRESHOLD but above WEAK_TONE_THRESHOLD: the classifier still leans
+# in one direction (margin 0.5 ≈ top class ~75% probability) — surfaced as
+# weakly_* so low-confidence directional info isn't lost. Below this, lump as
+# not_clearly_leaning.
+WEAK_TONE_THRESHOLD = 0.50
 
 GATING_MINIMAL_MAX_S = 10.0
 GATING_STANDARD_MAX_S = 30.0
@@ -61,9 +66,13 @@ def _label_distribution(analyse_results: list, total_duration_sec: float) -> dic
 
 
 def _tone_tendency(dominant_label: str | None, weighted_margin: float) -> str:
-    if weighted_margin < TONE_THRESHOLD or dominant_label not in ("female", "male"):
+    if dominant_label not in ("female", "male"):
         return "not_clearly_leaning"
-    return "leans_feminine" if dominant_label == "female" else "leans_masculine"
+    if weighted_margin >= TONE_THRESHOLD:
+        return "leans_feminine" if dominant_label == "female" else "leans_masculine"
+    if weighted_margin >= WEAK_TONE_THRESHOLD:
+        return "weakly_feminine" if dominant_label == "female" else "weakly_masculine"
+    return "not_clearly_leaning"
 
 
 def _summary_text_key(zone_key: str | None, tendency_key: str) -> str | None:

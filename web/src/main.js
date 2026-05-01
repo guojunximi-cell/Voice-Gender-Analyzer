@@ -36,7 +36,7 @@ import {
 	togglePlay,
 	updateWaveformTheme,
 } from "./modules/waveform.js";
-import { nextSessionColor, setToneThreshold } from "./utils.js";
+import { nextSessionColor, setToneThreshold, setWeakToneThreshold } from "./utils.js";
 
 // Expose i18n utilities so inline scripts in index.html (feedback modal) and
 // other non-ESM consumers can reach t() / setLang without extra plumbing.
@@ -676,6 +676,7 @@ async function initUploaders() {
 		maxDurationSec = cfg.max_audio_duration_sec ?? 180;
 		engineCEnabled = !!cfg.engine_c_enabled;
 		if (cfg.tone_threshold != null) setToneThreshold(cfg.tone_threshold);
+		if (cfg.weak_tone_threshold != null) setWeakToneThreshold(cfg.weak_tone_threshold);
 	} catch (_) {}
 
 	_initRecordMode(engineCEnabled);

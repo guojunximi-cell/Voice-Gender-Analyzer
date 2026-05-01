@@ -107,11 +107,28 @@ def test_tendency_leans_feminine_at_threshold():
     assert out["tone_panel"]["tone_tendency_key"] == "leans_feminine"
 
 
-def test_tendency_below_threshold_unclear():
+def test_tendency_below_weak_threshold_unclear():
+    """Below WEAK_TONE_THRESHOLD (0.50) → not_clearly_leaning, even with a clear label."""
+    y, sr = _empty_y()
+    items = [_seg("female", 30.0, 0.30)]
+    out = compute_advice(y, sr, items, 30.0, "female")
+    assert out["tone_panel"]["tone_tendency_key"] == "not_clearly_leaning"
+
+
+def test_tendency_weakly_feminine_at_weak_threshold():
+    """Exactly WEAK_TONE_THRESHOLD (0.50) → weakly_feminine."""
     y, sr = _empty_y()
     items = [_seg("female", 30.0, 0.50)]
     out = compute_advice(y, sr, items, 30.0, "female")
-    assert out["tone_panel"]["tone_tendency_key"] == "not_clearly_leaning"
+    assert out["tone_panel"]["tone_tendency_key"] == "weakly_feminine"
+
+
+def test_tendency_weakly_masculine_just_below_strong():
+    """Between WEAK_TONE_THRESHOLD and TONE_THRESHOLD → weakly_*."""
+    y, sr = _empty_y()
+    items = [_seg("male", 30.0, 0.77)]
+    out = compute_advice(y, sr, items, 30.0, "male")
+    assert out["tone_panel"]["tone_tendency_key"] == "weakly_masculine"
 
 
 def test_tendency_leans_masculine():
