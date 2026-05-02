@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     redis_uri: str = Field(..., validation_alias=AliasChoices("REDIS_URI", "REDIS_URL"))
     web_dir: Path = BASE_DIR.parent / "web"
 
+    # 旧部署（Railway）切到 VPS（voiceduck.cc）后用：设成 "https://voiceduck.cc"
+    # 即可让所有请求 308 跳转过去，路径/方法/query 全保留。空串 = 不跳转。
+    redirect_to: str = ""
+
     task_max_exec_sec: PositiveInt = 15 * 60
     task_events_ttl_sec: PositiveInt = 10 * 60
     task_result_ttl_sec: PositiveInt = 10 * 60
