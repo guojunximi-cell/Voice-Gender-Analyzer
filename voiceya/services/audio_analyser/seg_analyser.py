@@ -39,7 +39,8 @@ async def do_analyse_segments(
     end_pct: int = 95,
 ):
     # 音频已由 do_analyse 提前 load + 闸门校验，这里只需切片做声学分析。
-    start_pct = 55
+    # start_pct 紧跟 do_analyse 里 organize 事件（pct=35）后面 2pt，避免长跳。
+    start_pct = 37
     await publish(ProgressSSE(pct=start_pct, msg="鸭鸭正在载入音频…", msg_key="progress.loadAudio"))
 
     total_voiced = sum(1 for s in segmentation_results if _is_analyzable(s[0], s[2] - s[1]))

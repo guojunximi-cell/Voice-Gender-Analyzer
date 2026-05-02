@@ -357,9 +357,10 @@ let _engineCInterp = null;
 // when out-of-order events (e.g. Engine C start after Engine B ramp) would
 // otherwise retract the bar. Reset in _finishDuck / _hideDuck.
 let _duckPctHighWater = 0;
-// Engine C start pct — must match backend `pct=72` in audio_analyser/__init__.py.
-const ENGINE_C_START_PCT = 72;
-const ENGINE_C_CAP_PCT = 94;
+// Engine C start pct — must match backend `pct=68` in audio_analyser/__init__.py.
+// pct 分配按 scripts/profile_pipeline.py 实测时间份额校准（A:B:C:tail ≈ 25:33:30:10）。
+const ENGINE_C_START_PCT = 68;
+const ENGINE_C_CAP_PCT = 92;
 
 // ── Real progress: set duck bar to exact percentage ──────────
 function _setDuckProgress(pct, msg) {
@@ -383,9 +384,12 @@ function _setDuckProgress(pct, msg) {
 function _startEngineAInterp() {
 	_stopEngineAInterp();
 	const start = Date.now();
+	// TO 收紧到 33（实测 Engine A 占总时间约 25%，新分配 10→35）。
+	// DURATION 缩到 60s：A 在 prod CPU 上 5–30s 完事，60s 让 sqrt 曲线在中段
+	// 还有可见进给，不至于在 90s 才爬到顶。
 	const FROM = 10,
-		TO = 45;
-	const DURATION_MS = 90_000;
+		TO = 33;
+	const DURATION_MS = 60_000;
 
 	function tick() {
 		const elapsed = Date.now() - start;

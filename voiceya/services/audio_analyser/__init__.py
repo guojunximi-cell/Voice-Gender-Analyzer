@@ -80,13 +80,14 @@ async def do_analyse(
     segmentation_results = await do_segmentation(sample)
 
     # ── Engine B: 声学分析（仅对有声语音段）────────────
+    # pct 分配按 scripts/profile_pipeline.py 的实测时间份额校准：
+    # A:B:C:tail ≈ 25:33:30:10（warm cache, 30s+ 音频）。早先 A=40 / B=15 让用户
+    # 在最慢的 A/B 阶段看不到推进，又在 EC 段看到一路慢爬。
     await publish(
-        ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…", msg_key="progress.organizing")
+        ProgressSSE(pct=35, msg="鸭鸭听完了！正在整理笔记…", msg_key="progress.organizing")
     )
 
-    # 开 Engine C 时给"开小灶"阶段留一大段进度预算（72→94）——它是最慢的一环，
-    # 进度太靠右会让用户以为马上就好，其实还要等 ASR + MFA + Praat 跑完。
-    seg_end_pct = 70 if CFG.engine_c_enabled else 95
+    seg_end_pct = 65 if CFG.engine_c_enabled else 90
     analyse_results = await do_analyse_segments(
         y_full, int(sr_full), segmentation_results, publish, end_pct=seg_end_pct
     )
@@ -101,7 +102,7 @@ async def do_analyse(
         else:
             msg = "鸭鸭开小灶做进阶分析…"
             msg_key = "progress.engineCFree"
-        await publish(ProgressSSE(pct=72, msg=msg, msg_key=msg_key))
+        await publish(ProgressSSE(pct=68, msg=msg, msg_key=msg_key))
         sample.seek(0)
         audio_bytes = sample.read()
         engine_c_summary = await run_engine_c(
@@ -109,7 +110,8 @@ async def do_analyse(
         )
 
     # ── 全局汇总统计 ───────────────────────────────────────
-    await publish(ProgressSSE(pct=98, msg="鸭鸭快好了…", msg_key="progress.almostDone"))
+    # tail 拿 5pt 而非以前的 2pt——statics + advice 在长音频上能跑 0.5–1s。
+    await publish(ProgressSSE(pct=95, msg="鸭鸭快好了…", msg_key="progress.almostDone"))
 
     result = do_statics(analyse_results)
     summary = result["summary"]
