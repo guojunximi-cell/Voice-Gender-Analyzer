@@ -30,7 +30,8 @@ usage() {
 	cat <<'EOF'
 用法: bash scripts/deploy.sh [选项]
 
-  -b, --branch <name>    切到指定分支（默认：当前分支）
+  -b, --branch <name>    切到指定分支（不传时：交互式菜单选择；
+                         非交互/带 -y 时回退到当前分支）
   -r, --rebuild <scope>  rebuild 范围:
                            auto    根据 git diff 自动判断（默认）
                            app     只 build app
@@ -142,28 +143,82 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-[[ -z "$BRANCH" ]] && BRANCH="$CURRENT_BRANCH"
 OLD_COMMIT=$(git rev-parse HEAD)
-log "分支：$CURRENT_BRANCH    目标：$BRANCH    当前 commit：${OLD_COMMIT:0:8}"
 
-# ──────────── git fetch + 展示将要更新的内容 ────────────
+# ──────────── 先 fetch（让分支列表是新鲜的） ────────────
 log "git fetch origin"
 run "git fetch origin --prune"
+
+# ──────────── 选分支：CLI 参数 > 交互菜单 > 当前分支 ────────────
+pick_branch_interactive() {
+	local current=$1
+	local -a branches=("$current")
+	local b found x
+
+	# 本地其它分支
+	while read -r b; do
+		[[ -n "$b" && "$b" != "$current" ]] && branches+=("$b")
+	done < <(git for-each-ref --format='%(refname:short)' refs/heads/)
+
+	# 远程独有分支（不在本地的）。注意 origin/HEAD 的 short ref 可能是 "origin"
+	while read -r b; do
+		[[ "$b" == origin/* ]] || continue   # 跳过 "origin"（HEAD pointer 短名）
+		b="${b#origin/}"
+		[[ -z "$b" || "$b" == "HEAD" ]] && continue
+		found=0
+		for x in "${branches[@]}"; do [[ "$x" == "$b" ]] && { found=1; break; }; done
+		[[ $found -eq 0 ]] && branches+=("$b")
+	done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin/)
+
+	echo
+	echo "可用分支（* = 当前）："
+	for i in "${!branches[@]}"; do
+		local mark=" "
+		[[ "${branches[i]}" == "$current" ]] && mark="*"
+		printf "  [%2d] %s %s\n" "$((i+1))" "$mark" "${branches[i]}"
+	done
+	echo
+
+	local choice
+	read -rp "选择编号（回车 = 当前 $current）: " choice
+	if [[ -z "$choice" ]]; then
+		printf '%s' "$current"
+	elif [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#branches[@]} )); then
+		printf '%s' "${branches[$((choice-1))]}"
+	else
+		err "无效编号: $choice" >&2
+		return 1
+	fi
+}
+
+if [[ -z "$BRANCH" ]]; then
+	# 没有 -b：交互模式（TTY + 非 -y + 非 dry-run）下弹菜单，否则用当前分支
+	if [[ -t 0 && $ASSUME_YES -eq 0 && $DRY_RUN -eq 0 ]]; then
+		BRANCH=$(pick_branch_interactive "$CURRENT_BRANCH") || exit 1
+	else
+		BRANCH="$CURRENT_BRANCH"
+	fi
+fi
+
+log "分支：$CURRENT_BRANCH    目标：$BRANCH    当前 commit：${OLD_COMMIT:0:8}"
 
 if [[ $DRY_RUN -eq 0 ]]; then
 	REMOTE_REF="origin/$BRANCH"
 	if git rev-parse --verify --quiet "$REMOTE_REF" >/dev/null; then
 		REMOTE_COMMIT=$(git rev-parse "$REMOTE_REF")
+		# 只有目标分支与当前一样时才有 OLD_COMMIT..REMOTE 的概念
+		# 不一样时（切分支），要预览的是 OLD..REMOTE_REF 跨分支差异
 		if [[ "$OLD_COMMIT" != "$REMOTE_COMMIT" ]]; then
-			echo "── 即将拉取的 commits ──"
-			git log --oneline "$OLD_COMMIT..$REMOTE_COMMIT" | head -20 || true
+			echo "── 将要应用的 commits（${OLD_COMMIT:0:8} → ${REMOTE_COMMIT:0:8}）──"
+			git log --oneline "$OLD_COMMIT..$REMOTE_COMMIT" 2>/dev/null | head -20 || \
+				git log --oneline -10 "$REMOTE_COMMIT"
 			echo "── 涉及的文件 ──"
-			git diff --stat "$OLD_COMMIT..$REMOTE_COMMIT" | tail -20 || true
+			git diff --stat "$OLD_COMMIT..$REMOTE_COMMIT" 2>/dev/null | tail -20 || true
 		else
-			log "远端 $BRANCH 与本地一致"
+			log "目标分支 $BRANCH 与当前 commit 一致，无新内容"
 		fi
 	else
-		warn "远端没有分支 $REMOTE_REF"
+		warn "远端没有分支 origin/$BRANCH"
 	fi
 fi
 
