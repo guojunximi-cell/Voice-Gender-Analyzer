@@ -84,11 +84,11 @@ def test_quiet_input_triggers_too_quiet():
 
 
 def test_mostly_silent_triggers_insufficient_voicing():
-    """0.2s 正弦 + 1.8s 静音 → voiced_ratio ≈ 0.1 必触发 insufficient_voicing。
+    """0.1s 正弦 + 1.9s 静音 → voiced_ratio ≈ 0.05 必触发 insufficient_voicing。
 
     背景能量太低也会带出 too_quiet，这是物理上必然的连带，不强制只命中一条。
     """
-    x = np.concatenate([_voiced_speechlike(0.2, amp=0.5), _silence(1.8)])
+    x = np.concatenate([_voiced_speechlike(0.1, amp=0.5), _silence(1.9)])
     out = audio_gate(x, SR)
     codes = _codes(out)
     assert "insufficient_voicing" in codes, f"expected insufficient_voicing, got {codes}"

@@ -9,8 +9,8 @@ import numpy as np
 
 # Tier 1 阈值——硬编码常量；Tier 2 接入时再统一规划是否上浮到 CFG。
 CLIPPING_RATIO_MAX = 0.005  # |x| >= 0.99 占比上限
-RMS_DBFS_MIN = -40.0  # 整段 RMS dBFS 下限
-VOICED_RATIO_MIN = 0.30  # 活动段时长占比下限
+RMS_DBFS_MIN = -55.0  # 整段 RMS dBFS 下限——低于此基本是坏麦/纯静音
+VOICED_RATIO_MIN = 0.10  # 活动段时长占比下限——低于此基本没说话
 CLIP_THRESHOLD = 0.99  # 削波判定阈值
 VAD_TOP_DB = 30  # librosa.effects.split 静音阈
 
