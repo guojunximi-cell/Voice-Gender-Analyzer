@@ -44,18 +44,17 @@ export function groupPhonesByChar(phones) {
 			});
 		}
 	}
-	// Compute aggregates per character cell
+	// Compute aggregates per character cell — duration-weighted so that a long
+	// vowel dominates a short adjacent consonant, which is what the eye and
+	// ear actually pick up; the previous unweighted mean over-counted brief
+	// stops and skewed CV chars away from their vowel core.  Pitch keeps the
+	// "voiced only" gate (Praat returns 0/null for unvoiced).
 	for (const c of chars) {
-		const voiced = c.phones.filter((p) => p.pitch > 0);
-		c.pitch = voiced.length ? _mean(voiced.map((p) => p.pitch)) : null;
-		const resVals = c.phones.map((p) => p.resonance).filter((r) => r != null);
-		c.resonance = resVals.length ? _mean(resVals) : null;
-		const f1Vals = c.phones.map((p) => p.F1).filter((v) => v != null);
-		c.F1 = f1Vals.length ? _mean(f1Vals) : null;
-		const f2Vals = c.phones.map((p) => p.F2).filter((v) => v != null);
-		c.F2 = f2Vals.length ? _mean(f2Vals) : null;
-		const f3Vals = c.phones.map((p) => p.F3).filter((v) => v != null);
-		c.F3 = f3Vals.length ? _mean(f3Vals) : null;
+		c.pitch = _durWeightedMean(c.phones, "pitch", (p) => p.pitch > 0);
+		c.resonance = _durWeightedMean(c.phones, "resonance");
+		c.F1 = _durWeightedMean(c.phones, "F1");
+		c.F2 = _durWeightedMean(c.phones, "F2");
+		c.F3 = _durWeightedMean(c.phones, "F3");
 	}
 
 	// Pitch is fundamentally sparse at the phone level: Praat can't extract F0
@@ -149,6 +148,21 @@ export function findActiveIdx(t, chars, lastIdx) {
 
 function _mean(arr) {
 	return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function _durWeightedMean(phones, key, predicate = null) {
+	let sum = 0;
+	let w = 0;
+	for (const p of phones) {
+		const v = p[key];
+		if (v == null) continue;
+		if (predicate && !predicate(p)) continue;
+		const d = Math.max(0, p.end - p.start);
+		if (d <= 0) continue;
+		sum += v * d;
+		w += d;
+	}
+	return w > 0 ? sum / w : null;
 }
 
 // CJK ideograph (BMP Unified + Extension A).  A "char" that is a single CJK

@@ -10,6 +10,7 @@
  * Feature-flagged via vga.timeline (see feature-flag.js).
  */
 
+import { getBandMode, onBandModeChange, setBandMode } from "./band-mode.js";
 import { createBus } from "./bus.js";
 import { divergingPitch, divergingResonance } from "./diverging.js";
 import { renderFallback, renderLowPhoneBanner, renderNoSpeech } from "./engine-c-fallback.js";
@@ -51,6 +52,27 @@ const resonanceTitleFn = (p) => {
 	const charLabel = p.char || "\u2205";
 	const resLabel = p.resonance != null ? p.resonance.toFixed(2) : "\u2014";
 	return t("timeline.resonanceTitle", { char: charLabel, phone: p.phone, res: resLabel });
+};
+
+// Word-mode tooltip & color: one rect per char, value = duration-weighted
+// aggregate across the char's phones (computed in phone-utils).  Uses the
+// interpolated pitch (`pitchInterp`) so a fully unvoiced char still shows
+// a sensible color from neighbours instead of blank hatch.
+const wordPitchColorFn = (c) => divergingPitch(c.pitchInterp ?? c.pitch);
+const wordResonanceColorFn = (c) => divergingResonance(c.resonance);
+const wordPitchTitleFn = (c) => {
+	const charLabel = c.char || "\u2205";
+	const v = c.pitch ?? c.pitchInterp;
+	const interp = c.pitch == null && c.pitchInterp != null;
+	const raw = v != null ? `${v.toFixed(0)} Hz` : "\u2014";
+	return interp
+		? t("timeline.pitchTitleInterp", { char: charLabel, phone: t("timeline.wordAvgLabel"), raw, interp: v.toFixed(0) })
+		: t("timeline.pitchTitle", { char: charLabel, phone: t("timeline.wordAvgLabel"), raw });
+};
+const wordResonanceTitleFn = (c) => {
+	const charLabel = c.char || "\u2205";
+	const resLabel = c.resonance != null ? c.resonance.toFixed(2) : "\u2014";
+	return t("timeline.resonanceTitle", { char: charLabel, phone: t("timeline.wordAvgLabel"), res: resLabel });
 };
 
 export class PhoneTimeline {
@@ -290,6 +312,8 @@ export class PhoneTimeline {
 		const rowsEl = timeline.querySelector(".vga-timeline__rows");
 		const cursorEl = timeline.querySelector(".vga-timeline__cursor");
 
+		const initialBandMode = getBandMode();
+
 		// Pitch heatmap (top).  Color per char-level aggregate (inherited by
 		// all phones of that char) so unvoiced consonants don't leave gaps
 		// inside otherwise-voiced hanzi.  See phone-utils._fillCharPitch.
@@ -301,6 +325,9 @@ export class PhoneTimeline {
 			bus: this._bus,
 			colorFn: (p) => divergingPitch(p.charPitch),
 			titleFn: pitchTitleFn,
+			wordColorFn: wordPitchColorFn,
+			wordTitleFn: wordPitchTitleFn,
+			mode: initialBandMode,
 			ariaLabel: t("timeline.ariaPitch"),
 			ariaDescription: t("timeline.ariaPitchDesc"),
 		});
@@ -330,12 +357,38 @@ export class PhoneTimeline {
 			bus: this._bus,
 			colorFn: (p) => divergingResonance(p.resonance),
 			titleFn: resonanceTitleFn,
+			wordColorFn: wordResonanceColorFn,
+			wordTitleFn: wordResonanceTitleFn,
+			mode: initialBandMode,
 			ariaLabel: t("timeline.ariaResonance"),
 			ariaDescription: t("timeline.ariaResonanceDesc"),
 		});
 
 		this._legend = new GenderLegend();
 		this._legend.mount({ container: footerLegendEl });
+
+		// Bar-mode toggle (phone detail vs word aggregate).  Hosted inside the
+		// readout row, right-aligned next to the active-char readout pill —
+		// this keeps the setting visible exactly where the user reads the
+		// numbers it affects, and the row's flex layout (pill | toggle) puts
+		// it at the right edge automatically.  Persisted module-level state,
+		// so it survives across analyses.
+		const barModeEl = document.createElement("div");
+		barModeEl.className = "vga-timeline__bar-mode";
+		readoutEl?.appendChild(barModeEl);
+		this._barModeEl = barModeEl;
+		this._renderBarModeSwitcher(barModeEl, initialBandMode);
+		this._onBarModeClick = (e) => {
+			const btn = e.target.closest(".vga-band-mode-btn");
+			if (!btn || btn.disabled) return;
+			setBandMode(btn.dataset.mode);
+		};
+		barModeEl.addEventListener("click", this._onBarModeClick);
+		this._offBandMode = onBandModeChange((mode) => {
+			this._pitchBand?.setMode(mode);
+			this._resonanceBand?.setMode(mode);
+			this._renderBarModeSwitcher(barModeEl, mode);
+		});
 
 		// Hover crosshair: a 1px vertical line across the three rows makes the
 		// "same column = same moment in time" relationship explicit.  We query
@@ -445,6 +498,17 @@ export class PhoneTimeline {
 		this._cursorRowsEl = null;
 		this._onCursorMove = null;
 		this._onCursorLeave = null;
+		if (this._barModeEl) {
+			if (this._onBarModeClick) this._barModeEl.removeEventListener("click", this._onBarModeClick);
+			// Element is appended dynamically into the (persistent across reslice)
+			// readout row, so we must remove it explicitly — otherwise a second
+			// _mountInteractive on resize would stack a duplicate toggle.
+			this._barModeEl.remove();
+		}
+		this._barModeEl = null;
+		this._onBarModeClick = null;
+		this._offBandMode?.();
+		this._offBandMode = null;
 		this._sync?.destroy();
 		this._pitchBand?.destroy();
 		this._resonanceBand?.destroy();
@@ -457,6 +521,23 @@ export class PhoneTimeline {
 		this._transcript = null;
 		this._legend = null;
 		this._bus = null;
+	}
+
+	/**
+	 * Paint the active state of the 2-segment bar-mode switcher.  Idempotent —
+	 * called both on initial mount and on every onBandModeChange tick so the
+	 * highlight follows even when the mode is changed from a different
+	 * timeline instance (history panel etc.).
+	 */
+	_renderBarModeSwitcher(host, mode) {
+		const phoneActive = mode !== "word";
+		host.innerHTML =
+			`<div class="vga-band-mode" role="radiogroup" aria-label="${t("timeline.barModeAria")}">` +
+			`<button type="button" class="vga-band-mode-btn${phoneActive ? " is-active" : ""}" ` +
+			`data-mode="phone" role="radio" aria-checked="${phoneActive}">${t("timeline.barModePhone")}</button>` +
+			`<button type="button" class="vga-band-mode-btn${!phoneActive ? " is-active" : ""}" ` +
+			`data-mode="word" role="radio" aria-checked="${!phoneActive}">${t("timeline.barModeWord")}</button>` +
+			`</div>`;
 	}
 
 	/** Polite SR announcement on analysis complete. */

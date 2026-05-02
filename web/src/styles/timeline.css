@@ -71,11 +71,27 @@
 
 /* ── Active-char readout (header above the sandwich) ─────────── */
 .vga-timeline__readout-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
 	margin-bottom: 8px;
 }
 
 .vga-timeline__readout-row:empty {
 	display: none;
+}
+
+/* Readout pill grows to take remaining width; the bar-mode toggle keeps
+   its natural width on the right edge.  Without the grow, the pill would
+   collapse to its content and the toggle would float in the middle. */
+.vga-timeline__readout-row > .vga-transcript-readout {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.vga-timeline__bar-mode {
+	flex: 0 0 auto;
+	margin-left: auto;
 }
 
 /* ── Row grid: [label | content] ─────────────────────────────
@@ -368,6 +384,53 @@
 
 .vga-timeline__nav-row:empty {
 	display: none;
+}
+
+/* ── Bar-mode toggle (phone detail vs word aggregate) ─────────────
+   Lives at the right edge of the readout row, next to the active-char
+   pill.  Compact: a small pill-shaped 2-segment switcher whose height
+   roughly matches the readout pill so the row reads as one strip. */
+/* Visually paired with .vga-transcript-readout — same bg, radius, padding,
+   font-size, min-height — so the readout pill on the left and the toggle
+   on the right read as one strip.  The active button mirrors the readout's
+   "active char" treatment (var(--active) color); the inactive button uses
+   the muted label tone of __label. */
+.vga-band-mode {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 14px;
+	padding: 6px 10px;
+	background: var(--bg-secondary);
+	border-radius: var(--radius-sm);
+	font-size: 0.82rem;
+	color: var(--text-secondary);
+	min-height: 28px;
+	box-sizing: border-box;
+}
+
+.vga-band-mode-btn {
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	transition: color 120ms linear;
+}
+
+.vga-band-mode-btn:hover {
+	color: var(--text-primary);
+}
+
+.vga-band-mode-btn.is-active {
+	color: var(--active);
+	font-weight: 500;
+}
+
+.vga-band-mode-btn:focus-visible {
+	outline: 2px solid var(--active);
+	outline-offset: 2px;
+	border-radius: 2px;
 }
 
 /* ── Timeline footer (shared palette legend only) ─────────────── */
