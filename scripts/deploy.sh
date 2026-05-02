@@ -4,19 +4,19 @@
 #
 # 默认行为：
 #   - 走当前分支 git pull
-#   - 自动检测改动范围决定 rebuild 哪个镜像（app / sidecar / 都不 build）
+#   - 自动检测 已部署commit→目标commit 的差异决定 rebuild 哪个镜像
 #   - 健康检查通过后清理悬挂镜像
 #   - 失败时可回滚到上一版镜像 + commit
 #
 # 常用：
-#   bash scripts/deploy.sh                       # 全自动
-#   bash scripts/deploy.sh -b main               # 切到 main 再 pull
+#   bash scripts/deploy.sh                       # 全自动（弹分支菜单）
+#   bash scripts/deploy.sh -b main               # 指定分支
 #   bash scripts/deploy.sh -r app                # 强制只 rebuild app
 #   bash scripts/deploy.sh -r none               # 不 build，只 restart（适合改 .env）
-#   bash scripts/deploy.sh -y                    # 全部跳过确认
+#   bash scripts/deploy.sh -y                    # 全部跳过确认（用当前分支）
 #   bash scripts/deploy.sh --dry-run             # 只打印动作
-#   bash scripts/deploy.sh --rollback            # 回到上一版（标了 :rollback 的镜像 + 上一个 commit）
-#   bash scripts/deploy.sh --status              # 只看当前状态，不动
+#   bash scripts/deploy.sh --rollback            # 回到上一版（:rollback 镜像 + 上一个 commit）
+#   bash scripts/deploy.sh --status              # 只看当前状态
 set -euo pipefail
 
 BRANCH=""
@@ -33,7 +33,7 @@ usage() {
   -b, --branch <name>    切到指定分支（不传时：交互式菜单选择；
                          非交互/带 -y 时回退到当前分支）
   -r, --rebuild <scope>  rebuild 范围:
-                           auto    根据 git diff 自动判断（默认）
+                           auto    根据 已部署→目标 的 git diff 自动判断（默认）
                            app     只 build app
                            sidecar 只 build visualizer-backend
                            all     两个都 build
@@ -70,14 +70,14 @@ C_WARN=$'\033[1;33m'
 C_ERR=$'\033[1;31m'
 C_OK=$'\033[1;32m'
 C_END=$'\033[0m'
-log()  { printf '%s[%s]%s %s\n' "$C_INFO" "$(date +%H:%M:%S)" "$C_END" "$*"; }
-warn() { printf '%s[warn]%s %s\n' "$C_WARN" "$C_END" "$*"; }
+log()  { printf '%s[%s]%s %s\n' "$C_INFO" "$(date +%H:%M:%S)" "$C_END" "$*" >&2; }
+warn() { printf '%s[warn]%s %s\n' "$C_WARN" "$C_END" "$*" >&2; }
 err()  { printf '%s[err ]%s %s\n' "$C_ERR" "$C_END" "$*" >&2; }
-ok()   { printf '%s[ok  ]%s %s\n' "$C_OK" "$C_END" "$*"; }
+ok()   { printf '%s[ok  ]%s %s\n' "$C_OK" "$C_END" "$*" >&2; }
 
 run() {
 	if [[ $DRY_RUN -eq 1 ]]; then
-		printf '   %s[dry]%s %s\n' "$C_WARN" "$C_END" "$*"
+		printf '   %s[dry]%s %s\n' "$C_WARN" "$C_END" "$*" >&2
 	else
 		eval "$@"
 	fi
@@ -95,6 +95,9 @@ confirm() {
 cd "$(dirname "$0")/.."
 PROJECT_ROOT="$PWD"
 
+# 状态文件放到 .git/ 里（git 永远不追踪，且 worktree 隔离）
+STATE_FILE="$PROJECT_ROOT/.git/deploy-prev-commit"
+
 # ──────────── 校验环境 ────────────
 [[ -f .env ]] || { err ".env 不存在；先 cp .env.example .env"; exit 1; }
 docker compose version >/dev/null 2>&1 || { err "docker compose 不可用"; exit 1; }
@@ -104,10 +107,27 @@ if grep -q '^ENGINE_C_ENABLED=true' .env; then
 	ENGINE_C_FLAG="--profile engine-c"
 fi
 
+# 已部署 commit（可能不存在 = 第一次部署）
+read_deployed_commit() {
+	[[ -f "$STATE_FILE" ]] || return 1
+	local c
+	c=$(head -1 "$STATE_FILE" | tr -d '[:space:]')
+	[[ -n "$c" ]] || return 1
+	# 校验该 commit 在当前 git 库里能找到
+	git rev-parse --verify --quiet "$c^{commit}" >/dev/null || return 1
+	printf '%s' "$c"
+}
+
 # ──────────── 仅显示状态 ────────────
 if [[ $STATUS_ONLY -eq 1 ]]; then
 	echo "── git ──"
 	git log --oneline -3
+	echo "── 已部署 commit ──"
+	if dep=$(read_deployed_commit); then
+		git log --oneline -1 "$dep" 2>/dev/null || echo "$dep"
+	else
+		echo "(未记录——首次部署或未通过 deploy.sh 部署过)"
+	fi
 	echo "── compose ──"
 	docker compose $ENGINE_C_FLAG ps
 	echo "── 资源 ──"
@@ -118,9 +138,12 @@ fi
 
 # ──────────── 回滚分支 ────────────
 if [[ $ROLLBACK -eq 1 ]]; then
-	[[ -f .deploy-prev-commit ]] || { err "找不到 .deploy-prev-commit，无法回滚"; exit 1; }
-	PREV=$(cat .deploy-prev-commit)
+	if ! PREV=$(read_deployed_commit); then
+		err "找不到有效的 .git/deploy-prev-commit，无法回滚"
+		exit 1
+	fi
 	log "回滚到 commit: ${PREV:0:8}"
+	git log --oneline -1 "$PREV" >&2 || true
 	confirm "确认回滚？" || exit 1
 
 	for img in voice-gender-analyzer-app voice-gender-analyzer-visualizer-backend; do
@@ -138,18 +161,18 @@ fi
 # ──────────── git 状态预检 ────────────
 if [[ -n "$(git status --porcelain)" ]]; then
 	warn "工作树有未提交的改动："
-	git status --short
-	confirm "继续？（git pull 可能与未提交改动冲突）" || exit 1
+	git status --short >&2
+	confirm "继续？（git pull / checkout 可能与未提交改动冲突）" || exit 1
 fi
 
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-OLD_COMMIT=$(git rev-parse HEAD)
 
 # ──────────── 先 fetch（让分支列表是新鲜的） ────────────
 log "git fetch origin"
 run "git fetch origin --prune"
 
 # ──────────── 选分支：CLI 参数 > 交互菜单 > 当前分支 ────────────
+# 注意：所有交互输出（菜单、提示）必须 → stderr，stdout 只允许返回值
 pick_branch_interactive() {
 	local current=$1
 	local -a branches=("$current")
@@ -160,7 +183,7 @@ pick_branch_interactive() {
 		[[ -n "$b" && "$b" != "$current" ]] && branches+=("$b")
 	done < <(git for-each-ref --format='%(refname:short)' refs/heads/)
 
-	# 远程独有分支（不在本地的）。注意 origin/HEAD 的 short ref 可能是 "origin"
+	# 远程独有分支（不在本地的）。注意 origin/HEAD 的 short ref 是 "origin"
 	while read -r b; do
 		[[ "$b" == origin/* ]] || continue   # 跳过 "origin"（HEAD pointer 短名）
 		b="${b#origin/}"
@@ -170,14 +193,16 @@ pick_branch_interactive() {
 		[[ $found -eq 0 ]] && branches+=("$b")
 	done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin/)
 
-	echo
-	echo "可用分支（* = 当前）："
-	for i in "${!branches[@]}"; do
-		local mark=" "
-		[[ "${branches[i]}" == "$current" ]] && mark="*"
-		printf "  [%2d] %s %s\n" "$((i+1))" "$mark" "${branches[i]}"
-	done
-	echo
+	{
+		echo
+		echo "可用分支（* = 当前）："
+		for i in "${!branches[@]}"; do
+			local mark=" "
+			[[ "${branches[i]}" == "$current" ]] && mark="*"
+			printf "  [%2d] %s %s\n" "$((i+1))" "$mark" "${branches[i]}"
+		done
+		echo
+	} >&2
 
 	local choice
 	read -rp "选择编号（回车 = 当前 $current）: " choice
@@ -186,7 +211,7 @@ pick_branch_interactive() {
 	elif [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#branches[@]} )); then
 		printf '%s' "${branches[$((choice-1))]}"
 	else
-		err "无效编号: $choice" >&2
+		err "无效编号: $choice"
 		return 1
 	fi
 }
@@ -200,37 +225,73 @@ if [[ -z "$BRANCH" ]]; then
 	fi
 fi
 
-log "分支：$CURRENT_BRANCH    目标：$BRANCH    当前 commit：${OLD_COMMIT:0:8}"
+# ──────────── 算"已部署 commit" 和 "目标 commit"（auto 检测的真实基准）────────────
+DEPLOYED_COMMIT=""
+if dep=$(read_deployed_commit); then
+	DEPLOYED_COMMIT="$dep"
+fi
 
-if [[ $DRY_RUN -eq 0 ]]; then
-	REMOTE_REF="origin/$BRANCH"
-	if git rev-parse --verify --quiet "$REMOTE_REF" >/dev/null; then
-		REMOTE_COMMIT=$(git rev-parse "$REMOTE_REF")
-		# 只有目标分支与当前一样时才有 OLD_COMMIT..REMOTE 的概念
-		# 不一样时（切分支），要预览的是 OLD..REMOTE_REF 跨分支差异
-		if [[ "$OLD_COMMIT" != "$REMOTE_COMMIT" ]]; then
-			echo "── 将要应用的 commits（${OLD_COMMIT:0:8} → ${REMOTE_COMMIT:0:8}）──"
-			git log --oneline "$OLD_COMMIT..$REMOTE_COMMIT" 2>/dev/null | head -20 || \
-				git log --oneline -10 "$REMOTE_COMMIT"
-			echo "── 涉及的文件 ──"
-			git diff --stat "$OLD_COMMIT..$REMOTE_COMMIT" 2>/dev/null | tail -20 || true
-		else
-			log "目标分支 $BRANCH 与当前 commit 一致，无新内容"
-		fi
+# 目标 commit：dry-run 用 origin/$BRANCH 预演；否则就是 pull 后的 HEAD
+if [[ $DRY_RUN -eq 1 ]]; then
+	if git rev-parse --verify --quiet "origin/$BRANCH^{commit}" >/dev/null; then
+		TARGET_COMMIT=$(git rev-parse "origin/$BRANCH")
 	else
-		warn "远端没有分支 origin/$BRANCH"
+		TARGET_COMMIT=$(git rev-parse HEAD)
+	fi
+fi
+# 非 dry-run 模式下 TARGET_COMMIT 在 pull 完之后再算
+
+# 比较基准：优先用已部署 commit，否则用当前 HEAD
+COMPARE_FROM="${DEPLOYED_COMMIT:-$(git rev-parse HEAD)}"
+
+log "分支：$CURRENT_BRANCH    目标：$BRANCH"
+log "已部署 commit：${DEPLOYED_COMMIT:-(无记录)}"
+
+# ──────────── 切分支（友好处理脏树冲突）────────────
+if [[ "$BRANCH" != "$CURRENT_BRANCH" ]]; then
+	log "切到 $BRANCH"
+	if [[ $DRY_RUN -eq 1 ]]; then
+		printf '   %s[dry]%s git checkout %s\n' "$C_WARN" "$C_END" "$BRANCH" >&2
+	else
+		if ! git checkout "$BRANCH" 2>&1; then
+			err "git checkout 失败——大概率是工作树有未提交改动与目标分支冲突"
+			warn "处理方式（任选）："
+			warn "  保留改动：git stash; bash scripts/deploy.sh; git stash pop"
+			warn "  丢弃改动：git restore .; bash scripts/deploy.sh"
+			exit 1
+		fi
 	fi
 fi
 
-# ──────────── 切分支 + pull ────────────
-if [[ "$BRANCH" != "$CURRENT_BRANCH" ]]; then
-	log "切到 $BRANCH"
-	run "git checkout $BRANCH"
+# ──────────── 展示将要应用的改动 ────────────
+PULL_TARGET="origin/$BRANCH"
+if git rev-parse --verify --quiet "$PULL_TARGET^{commit}" >/dev/null; then
+	REMOTE_COMMIT=$(git rev-parse "$PULL_TARGET")
+	if [[ "$COMPARE_FROM" != "$REMOTE_COMMIT" ]]; then
+		echo "── 将要应用的 commits（${COMPARE_FROM:0:8} → ${REMOTE_COMMIT:0:8}）──"
+		git log --oneline "$COMPARE_FROM..$REMOTE_COMMIT" 2>/dev/null | head -20 || \
+			git log --oneline -10 "$REMOTE_COMMIT"
+		echo "── 涉及的文件 ──"
+		git diff --stat "$COMPARE_FROM..$REMOTE_COMMIT" 2>/dev/null | tail -20 || true
+	else
+		log "已部署 commit 与远端 $BRANCH 一致，无新内容"
+	fi
+else
+	warn "远端没有分支 origin/$BRANCH"
 fi
-log "git pull --ff-only"
-run "git pull --ff-only"
 
-NEW_COMMIT=$(git rev-parse HEAD)
+# ──────────── pull ────────────
+log "git pull --ff-only"
+if [[ $DRY_RUN -eq 0 ]]; then
+	if ! git pull --ff-only 2>&1; then
+		err "git pull --ff-only 失败——分支可能 force-pushed 或有冲突"
+		warn "处理方式：git fetch + 手动检查"
+		exit 1
+	fi
+	TARGET_COMMIT=$(git rev-parse HEAD)
+else
+	printf '   %s[dry]%s git pull --ff-only\n' "$C_WARN" "$C_END" >&2
+fi
 
 # ──────────── 子模块 ────────────
 log "submodule update"
@@ -238,17 +299,20 @@ run "git submodule update --init --recursive"
 
 # ──────────── auto 检测 rebuild 范围 ────────────
 detect_rebuild() {
-	if [[ "$OLD_COMMIT" == "$NEW_COMMIT" ]]; then
+	local from=$1 to=$2
+	if [[ "$from" == "$to" ]]; then
 		echo "none"
 		return
 	fi
 	local changed app=0 sidecar=0
-	changed=$(git diff --name-only "$OLD_COMMIT" "$NEW_COMMIT")
+	changed=$(git diff --name-only "$from" "$to" 2>/dev/null || true)
+	[[ -z "$changed" ]] && { echo "none"; return; }
+
 	# sidecar 改动：voiceya/sidecars/** 或 sidecar Dockerfile
 	if echo "$changed" | grep -qE '^voiceya/sidecars/|/visualizer-backend\.Dockerfile$'; then
 		sidecar=1
 	fi
-	# app 改动：除 sidecar / docs / tests / *.md 外，凡涉及 .py/web/Dockerfile/lock 都算
+	# app 改动：除 sidecar / docs / tests / *.md / 部署脚本本身 外，凡涉及代码 / web / lock 都算
 	local app_files
 	app_files=$(echo "$changed" \
 		| grep -vE '^voiceya/sidecars/' \
@@ -264,20 +328,22 @@ detect_rebuild() {
 }
 
 if [[ "$REBUILD" == "auto" ]]; then
-	REBUILD=$(detect_rebuild)
-	log "auto 检测 → rebuild=$REBUILD"
+	REBUILD=$(detect_rebuild "$COMPARE_FROM" "$TARGET_COMMIT")
+	log "auto 检测（${COMPARE_FROM:0:8}..${TARGET_COMMIT:0:8}）→ rebuild=$REBUILD"
 fi
 
-if [[ "$OLD_COMMIT" == "$NEW_COMMIT" && "$REBUILD" == "none" ]]; then
-	ok "代码无更新且无需 rebuild，退出"
+if [[ "$COMPARE_FROM" == "$TARGET_COMMIT" && "$REBUILD" == "none" ]]; then
+	ok "已部署 commit 与目标一致，且无需 rebuild，退出"
 	exit 0
 fi
 
 log "rebuild 范围：$REBUILD"
 confirm "继续部署？" || exit 1
 
-# 记录回滚点
-echo "$OLD_COMMIT" > .deploy-prev-commit
+# 记录回滚点（dry-run 不写）
+if [[ $DRY_RUN -eq 0 ]]; then
+	echo "$COMPARE_FROM" > "$STATE_FILE"
+fi
 
 # ──────────── 标记 :rollback 镜像 ────────────
 tag_rollback() {
@@ -326,8 +392,8 @@ health_check() {
 			ok "app healthy"
 			break
 		fi
-		sleep 3; elapsed=$((elapsed+3)); printf '.'
-	done; echo
+		sleep 3; elapsed=$((elapsed+3)); printf '.' >&2
+	done; echo >&2
 	[[ $elapsed -ge $timeout ]] && { err "app 健康检查超时"; return 1; }
 
 	if [[ -n "$ENGINE_C_FLAG" ]]; then
@@ -338,8 +404,8 @@ health_check() {
 				ok "sidecar healthy"
 				break
 			fi
-			sleep 3; elapsed=$((elapsed+3)); printf '.'
-		done; echo
+			sleep 3; elapsed=$((elapsed+3)); printf '.' >&2
+		done; echo >&2
 		[[ $elapsed -ge $timeout ]] && { err "sidecar 健康检查超时"; return 1; }
 	fi
 }
@@ -361,7 +427,7 @@ run "docker image prune -f"
 echo
 ok "部署完成"
 echo "    分支:     $BRANCH"
-echo "    commit:   ${OLD_COMMIT:0:8} → ${NEW_COMMIT:0:8}"
+echo "    commit:   ${COMPARE_FROM:0:8} → ${TARGET_COMMIT:0:8}"
 echo "    rebuild:  $REBUILD"
 echo
 docker compose $ENGINE_C_FLAG ps
