@@ -55,8 +55,11 @@ RUN micromamba run -n mfa mfa model download acoustic mandarin_mfa \
  && micromamba run -n mfa mfa model download dictionary mandarin_china_mfa \
  && micromamba run -n mfa mfa model download acoustic english_us_arpa \
  && micromamba run -n mfa mfa model download dictionary english_us_arpa \
+ && micromamba run -n mfa mfa model download acoustic french_mfa \
+ && micromamba run -n mfa mfa model download dictionary french_mfa \
  && micromamba run -n mfa mfa model inspect acoustic mandarin_mfa \
- && micromamba run -n mfa mfa model inspect acoustic english_us_arpa
+ && micromamba run -n mfa mfa model inspect acoustic english_us_arpa \
+ && micromamba run -n mfa mfa model inspect acoustic french_mfa
 
 # mandarin_mfa G2P/alignment implicit deps.
 # Versions pinned from the known-good build (2026-04-17).
@@ -74,6 +77,22 @@ COPY voiceya/sidecars/visualizer-backend/ /app/
 
 # FastAPI wrapper (voiceya-owned, not vendored).
 COPY voiceya/sidecars/wrapper/ /app/wrapper/
+
+# French MFA dictionary: copy from MFA pretrained cache into /app so phones.py
+# can find it under the bare relative name expected by the vendored library.
+# mandarin_dict.txt + cmudict.txt are committed to the repo (vendored from
+# upstream); french_mfa_dict.txt isn't, so we materialise it here from the
+# build-time `mfa model download dictionary french_mfa` cache.  Without
+# stats_fr.json (produced by scripts/train_stats_fr.py), fr won't appear in
+# /healthz `languages` and worker requests gracefully fall back to engine_c=null.
+# `find` is defensive against MFA storing the dict under a different
+# extension (.dict / .yaml / .txt) across versions — we just take the first
+# match keyed on the registry name.
+RUN F=$(find /opt/mfa_root/pretrained_models/dictionary \
+              -name 'french_mfa*' -type f 2>/dev/null | head -1) \
+ && test -n "$F" \
+ && cp "$F" /app/french_mfa_dict.txt \
+ && head -1 /app/french_mfa_dict.txt
 
 # Settings must match in-container binary locations; upstream ships settings
 # for local dev where paths differ.

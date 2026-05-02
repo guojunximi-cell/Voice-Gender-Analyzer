@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     engine_c_whisper_device: str = "auto"
     engine_c_whisper_compute_type: str = "int8"
 
+    # ─── Engine C / 法语 ASR (faster-whisper multilingual) ───────
+    # 只有 free + fr-FR 模式触达；不能复用 *.en 检查点（英文专用）。
+    # tiny / base / small / medium / large-v3 都可，base 在 CPU 上 ~2× 实时。
+    engine_c_whisper_model_fr: str = "base"
+
 
 CFG: Settings = None  # type: ignore
 

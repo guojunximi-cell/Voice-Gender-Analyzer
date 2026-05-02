@@ -2,12 +2,15 @@ import { analyzeAudio, cancelAnalysis } from "./modules/analyzer.js";
 import * as audioCache from "./modules/audio-cache.js";
 import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
+import { buildExportPayload, downloadExport, parseImportFile } from "./modules/export-import.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
 import { applyStaticDom, getLang, onLangChange, setLang, t } from "./modules/i18n.js";
-import { clearMetricsPanel, renderMetricsPanel } from "./modules/metrics-panel.js";
+import { clearMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
-import { highlightActiveSegment, renderSegments, renderStats, resetResults } from "./modules/results.js";
+import { renderFromSummary } from "./modules/results-render.js";
+import { highlightActiveSegment, renderStats, resetResults } from "./modules/results.js";
+import { getScatterMode, onScatterModeChange, setScatterMode } from "./modules/scatter-mode.js";
 import {
 	addSession,
 	clearAllSessions,
@@ -17,14 +20,14 @@ import {
 	removeSession as scatterRemoveSession,
 	selectSession,
 } from "./modules/scatter.js";
-import { scriptsForLang } from "./modules/scripts.js";
+import { CUSTOM_SCRIPT_ID, scriptsForLang } from "./modules/scripts.js";
 import {
 	clearSessions,
 	loadSessions,
 	saveSession,
 	removeSession as storeRemoveSession,
 } from "./modules/session-store.js";
-import { RESTRICTED_MAX_BYTES, setupUploader, validateFile } from "./modules/uploader.js";
+import { setupUploader } from "./modules/uploader.js";
 import {
 	destroyWaveform,
 	drawTimeline,
@@ -33,7 +36,7 @@ import {
 	togglePlay,
 	updateWaveformTheme,
 } from "./modules/waveform.js";
-import { nextSessionColor } from "./utils.js";
+import { nextSessionColor, setToneThreshold, setWeakToneThreshold } from "./utils.js";
 
 // Expose i18n utilities so inline scripts in index.html (feedback modal) and
 // other non-ESM consumers can reach t() / setLang without extra plumbing.
@@ -59,12 +62,16 @@ function setAudioUnavailableHint(show) {
 }
 
 // ─── Record mode (free-speech vs. script mode for Engine C) ──────
-// When Engine C is on, script mode skips FunASR and feeds the preset text
+// When Engine C is on, script mode skips FunASR and feeds the chosen text
 // straight to MFA — same phone alignment, lower CPU/RAM. Disabled and
 // forced to "free" when Engine C is off. Upload tab always uses free mode
-// since pre-recorded audio rarely matches a preset script verbatim.
+// since pre-recorded audio rarely matches a script verbatim.
+//
+// Script source is keyed by id ("custom" sentinel means user-supplied text
+// from the textarea, otherwise it's a preset id from scripts.js).
 let _recordMode = "script"; // 默认跟读；Engine C 关时强制 "free"
-let _scriptIdx = 0;
+let _scriptId = "";
+let _customScriptText = "";
 let _engineCEnabled = false;
 let _activeInputTab = "record";
 
@@ -72,16 +79,19 @@ function _getScriptList() {
 	return scriptsForLang(getLang());
 }
 
-function _getCurrentScript() {
-	const list = _getScriptList();
-	return list[_scriptIdx % list.length];
+function _resolveScriptText() {
+	if (_scriptId === CUSTOM_SCRIPT_ID) {
+		const trimmed = (_customScriptText || "").trim();
+		return trimmed || null;
+	}
+	const s = _getScriptList().find((it) => it.id === _scriptId);
+	return s?.text ?? null;
 }
 
 function _getRecordOptions() {
 	if (_activeInputTab === "upload") return { mode: "free", script: null };
 	if (_recordMode !== "script") return { mode: "free", script: null };
-	const s = _getCurrentScript();
-	return { mode: "script", script: s?.text ?? null };
+	return { mode: "script", script: _resolveScriptText() };
 }
 
 function _applyRecordMode() {
@@ -97,27 +107,46 @@ function _applyRecordMode() {
 }
 
 function _renderCurrentScript() {
-	const s = _getCurrentScript();
+	const isCustom = _scriptId === CUSTOM_SCRIPT_ID;
 	const textEl = $("record-script-text");
-	if (textEl) textEl.textContent = s?.text ?? "";
+	const customEl = $("record-script-custom");
+	const presetHint = $("record-script-hint");
+	const customHint = $("record-script-custom-hint");
+	if (textEl) {
+		textEl.hidden = isCustom;
+		if (!isCustom) {
+			const s = _getScriptList().find((it) => it.id === _scriptId);
+			textEl.textContent = s?.text ?? "";
+		}
+	}
+	if (customEl) {
+		customEl.hidden = !isCustom;
+		// Avoid clobbering an in-flight cursor when the value already matches.
+		if (isCustom && customEl.value !== _customScriptText) {
+			customEl.value = _customScriptText;
+		}
+	}
+	if (presetHint) presetHint.hidden = isCustom;
+	if (customHint) customHint.hidden = !isCustom;
 	const select = $("record-script-select");
-	if (select && s?.id != null) select.value = s.id;
+	if (select) select.value = _scriptId;
 }
 
 function _populateScriptSelect() {
 	const select = $("record-script-select");
 	if (!select) return;
 	const list = _getScriptList();
-	select.replaceChildren(
-		...list.map((s) => {
-			const opt = document.createElement("option");
-			opt.value = s.id;
-			opt.textContent = s.title;
-			return opt;
-		}),
-	);
-	const cur = list[_scriptIdx % list.length];
-	if (cur?.id != null) select.value = cur.id;
+	const presetOpts = list.map((s) => {
+		const opt = document.createElement("option");
+		opt.value = s.id;
+		opt.textContent = s.title;
+		return opt;
+	});
+	const customOpt = document.createElement("option");
+	customOpt.value = CUSTOM_SCRIPT_ID;
+	customOpt.textContent = t("record.scriptCustom");
+	select.replaceChildren(...presetOpts, customOpt);
+	select.value = _scriptId;
 }
 
 function _initInputMethodTabs() {
@@ -167,10 +196,13 @@ function _initRecordMode(engineCEnabled) {
 	const savedMode = localStorage.getItem("record-mode");
 	if (savedMode === "free" || savedMode === "script") _recordMode = savedMode;
 
-	const savedIdx = parseInt(localStorage.getItem("record-script-idx") || "0", 10);
-	const listLen = _getScriptList().length;
-	if (Number.isFinite(savedIdx) && savedIdx >= 0 && savedIdx < listLen) {
-		_scriptIdx = savedIdx;
+	_customScriptText = localStorage.getItem("record-custom-script") || "";
+	const savedId = localStorage.getItem("record-script-id") || "";
+	const list = _getScriptList();
+	if (savedId === CUSTOM_SCRIPT_ID || list.find((s) => s.id === savedId)) {
+		_scriptId = savedId;
+	} else {
+		_scriptId = list[0]?.id ?? CUSTOM_SCRIPT_ID;
 	}
 
 	_populateScriptSelect();
@@ -187,18 +219,25 @@ function _initRecordMode(engineCEnabled) {
 
 	$("record-script-select")?.addEventListener("change", (e) => {
 		const id = e.target.value;
-		const list = _getScriptList();
-		const idx = list.findIndex((s) => s.id === id);
-		if (idx < 0) return;
-		_scriptIdx = idx;
-		localStorage.setItem("record-script-idx", String(_scriptIdx));
+		if (id !== CUSTOM_SCRIPT_ID && !_getScriptList().find((s) => s.id === id)) return;
+		_scriptId = id;
+		localStorage.setItem("record-script-id", _scriptId);
 		_renderCurrentScript();
 	});
 
-	// 切语言时列表长度/内容都会变 — 把索引折进当前语言的范围，再重画选项+正文。
+	$("record-script-custom")?.addEventListener("input", (e) => {
+		_customScriptText = e.target.value;
+		localStorage.setItem("record-custom-script", _customScriptText);
+	});
+
+	// 切语言时预设列表内容会变 —— 重画 dropdown，并在当前 id 在新列表里没有时
+	// 退回到首个预设。"custom" 跨语言保留；用户的自定义文本与语言无关。
 	onLangChange(() => {
-		const len = _getScriptList().length;
-		_scriptIdx = _scriptIdx % len;
+		const list = _getScriptList();
+		if (_scriptId !== CUSTOM_SCRIPT_ID && !list.find((s) => s.id === _scriptId)) {
+			_scriptId = list[0]?.id ?? CUSTOM_SCRIPT_ID;
+			localStorage.setItem("record-script-id", _scriptId);
+		}
 		_populateScriptSelect();
 		_renderCurrentScript();
 	});
@@ -249,6 +288,31 @@ function _initClassifyModeSwitcher() {
 		_renderClassifiedForCurrent();
 		scatterRedraw();
 	});
+}
+
+// ─── Scatter mode (history panel layout-axis: score vs time) ──
+function _updateScatterModeSwitcher() {
+	const switcher = $("scatter-mode-switcher");
+	if (!switcher) return;
+	const mode = getScatterMode();
+	switcher.querySelectorAll(".scatter-mode-btn").forEach((btn) => {
+		const isActive = btn.dataset.mode === mode;
+		btn.classList.toggle("is-active", isActive);
+		btn.setAttribute("aria-checked", isActive ? "true" : "false");
+	});
+}
+
+function _initScatterModeSwitcher() {
+	const switcher = $("scatter-mode-switcher");
+	if (!switcher) return;
+	switcher.addEventListener("click", (e) => {
+		const btn = e.target.closest(".scatter-mode-btn");
+		if (!btn || btn.disabled) return;
+		setScatterMode(btn.dataset.mode);
+	});
+	// scatter.js subscribes to mode changes itself to drive the cross-fade —
+	// we only need to keep the switcher's active state in sync here.
+	onScatterModeChange(() => _updateScatterModeSwitcher());
 }
 
 // ─── Toast ────────────────────────────────────────────────────
@@ -464,6 +528,10 @@ function setPhase(next) {
 	$("upload-section").hidden = next !== "idle";
 	$("player-section").hidden = next === "idle";
 
+	// Export button only makes sense once an analysis result exists.
+	const exportBtn = $("export-result-btn");
+	if (exportBtn) exportBtn.hidden = next !== "results";
+
 	// Hide waveform skeleton whenever we're not in 'loaded' phase (skeleton is shown by onFileSelected)
 	if (next !== "loaded") {
 		const wl = $("waveform-loading");
@@ -607,6 +675,8 @@ async function initUploaders() {
 		maxFileSizeMb = cfg.max_file_size_mb ?? 5;
 		maxDurationSec = cfg.max_audio_duration_sec ?? 180;
 		engineCEnabled = !!cfg.engine_c_enabled;
+		if (cfg.tone_threshold != null) setToneThreshold(cfg.tone_threshold);
+		if (cfg.weak_tone_threshold != null) setWeakToneThreshold(cfg.weak_tone_threshold);
 	} catch (_) {}
 
 	_initRecordMode(engineCEnabled);
@@ -639,21 +709,29 @@ async function initUploaders() {
 		},
 	});
 
-	// Scatter panel upload button (always available, single file only)
-	$("scatter-file-input")?.addEventListener("change", (e) => {
+	// Import previously exported .vga.json — single-file, JSON only.
+	// 走和散点图历史还原一样的路径，把 summary/analysis/audio 灌回 UI。
+	$("import-result-btn")?.addEventListener("click", () => {
+		$("import-input")?.click();
+	});
+	$("import-input")?.addEventListener("change", async (e) => {
 		const file = e.target.files?.[0];
-		if (!file) {
-			e.target.value = "";
-			return;
-		}
-		const err = validateFile(file, maxBytes);
-		if (err) {
-			showToast(err, "error");
-			e.target.value = "";
-			return;
-		}
-		onFileSelected(file);
 		e.target.value = "";
+		if (!file) return;
+		try {
+			const { sessions } = await parseImportFile(file);
+			// 单 session：自动打开详情（最常见用例）。
+			// 多 session：仅追加到历史，让用户在散点图自己选要看哪条。
+			if (sessions.length === 1) {
+				await _loadImportedSession(sessions[0]);
+				showToast(t("import.successFmt", { name: sessions[0].filename }));
+			} else {
+				for (const s of sessions) _appendImportedToHistory(s);
+				showToast(t("import.successMultiFmt", { n: sessions.length }));
+			}
+		} catch (err) {
+			showToast(err.message, "error");
+		}
 	});
 }
 
@@ -684,13 +762,19 @@ $("play-btn")?.addEventListener("click", togglePlay);
 $("analyze-btn")?.addEventListener("click", async () => {
 	if (!currentFile || phase === "analyzing") return;
 
+	const recordOpts = _getRecordOptions();
+	if (recordOpts.mode === "script" && !recordOpts.script) {
+		showToast(t("record.scriptCustomEmpty"), "error");
+		return;
+	}
+
 	setPhase("analyzing");
 	resetResults();
 	clearMetricsPanel();
 
 	try {
 		const data = await analyzeAudio(currentFile, {
-			..._getRecordOptions(),
+			...recordOpts,
 			onProgress(pct, msg) {
 				// First real SSE event: stop fake animation and switch to real progress
 				if (_duckRaf !== null) {
@@ -718,17 +802,10 @@ $("analyze-btn")?.addEventListener("click", async () => {
 		// Sync classify mode buttons (lock pitch/resonance when no Engine C)
 		_updateClassifyModeSwitcher();
 
-		// Stats cards + waveform overlay both follow the current classify mode.
-		const segs = classifyForMode(data, getMode());
+		// 4 panels: stats / segments / metrics / advice — see results-render.js.
+		const segs = renderFromSummary(data);
+		// Waveform overlay needs wavesurfer.duration, which is ready in 'analyzing' phase.
 		drawTimeline(segs);
-		renderStats(segs);
-
-		// Segment list always reflects Engine A — it's the "AI 分段详情" card.
-		renderSegments(data.analysis);
-
-		// Whole-file acoustic averages (Engine C + duration-weighted Engine A).
-		// Rendered once here — no per-segment updates.
-		renderMetricsPanel(data.summary, data.analysis);
 
 		// Feed Engine C data to phone timeline
 		if (_phoneTimeline && data.summary?.engine_c) {
@@ -768,6 +845,161 @@ $("analyze-btn")?.addEventListener("click", async () => {
 	}
 });
 
+// ─── Export dialog ───────────────────────────────────────────
+// 点击 "导出结果" 打开 dialog 让用户选范围（当前 / 全部历史）和内容
+// （含音频 / 含 Engine C）。预估体积在 dialog 打开 + checkbox 切换时刷新。
+
+function _formatBytes(n) {
+	if (!Number.isFinite(n) || n <= 0) return "0 B";
+	if (n < 1024) return `${n} B`;
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+	return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// 获取一个 session 对应的音频 File（若存在）。当前结果优先用 currentFile，
+// 否则按 session id 查 audioCache。
+async function _resolveAudioFor(session) {
+	if (session === analysisData && currentFile) return currentFile;
+	if (session?.id) {
+		try {
+			return await audioCache.get(session.id);
+		} catch {
+			return null;
+		}
+	}
+	return null;
+}
+
+// 取当前 dialog scope/content 选项下涉及的 sessions + 预估音频总大小。
+async function _collectSessionsForExport({ scope, includeAudio }) {
+	const acc = [];
+	let audioBytes = 0;
+	let audioCount = 0;
+	if (scope === "all") {
+		const stored = await loadSessions();
+		for (const s of stored) {
+			let audioFile = null;
+			if (includeAudio) {
+				audioFile = await _resolveAudioFor(s);
+				if (audioFile) {
+					audioBytes += audioFile.size || 0;
+					audioCount++;
+				}
+			}
+			acc.push({ ...s, audioFile });
+		}
+	} else if (analysisData) {
+		let audioFile = null;
+		if (includeAudio) {
+			audioFile = await _resolveAudioFor(analysisData);
+			if (audioFile) {
+				audioBytes += audioFile.size || 0;
+				audioCount++;
+			}
+		}
+		acc.push({ ...analysisData, audioFile });
+	}
+	return { sessions: acc, audioBytes, audioCount };
+}
+
+async function _refreshExportDialogSize() {
+	const dialog = $("export-dialog");
+	if (!dialog?.open) return;
+	const scope = dialog.querySelector('input[name="export-scope"]:checked')?.value || "current";
+	const includeAudio = $("export-include-audio")?.checked ?? false;
+	const sizeEl = $("export-audio-size");
+	if (!sizeEl) return;
+	if (!includeAudio) {
+		sizeEl.textContent = t("export.audioSizeNone");
+		return;
+	}
+	const { audioBytes, audioCount } = await _collectSessionsForExport({ scope, includeAudio: true });
+	if (audioCount === 0) {
+		sizeEl.textContent = t("export.audioSizeNone");
+	} else if (scope === "all") {
+		sizeEl.textContent = t("export.audioSizeMultiFmt", { n: audioCount, size: _formatBytes(audioBytes) });
+	} else {
+		sizeEl.textContent = t("export.audioSizeFmt", { size: _formatBytes(audioBytes) });
+	}
+}
+
+async function _openExportDialog() {
+	const dialog = $("export-dialog");
+	if (!dialog) return;
+	if (!analysisData?.summary || !Array.isArray(analysisData?.analysis)) {
+		showToast(t("export.errNoData"), "error");
+		return;
+	}
+
+	// 重置表单 → 当前结果 + 默认勾选 audio + engine_c。
+	const scopeCurrent = dialog.querySelector('input[name="export-scope"][value="current"]');
+	if (scopeCurrent) scopeCurrent.checked = true;
+	const audioCb = $("export-include-audio");
+	const ecCb = $("export-include-engine-c");
+	if (audioCb) audioCb.checked = true;
+	if (ecCb) ecCb.checked = true;
+
+	// 历史条数：散点图 / IDB 当前快照。空历史时禁用 "全部历史"。
+	const stored = await loadSessions();
+	const countEl = $("export-history-count");
+	if (countEl) countEl.textContent = t("export.scopeAllCountFmt", { n: stored.length });
+	const scopeAll = dialog.querySelector('input[name="export-scope"][value="all"]');
+	if (scopeAll) scopeAll.disabled = stored.length === 0;
+
+	if (typeof dialog.showModal === "function") dialog.showModal();
+	else dialog.setAttribute("open", "");
+
+	_refreshExportDialogSize();
+}
+
+function _closeExportDialog() {
+	const dialog = $("export-dialog");
+	if (!dialog) return;
+	if (typeof dialog.close === "function") dialog.close();
+	else dialog.removeAttribute("open");
+}
+
+async function _confirmExport() {
+	const dialog = $("export-dialog");
+	if (!dialog) return;
+	const scope = dialog.querySelector('input[name="export-scope"]:checked')?.value || "current";
+	const includeAudio = $("export-include-audio")?.checked ?? true;
+	const includeEngineC = $("export-include-engine-c")?.checked ?? true;
+
+	try {
+		const { sessions } = await _collectSessionsForExport({ scope, includeAudio });
+		if (sessions.length === 0) {
+			showToast(t(scope === "all" ? "export.errEmptyHistory" : "export.errNoData"), "error");
+			return;
+		}
+		const exportObj = await buildExportPayload({
+			sessions,
+			options: { includeAudio, includeEngineC },
+		});
+		const { filename, size } = downloadExport(exportObj);
+		_closeExportDialog();
+		showToast(t("export.successFmt", { name: filename, size: _formatBytes(size) }));
+	} catch (err) {
+		showToast(t("toast.failedFmt", { msg: err.message }), "error");
+	}
+}
+
+$("export-result-btn")?.addEventListener("click", _openExportDialog);
+$("export-dialog-cancel")?.addEventListener("click", _closeExportDialog);
+$("export-dialog-confirm")?.addEventListener("click", _confirmExport);
+// 切 scope / 切 include-audio 都会改变预估体积——重算一次。
+$("export-dialog")?.addEventListener("change", (e) => {
+	const tgt = e.target;
+	if (tgt?.name === "export-scope" || tgt?.id === "export-include-audio" || tgt?.id === "export-include-engine-c") {
+		_refreshExportDialogSize();
+	}
+});
+// ESC / dialog.cancel 事件兜底
+$("export-dialog")?.addEventListener("cancel", (e) => {
+	e.preventDefault();
+	_closeExportDialog();
+});
+
 // ─── Scatter dot click → restore session ────────────────────
 let _selectedSessionId = null;
 
@@ -797,12 +1029,14 @@ async function onScatterDotClick(session) {
 	// 历史是查看态：强制锁 analyze-btn 防 setPhase 残留把它解锁
 	if ($("analyze-btn")) $("analyze-btn").disabled = true;
 	if ($("analyze-text")) $("analyze-text").textContent = t("action.analyzed");
+	// 历史还原不走 setPhase("results")——导出按钮单独显示。
+	const exportBtnRestore = $("export-result-btn");
+	if (exportBtnRestore) exportBtnRestore.hidden = false;
 
 	_updateClassifyModeSwitcher();
-	const _segs = classifyForMode(session, getMode());
-	renderStats(_segs);
-	renderSegments(session.analysis);
-	renderMetricsPanel(session.summary, session.analysis);
+	// 4 panels: stats / segments / metrics / advice — see results-render.js.
+	// drawTimeline 留到下面 waveform onReady 里（依赖 wavesurfer.duration）。
+	renderFromSummary(session);
 
 	const tlRoot = $("phone-timeline-root");
 	const cachedFile = await audioCache.get(session.id);
@@ -846,6 +1080,105 @@ async function onScatterDotClick(session) {
 function onScatterDeselect() {
 	_selectedSessionId = null;
 	$("delete-session-btn").hidden = true;
+}
+
+// 追加单条导入项到历史 + 散点图（不打开详情）。多 session 导入用。
+function _appendImportedToHistory({ summary, analysis, filename, audioFile }) {
+	if (summary?.overall_f0_median_hz == null) return null;
+	const sessionId = Date.now().toString() + Math.random().toString(36).slice(2, 8);
+	const session = {
+		id: sessionId,
+		filename: filename || "imported",
+		f0_median: summary.overall_f0_median_hz,
+		gender_score: summary.overall_gender_score,
+		confidence: summary.overall_confidence,
+		label: summary.dominant_label,
+		color: nextSessionColor(),
+		summary,
+		analysis,
+	};
+	saveSession(session);
+	addSession(session);
+	if (audioFile) audioCache.set(sessionId, audioFile);
+	return session;
+}
+
+// ─── Import previously exported result ──────────────────────
+// 走和"点散点图历史 dot"几乎一样的还原路径。如果导出文件包含音频，
+// 还能完整还原 player + 波形 + 卡拉 OK 同步——用户体验从冷态变成热态。
+async function _loadImportedSession({ summary, analysis, filename, audioFile }) {
+	if (phase === "analyzing") cancelAnalysis();
+
+	const sessionId = Date.now().toString() + Math.random().toString(36).slice(2, 8);
+	const session = {
+		id: sessionId,
+		filename: filename || "imported",
+		f0_median: summary.overall_f0_median_hz,
+		gender_score: summary.overall_gender_score,
+		confidence: summary.overall_confidence,
+		label: summary.dominant_label,
+		color: nextSessionColor(),
+		summary,
+		analysis,
+	};
+
+	analysisData = session;
+	// 导入的同样按"查看态"处理：锁 analyze-btn，避免误触发再分析。
+	currentFile = null;
+	_selectedSessionId = sessionId;
+
+	destroyWaveform();
+	if (_phoneTimeline) {
+		_phoneTimeline.destroy();
+		_phoneTimeline = null;
+	}
+
+	if ($("file-name")) $("file-name").textContent = session.filename;
+	if ($("player-section")) $("player-section").hidden = false;
+	if ($("upload-section")) $("upload-section").hidden = true;
+
+	if ($("analyze-btn")) $("analyze-btn").disabled = true;
+	if ($("analyze-text")) $("analyze-text").textContent = t("action.analyzed");
+	$("delete-session-btn").hidden = false;
+	const exportBtn = $("export-result-btn");
+	if (exportBtn) exportBtn.hidden = false;
+
+	_updateClassifyModeSwitcher();
+	renderFromSummary(session);
+
+	// 入历史：写 IDB session + 散点图新增一个点。导入项正常参与 LRU。
+	if (summary.overall_f0_median_hz != null) {
+		saveSession(session);
+		addSession(session);
+		selectSession(session.id);
+	}
+
+	const tlRoot = $("phone-timeline-root");
+	if (_timelineEnabled && tlRoot) {
+		tlRoot.hidden = false;
+		_phoneTimeline = new PhoneTimeline({ container: tlRoot, wavesurfer: null });
+		_phoneTimeline.setLoading();
+		_phoneTimeline.setData(summary?.engine_c ?? null);
+	}
+
+	if (audioFile) {
+		audioCache.set(sessionId, audioFile);
+		setAudioUnavailableHint(false);
+		const loading = $("waveform-loading");
+		if (loading) loading.style.display = "flex";
+		initWaveform(audioFile, {
+			onReady: () => {
+				drawTimeline(classifyForMode(session, getMode()));
+				if ($("analyze-btn")) $("analyze-btn").disabled = true;
+				_phoneTimeline?.attachWavesurfer(getWaveSurfer());
+			},
+			onTimeUpdate: (tm) => {
+				if (analysisData) highlightActiveSegment(tm, analysisData.analysis);
+			},
+		});
+	} else {
+		setAudioUnavailableHint(true);
+	}
 }
 
 // ─── Delete single session ────────────────────────────────────
@@ -913,7 +1246,7 @@ async function initScatterFromStorage() {
 	if (!tabBar || !rightPanel) return;
 
 	const tabs = tabBar.querySelectorAll(".mobile-tab");
-	let activeTab = "segments";
+	let activeTab = "metrics";
 
 	function applyTab(tab) {
 		activeTab = tab;
@@ -969,27 +1302,77 @@ async function initScatterFromStorage() {
 // ─── Language toggle ──────────────────────────────────────────
 // 顶部按钮既切 UI 又切管线：同一语言决定 DICT、示例稿件库以及 POST
 // /api/analyze-voice 的 `language` 字段（见 analyzer.js）。
+// 点击按钮打开菜单，菜单内三选一。按钮 label 显示「当前」语言短名。
+// keep in sync with SUPPORTED in i18n.js
+const _LANG_SHORT_KEY = {
+	"zh-CN": "header.langShort.zh",
+	"en-US": "header.langShort.en",
+	"fr-FR": "header.langShort.fr",
+};
 function _updateLangToggleLabel() {
 	const lbl = $("lang-toggle-label");
 	if (!lbl) return;
-	// 显示"去切到的语言"的首字——EN 按钮在中文态显示，中 按钮在英文态显示。
-	lbl.textContent = getLang() === "zh-CN" ? t("header.langShort.en") : t("header.langShort.zh");
+	lbl.textContent = t(_LANG_SHORT_KEY[getLang()]);
+}
+function _updateLangMenuActive() {
+	const menu = $("lang-menu");
+	if (!menu) return;
+	const cur = getLang();
+	menu.querySelectorAll(".lang-menu-item").forEach((btn) => {
+		const active = btn.dataset.lang === cur;
+		btn.classList.toggle("is-active", active);
+		if (active) btn.setAttribute("aria-current", "true");
+		else btn.removeAttribute("aria-current");
+	});
+}
+function _setLangMenuOpen(open) {
+	const btn = $("lang-toggle");
+	const menu = $("lang-menu");
+	if (!btn || !menu) return;
+	btn.setAttribute("aria-expanded", open ? "true" : "false");
+	menu.setAttribute("aria-hidden", open ? "false" : "true");
+	menu.hidden = !open;
+}
+function _isLangMenuOpen() {
+	return $("lang-toggle")?.getAttribute("aria-expanded") === "true";
 }
 
-$("lang-toggle")?.addEventListener("click", () => {
-	setLang(getLang() === "zh-CN" ? "en-US" : "zh-CN");
+$("lang-toggle")?.addEventListener("click", (e) => {
+	e.stopPropagation();
+	_setLangMenuOpen(!_isLangMenuOpen());
+});
+$("lang-menu")?.addEventListener("click", (e) => {
+	const item = e.target.closest(".lang-menu-item");
+	if (!item) return;
+	const code = item.dataset.lang;
+	_setLangMenuOpen(false);
+	if (code && code !== getLang()) {
+		setLang(code);
+		location.reload();
+		return;
+	}
+	$("lang-toggle")?.focus();
+});
+document.addEventListener("click", (e) => {
+	if (!_isLangMenuOpen()) return;
+	if (e.target.closest("#lang-picker")) return;
+	_setLangMenuOpen(false);
+});
+document.addEventListener("keydown", (e) => {
+	if (e.key === "Escape" && _isLangMenuOpen()) {
+		_setLangMenuOpen(false);
+		$("lang-toggle")?.focus();
+	}
 });
 
 onLangChange(() => {
 	_updateLangToggleLabel();
+	_updateLangMenuActive();
 	_updateClassifyModeSwitcher();
 	// 切语言后重刷依赖 t() 的动态区块：分段置信度、整段卡片、占比条。
-	// analysisData 非空说明已经跑过一次（或从历史还原）——都可以安全重绘。
+	// analysisData 非空说明已经跑过一次（或从历史还原 / 导入）——都可以安全重绘。
 	if (analysisData) {
-		const segs = classifyForMode(analysisData, getMode());
-		renderStats(segs);
-		renderSegments(analysisData.analysis);
-		renderMetricsPanel(analysisData.summary, analysisData.analysis);
+		renderFromSummary(analysisData);
 	}
 	scatterRedraw();
 });
@@ -998,8 +1381,11 @@ onLangChange(() => {
 initTheme();
 applyStaticDom();
 _updateLangToggleLabel();
+_updateLangMenuActive();
 setPhase("idle");
 _initInputMethodTabs();
 _initClassifyModeSwitcher();
 _updateClassifyModeSwitcher();
+_initScatterModeSwitcher();
+_updateScatterModeSwitcher();
 initScatterFromStorage();

@@ -177,6 +177,54 @@ body {
 	gap: 4px;
 }
 
+.lang-picker {
+	position: relative;
+	display: inline-flex;
+}
+.lang-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: 0;
+	min-width: 132px;
+	background: var(--surface);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	box-shadow: var(--shadow-md);
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	z-index: 50;
+}
+.lang-menu[hidden] {
+	display: none;
+}
+.lang-menu-item {
+	background: none;
+	border: none;
+	border-radius: var(--radius-sm);
+	padding: 6px 10px;
+	font: inherit;
+	font-size: 0.85rem;
+	color: var(--text-secondary);
+	text-align: left;
+	cursor: pointer;
+	transition:
+		background var(--transition),
+		color var(--transition);
+}
+.lang-menu-item:hover,
+.lang-menu-item:focus-visible {
+	background: var(--surface-hover);
+	color: var(--text-primary);
+	outline: none;
+}
+.lang-menu-item.is-active {
+	color: var(--text-primary);
+	font-weight: 600;
+	background: var(--surface-hover);
+}
+
 /* ============================================================
    MAIN LAYOUT
    ============================================================ */
@@ -389,6 +437,122 @@ body {
 	font-weight: normal;
 }
 
+/* Import-result row sits below the upload dropzone — secondary entry,
+   centered so it reads as a quiet alternative to the main CTA. */
+.upload-import-row {
+	display: flex;
+	justify-content: center;
+	margin-top: 12px;
+}
+
+/* Secondary action button — paired with btn-primary in toolbars / dialogs. */
+.btn-secondary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: var(--surface);
+	color: var(--text-primary);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	padding: 6px 12px;
+	font: inherit;
+	font-size: 0.85rem;
+	font-weight: 500;
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		background var(--transition),
+		border-color var(--transition);
+}
+.btn-secondary:hover:not(:disabled) {
+	background: var(--accent-subtle);
+	border-color: var(--accent-border);
+}
+.btn-secondary:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+/* Small modifier — used in file-info row so Export / Change-file line up
+   with the historical link-btn.small font size. */
+.btn-secondary.small {
+	font-size: 0.78rem;
+	padding: 4px 10px;
+	gap: 5px;
+}
+
+/* Export dialog (range + content options). Uses native <dialog>.
+   --bg-primary 不存在，必须用 --surface（白）；UA 默认居中，再加
+   margin:auto 防外层 transform 影响。 */
+.export-dialog {
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-md);
+	background: var(--surface);
+	color: var(--text-primary);
+	padding: 0;
+	max-width: 440px;
+	width: calc(100% - 32px);
+	box-shadow: var(--shadow-md);
+	margin: auto;
+}
+.export-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.35);
+}
+.export-dialog-form {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 20px 22px;
+}
+.export-dialog-title {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+.export-dialog-group {
+	border: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.export-dialog-group legend {
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	padding: 0 0 4px;
+}
+.export-dialog-option {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	font-size: 0.9rem;
+	color: var(--text-primary);
+	cursor: pointer;
+	padding: 4px 6px;
+	border-radius: var(--radius-sm);
+}
+.export-dialog-option:hover {
+	background: var(--accent-subtle);
+}
+.export-dialog-option input {
+	margin-top: 3px;
+	accent-color: var(--accent);
+}
+.export-dialog-option .hint-muted {
+	display: inline-block;
+	margin-left: 6px;
+}
+.export-dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-top: 4px;
+}
+
 .btn-primary {
 	display: inline-flex;
 	align-items: center;
@@ -537,6 +701,46 @@ body {
 	opacity: 1;
 }
 
+/* History scatter tooltip (both modes).  Shares the waveform tooltip's
+   look-and-feel — surface bg, soft shadow, fade-in — but is positioned via
+   explicit pixel left/top so it can flip horizontally / vertically when the
+   target dot/strip is near the panel edge.  Hidden by default. */
+.scatter-tooltip {
+	position: absolute;
+	left: 0;
+	top: 0;
+	background: var(--surface);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	padding: 5px 8px;
+	font-size: 0.7rem;
+	color: var(--text-secondary);
+	line-height: 1.35;
+	pointer-events: none;
+	box-shadow: var(--shadow-md);
+	opacity: 0;
+	transition: opacity 120ms ease;
+	z-index: 10;
+	font-variant-numeric: tabular-nums;
+	max-width: 220px;
+}
+.scatter-tooltip.visible {
+	opacity: 1;
+}
+.scatter-tooltip-line {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.scatter-tooltip-time {
+	color: var(--text-muted);
+	font-size: 0.66rem;
+}
+.scatter-tooltip-name {
+	color: var(--text-primary);
+	font-weight: 500;
+}
+
 .waveform-loading {
 	position: absolute;
 	inset: 0;
@@ -646,6 +850,15 @@ body {
 .stats-section {
 }
 
+/* Caption above the male/female bars, calls out that the % denominator is
+   voiced speech (not full audio) — see results.js renderStats. */
+.stats-caption {
+	padding: 0 12px 6px;
+	font-size: 11px;
+	line-height: 1.3;
+	color: var(--text-muted);
+}
+
 /* Stats list mirrors .segments-list visual language: a column of transparent
    grid rows inside a single .card wrapper (no per-row borders / shadows / left
    accent stripes).  Per-type dominance is conveyed by a subtle tinted
@@ -753,6 +966,23 @@ body {
 	margin-bottom: 12px;
 }
 
+#segments-details > summary {
+	list-style: none;
+	cursor: pointer;
+}
+#segments-details > summary::-webkit-details-marker {
+	display: none;
+}
+#segments-details > summary .section-title::after {
+	content: " ▸";
+	font-size: 0.7em;
+	color: var(--text-muted);
+	margin-left: 4px;
+}
+#segments-details[open] > summary .section-title::after {
+	content: " ▾";
+}
+
 .section-title {
 	font-size: 0.9rem;
 	font-weight: 600;
@@ -770,8 +1000,11 @@ body {
 }
 
 /* Classify-mode segmented control — swaps the classification source driving
-   the stats bar, waveform overlay, and history scatter. */
-.classify-mode-switcher {
+   the stats bar, waveform overlay, and history scatter.
+   Scatter-mode segmented control — swaps the history panel's Y-axis between
+   gender score (strips) and creation time (dots).  Shares pill sizing. */
+.classify-mode-switcher,
+.scatter-mode-switcher {
 	display: inline-flex;
 	gap: 2px;
 	padding: 2px;
@@ -779,7 +1012,8 @@ body {
 	background: var(--bg-secondary);
 	border: 1px solid var(--border);
 }
-.classify-mode-btn {
+.classify-mode-btn,
+.scatter-mode-btn {
 	font: inherit;
 	font-size: 0.7rem;
 	font-weight: 500;
@@ -794,21 +1028,36 @@ body {
 		color 0.12s ease;
 	line-height: 1.3;
 }
-.classify-mode-btn:hover:not(:disabled):not(.is-active) {
+.classify-mode-btn:hover:not(:disabled):not(.is-active),
+.scatter-mode-btn:hover:not(:disabled):not(.is-active) {
 	color: var(--text-primary);
 }
-.classify-mode-btn.is-active {
+.classify-mode-btn.is-active,
+.scatter-mode-btn.is-active {
 	background: var(--surface);
 	color: var(--text-primary);
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
-.classify-mode-btn:disabled {
+.classify-mode-btn:disabled,
+.scatter-mode-btn:disabled {
 	opacity: 0.38;
 	cursor: not-allowed;
 }
-.classify-mode-btn:focus-visible {
+.classify-mode-btn:focus-visible,
+.scatter-mode-btn:focus-visible {
 	outline: 2px solid var(--accent, #7aa);
 	outline-offset: 1px;
+}
+
+/* Scatter switcher sits in its own row below the history-panel header.
+   Stretches across the panel; each button gets equal width. */
+.scatter-mode-switcher {
+	margin: 8px 12px 0;
+	padding: 2px;
+}
+.scatter-mode-switcher .scatter-mode-btn {
+	flex: 1;
+	text-align: center;
 }
 
 .segments-list {
@@ -1045,6 +1294,68 @@ body {
 	text-align: center;
 	line-height: 1.6;
 	padding: 24px;
+}
+
+/* ── Advice v2 panel ──────────────────────────────────────────
+   One-sentence summary + gating warning. */
+.advice-panel {
+	padding: 14px 14px 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	border-bottom: 1px solid var(--border-strong);
+}
+
+.advice-warning {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: color-mix(in srgb, var(--accent) 10%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+	border-radius: var(--radius-sm);
+	color: var(--text-secondary);
+	font-size: 0.76rem;
+	line-height: 1.4;
+}
+
+.advice-warning svg {
+	flex-shrink: 0;
+	color: var(--accent);
+}
+
+.advice-warning-text,
+#advice-warning-text {
+	flex: 1;
+}
+
+.advice-warning-close {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	margin-left: 4px;
+	padding: 0;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	color: var(--text-secondary);
+	cursor: pointer;
+	opacity: 0.7;
+	transition:
+		background-color 120ms ease,
+		opacity 120ms ease,
+		color 120ms ease;
+}
+
+.advice-warning-close:hover,
+.advice-warning-close:focus-visible {
+	background: color-mix(in srgb, var(--accent) 18%, transparent);
+	color: var(--accent);
+	opacity: 1;
+	outline: none;
 }
 
 #metrics-content {
@@ -1284,65 +1595,6 @@ body {
 
 /* Gender spectrum bar — visually aligned with the pitch-range bar:
    soft gray base + low-alpha gradient overlay + frosted-glass indicator. */
-.gender-spectrum {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
-.gender-track {
-	position: relative;
-	height: 10px;
-	border-radius: 99px;
-	background: var(--border-strong);
-	overflow: visible;
-}
-
-.gender-track::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	background: linear-gradient(
-		to right,
-		rgba(91, 141, 239, 0.45) 0%,
-		rgba(160, 120, 210, 0.35) 50%,
-		rgba(224, 122, 170, 0.45) 100%
-	);
-	pointer-events: none;
-}
-
-.gender-thumb {
-	position: absolute;
-	top: 50%;
-	transform: translate(-50%, -50%);
-	width: 4px;
-	height: 20px;
-	border-radius: 2px;
-	left: 50%;
-	background: rgba(255, 255, 255, 0.5);
-	backdrop-filter: blur(4px) saturate(1.2);
-	-webkit-backdrop-filter: blur(4px) saturate(1.2);
-	box-shadow:
-		0 1px 3px rgba(0, 0, 0, 0.14),
-		inset 0 0 0 1px rgba(255, 255, 255, 0.7);
-	transition: left 600ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-[data-theme="dark"] .gender-thumb {
-	background: rgba(255, 255, 255, 0.18);
-	box-shadow:
-		0 1px 3px rgba(0, 0, 0, 0.4),
-		inset 0 0 0 1px rgba(255, 255, 255, 0.32);
-}
-
-.gender-labels {
-	display: flex;
-	justify-content: space-between;
-	font-size: 0.68rem;
-	color: var(--text-muted);
-}
-
 .gender-score-display {
 	font-size: 1.1rem;
 	font-weight: 600;
@@ -1395,17 +1647,19 @@ body {
 	transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Certainty tag badge in metrics panel */
+/* Certainty tag — primary signal of the NN section, no spectrum bar */
 .certainty-tag {
+	display: block;
 	text-align: center;
-	font-size: 11px;
-	padding: 3px 10px;
-	border-radius: 99px;
-	background: var(--bg-secondary);
-	color: var(--text-muted);
+	font-size: 1.05rem;
+	font-weight: 600;
+	padding: 14px 16px;
+	border-radius: 12px;
+	background: var(--surface-hover);
+	color: var(--text-primary);
 	border: 1px solid var(--border);
-	margin-top: 6px;
-	letter-spacing: 0.03em;
+	margin-top: 4px;
+	line-height: 1.3;
 }
 
 /* Segment label in right panel header */
@@ -1621,15 +1875,26 @@ body {
 		display: none;
 	}
 
-	/* Collapsible left panel */
-	.panel-left .scatter-wrap {
+	/* Collapsible left panel — header row stays visible, scatter body
+	   (mode switcher + canvas) collapses together. */
+	.panel-left .scatter-wrap,
+	.panel-left .scatter-mode-switcher {
 		max-height: 0;
 		overflow: hidden;
-		transition: max-height 300ms ease;
+		margin-top: 0;
+		margin-bottom: 0;
+		transition:
+			max-height 300ms ease,
+			margin 300ms ease,
+			padding 300ms ease;
 	}
 	.panel-left.panel-expanded .scatter-wrap {
 		max-height: 260px;
 		min-height: 180px;
+	}
+	.panel-left.panel-expanded .scatter-mode-switcher {
+		max-height: 32px;
+		margin: 8px 12px 0;
 	}
 	.panel-left .panel-header {
 		cursor: pointer;
@@ -1869,6 +2134,34 @@ body {
 	color: var(--text-primary);
 	margin: 0 0 6px;
 	letter-spacing: 0.02em;
+}
+.record-script-custom {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	font: inherit;
+	font-size: 1rem;
+	line-height: 1.65;
+	letter-spacing: 0.02em;
+	color: var(--text-primary);
+	background-color: var(--surface);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	padding: 8px 10px;
+	margin: 0 0 6px;
+	resize: vertical;
+	min-height: 88px;
+	transition:
+		border-color var(--transition),
+		box-shadow var(--transition);
+}
+.record-script-custom:hover {
+	border-color: var(--accent-border);
+}
+.record-script-custom:focus-visible {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 .record-script-hint {
 	font-size: 0.72rem;

@@ -1,0 +1,74 @@
+{
+  "f1_female_c5000": {
+    "gender": "female",
+    "source_clip": "common_voice_fr_18053683",
+    "sentence": "Je suis saisi de plusieurs amendements portant articles additionnels après l’article cinq.",
+    "chosen_ceiling_hz": 5000,
+    "phone_count": 49,
+    "median_resonance_adaptive": 0.7535,
+    "mean_resonance_adaptive": 0.6192
+  },
+  "f2_female_c5500": {
+    "gender": "female",
+    "source_clip": "common_voice_fr_18267987",
+    "sentence": "cinq rue Jean Soula, trente-trois mille Bordeaux",
+    "chosen_ceiling_hz": 5500,
+    "phone_count": 24,
+    "median_resonance_adaptive": 0.6194,
+    "mean_resonance_adaptive": 0.5633
+  },
+  "f3_female_c6000": {
+    "gender": "female",
+    "source_clip": "common_voice_fr_17744672",
+    "sentence": "Il fait ainsi disparaître le dernier alinéa de l’article L.",
+    "chosen_ceiling_hz": 6000,
+    "phone_count": 36,
+    "median_resonance_adaptive": 0.7993,
+    "mean_resonance_adaptive": 0.7612
+  },
+  "f4_female_c6500": {
+    "gender": "female",
+    "source_clip": "common_voice_fr_17792435",
+    "sentence": "C’était une galerie vitrée, exposée au midi, et remplie de plantes superbes.",
+    "chosen_ceiling_hz": 6500,
+    "phone_count": 39,
+    "median_resonance_adaptive": 0.4126,
+    "mean_resonance_adaptive": 0.496
+  },
+  "m1_male_c4500": {
+    "gender": "male",
+    "source_clip": "common_voice_fr_17835684",
+    "sentence": "Quelques mots seulement font croire qu'il s'affranchit, qu'il vécut des petits métiers de Paris.",
+    "chosen_ceiling_hz": 4500,
+    "phone_count": 45,
+    "median_resonance_adaptive": 0.1968,
+    "mean_resonance_adaptive": 0.3716
+  },
+  "m2_male_c5000": {
+    "gender": "male",
+    "source_clip": "common_voice_fr_18047417",
+    "sentence": "Il repoussa du pied,-en passant, le volume d'Horace qui gisait dans la poussière.",
+    "chosen_ceiling_hz": 5000,
+    "phone_count": 43,
+    "median_resonance_adaptive": 0.7527,
+    "mean_resonance_adaptive": 0.6264
+  },
+  "m3_male_c5500": {
+    "gender": "male",
+    "source_clip": "common_voice_fr_18273931",
+    "sentence": "Avenue de Saint-Laurent, douze, cent trente Saint-Geniez-d'Olt",
+    "chosen_ceiling_hz": 5500,
+    "phone_count": 28,
+    "median_resonance_adaptive": 0.461,
+    "mean_resonance_adaptive": 0.5139
+  },
+  "m4_male_c6000": {
+    "gender": "male",
+    "source_clip": "common_voice_fr_19455070",
+    "sentence": "Il perd deux ans plus tard une deuxième finale face à West Bromwich Albion.",
+    "chosen_ceiling_hz": 6000,
+    "phone_count": 38,
+    "median_resonance_adaptive": 1.0,
+    "mean_resonance_adaptive": 0.9848
+  }
+}

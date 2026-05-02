@@ -1,0 +1,734 @@
+# tests/fixtures/manifest.yaml
+#
+# **READ FIRST: tests/fixtures/KNOWN_LIMITATIONS.md**
+# Synthetic samples (sox pitch shift) are usable for trend observation only.
+# They MUST NOT be used for architectural decisions, threshold calibration,
+# or Engine C signal design — sox pitch shifts F0 and formants together,
+# so synthetic samples do not represent F0/formant decoupling that defines
+# real cis_male_high_f0 and trans voices.
+#
+# 每个条目对应一个音频文件。test_confidence_c1.py 读取此文件进行分类和分析。
+#
+# 字段说明：
+#   filename            相对于 tests/fixtures/ 的路径
+#   category            cis_female | cis_male_standard | cis_male_high_f0 |
+#                       trans_fem_early | trans_fem_mid | trans_fem_late |
+#                       trans_masc | neutral
+#   ground_truth_label  "female" | "male" | "neutral"
+#                       neutral = Engine A 预期不确定，不计入分类准确率
+#   estimated_f0_median_hz  pyin[60-250] 实测中位数，0 表示未知
+#   source              数据来源
+#   notes               备注（synthetic_pitch_shift 样本须标注）
+#
+# 数据来源说明：
+#   CMU ARCTIC  — Apache 2.0 / CMU 条款，学术/商业均可
+#     BDL = male, American English, F0 ~121-135 Hz
+#     JMK = male, Canadian English, F0 ~103-113 Hz
+#     RMS = male, American English, F0 ~80-100 Hz
+#     AWB = male, Scottish English, F0 ~124-139 Hz
+#     SLT = female, American English, F0 ~174-197 Hz
+#     CLB = female, American English, F0 ~180-185 Hz
+#   VCTK — CC-BY 4.0, CSTR Edinburgh
+#     14 speakers (4 M + 10 F), 3 sentences each, mic1 omni-directional
+#     Males p302/p304/p334/p360 all F0 88-115 Hz (cis_male_standard only)
+#     Note: target high-F0 males p254/p274/p286 NOT YET acquired — see KNOWN_LIMITATIONS.md
+#   internal/test_* — 内部测试录音，来源不明，仅用于模型行为观察
+
+samples:
+
+  # ── cis_female ─────────────────────────────────────────────────────────────
+  # Expected: C1-T2.0 mean > 0.82, accuracy > 95%
+
+  - filename: audio/female_1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 198
+    source: internal
+    notes: ""
+
+  - filename: audio/female_2.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 175
+    source: internal
+    notes: ""
+
+  - filename: audio/female_3.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 211
+    source: internal
+    notes: ""
+
+  - filename: audio/female_4.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 203
+    source: internal
+    notes: ""
+
+  - filename: audio/female_5.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 175
+    source: internal
+    notes: ""
+
+  - filename: audio/cis_female/cmu_arctic_slt_a0001.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 197
+    source: CMU_ARCTIC_SLT
+    notes: "American English female; arctic sentence 001"
+
+  - filename: audio/cis_female/cmu_arctic_slt_a0002.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 174
+    source: CMU_ARCTIC_SLT
+    notes: "arctic sentence 002"
+
+  - filename: audio/cis_female/cmu_arctic_slt_a0003.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 195
+    source: CMU_ARCTIC_SLT
+    notes: "arctic sentence 003"
+
+  - filename: audio/cis_female/cmu_arctic_clb_a0001.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 180
+    source: CMU_ARCTIC_CLB
+    notes: "American English female; arctic sentence 001"
+
+  - filename: audio/cis_female/cmu_arctic_clb_a0002.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 180
+    source: CMU_ARCTIC_CLB
+    notes: "arctic sentence 002"
+
+  - filename: audio/cis_female/cmu_arctic_clb_a0003.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 185
+    source: CMU_ARCTIC_CLB
+    notes: "arctic sentence 003"
+
+  - filename: audio/cis_female/test_ashley.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 188
+    source: internal_test
+    notes: "source unknown; for model behavior observation only"
+
+  - filename: audio/cis_female/test_lucy.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 232
+    source: internal_test
+    notes: "source unknown; for model behavior observation only"
+
+  # ── cis_male_standard ───────────────────────────────────────────────────────
+  # Expected: C1-T2.0 mean > 0.80, accuracy > 95%
+
+  - filename: audio/male_2.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 132
+    source: internal
+    notes: ""
+
+  - filename: audio/male_3.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 147
+    source: internal
+    notes: "F0 at upper boundary of standard range"
+
+  - filename: audio/male_5.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 132
+    source: internal
+    notes: ""
+
+  - filename: audio/zh_base_male.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 132
+    source: internal
+    notes: "Chinese male baseline"
+
+  - filename: audio/zh_10s.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 148
+    source: internal
+    notes: "Chinese speech 10s; F0 borderline standard/high_f0"
+
+  - filename: audio/zh_30s.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 132
+    source: internal
+    notes: "Chinese speech 30s"
+
+  - filename: audio/zh_60s.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 132
+    source: internal
+    notes: "Chinese speech 60s"
+
+  - filename: audio/cis_male_standard/cmu_arctic_bdl_a0001.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 135
+    source: CMU_ARCTIC_BDL
+    notes: "American English male; arctic sentence 001"
+
+  - filename: audio/cis_male_standard/cmu_arctic_bdl_a0002.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 126
+    source: CMU_ARCTIC_BDL
+    notes: "arctic sentence 002"
+
+  - filename: audio/cis_male_standard/cmu_arctic_bdl_a0003.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 125
+    source: CMU_ARCTIC_BDL
+    notes: "arctic sentence 003"
+
+  - filename: audio/cis_male_standard/cmu_arctic_jmk_a0001.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 113
+    source: CMU_ARCTIC_JMK
+    notes: "Canadian English male; arctic sentence 001"
+
+  - filename: audio/cis_male_standard/cmu_arctic_jmk_a0002.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 103
+    source: CMU_ARCTIC_JMK
+    notes: "arctic sentence 002"
+
+  - filename: audio/cis_male_standard/cmu_arctic_jmk_a0003.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 113
+    source: CMU_ARCTIC_JMK
+    notes: "arctic sentence 003"
+
+  - filename: audio/cis_male_standard/cmu_arctic_rms_a0001.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 93
+    source: CMU_ARCTIC_RMS
+    notes: "American English male (low F0); arctic sentence 001"
+
+  - filename: audio/cis_male_standard/cmu_arctic_rms_a0002.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 80
+    source: CMU_ARCTIC_RMS
+    notes: "arctic sentence 002"
+
+  - filename: audio/cis_male_standard/cmu_arctic_rms_a0003.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 100
+    source: CMU_ARCTIC_RMS
+    notes: "arctic sentence 003"
+
+  - filename: audio/cis_male_standard/cmu_arctic_awb_a0001.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 139
+    source: CMU_ARCTIC_AWB
+    notes: "Scottish English male (AWB, higher F0 than other ARCTIC males); arctic sentence 001"
+
+  - filename: audio/cis_male_standard/cmu_arctic_awb_a0002.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 138
+    source: CMU_ARCTIC_AWB
+    notes: "arctic sentence 002"
+
+  - filename: audio/cis_male_standard/cmu_arctic_awb_a0003.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 124
+    source: CMU_ARCTIC_AWB
+    notes: "arctic sentence 003"
+
+  - filename: audio/cis_male_standard/test_aiden.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 122
+    source: internal_test
+    notes: "source unknown; for model behavior observation only"
+
+  # ── cis_male_high_f0 ────────────────────────────────────────────────────────
+  # Expected: C1-T2.0 mean 0.70-0.90; accuracy < 50% (known Engine A bias)
+
+  - filename: audio/male_1.wav
+    category: cis_male_high_f0
+    ground_truth_label: male
+    estimated_f0_median_hz: 174
+    source: internal
+    notes: "high-F0 male; F0 falls in female range causing Engine A misclassification"
+
+  - filename: audio/male_4.wav
+    category: cis_male_high_f0
+    ground_truth_label: male
+    estimated_f0_median_hz: 176
+    source: internal
+    notes: "original bias case; C1-T1=0.928 C1-T2=0.883; pyin[60-400] shows octave errors at 287Hz"
+
+  - filename: audio/cis_male_high_f0/synth_bdl_pitch500.wav
+    category: cis_male_high_f0
+    ground_truth_label: male
+    estimated_f0_median_hz: 174
+    source: CMU_ARCTIC_BDL
+    notes: "synthetic_pitch_shift; sox pitch shifts F0 AND formants together; Engine A classifies as female (100% misclassified) — tests full-frequency-scale not F0/formant decoupling; replace with real high-F0 male samples"
+
+  - filename: audio/cis_male_high_f0/synth_awb_pitch400.wav
+    category: cis_male_high_f0
+    ground_truth_label: male
+    estimated_f0_median_hz: 177
+    source: CMU_ARCTIC_AWB
+    notes: "synthetic_pitch_shift; same limitation as synth_bdl_pitch500 — both F0 and formants shifted; 100% misclassified as female"
+
+  - filename: audio/cis_male_high_f0/synth_jmk_pitch600.wav
+    category: cis_male_high_f0
+    ground_truth_label: male
+    estimated_f0_median_hz: 159
+    source: CMU_ARCTIC_JMK
+    notes: "synthetic_pitch_shift; same limitation; 0% accuracy (classified as female) due to formant shift not just F0"
+
+  # ── trans_fem_early ─────────────────────────────────────────────────────────
+  # SYNTHETIC ONLY — no real samples available. acoustic approximation only.
+  # Expected: C1-T2.0 mean 0.60-0.85; accuracy (label=male) 50-80%
+
+  - filename: audio/trans_fem_early/synth_early_bdl_p150.wav
+    category: trans_fem_early
+    ground_truth_label: male
+    estimated_f0_median_hz: 130
+    source: CMU_ARCTIC_BDL
+    notes: "synthetic_pitch_shift; BDL +150 cents → 130Hz; NOT representative of real trans voice (no formant training)"
+
+  - filename: audio/trans_fem_early/synth_early_jmk_p200.wav
+    category: trans_fem_early
+    ground_truth_label: male
+    estimated_f0_median_hz: 113
+    source: CMU_ARCTIC_JMK
+    notes: "synthetic_pitch_shift; JMK +200 cents → 113Hz"
+
+  - filename: audio/trans_fem_early/synth_early_rms_p250.wav
+    category: trans_fem_early
+    ground_truth_label: male
+    estimated_f0_median_hz: 93
+    source: CMU_ARCTIC_RMS
+    notes: "synthetic_pitch_shift; RMS +250 cents → 93Hz (low end of early range)"
+
+  # ── trans_fem_mid ───────────────────────────────────────────────────────────
+  # SYNTHETIC ONLY. Expected: C1-T2.0 mean 0.40-0.70; accuracy 30-65%
+
+  - filename: audio/trans_fem_mid/synth_mid_bdl_p350.wav
+    category: trans_fem_mid
+    ground_truth_label: neutral
+    estimated_f0_median_hz: 161
+    source: CMU_ARCTIC_BDL
+    notes: "synthetic_pitch_shift; BDL +350 cents → 161Hz; formants still male"
+
+  - filename: audio/trans_fem_mid/synth_mid_awb_p350.wav
+    category: trans_fem_mid
+    ground_truth_label: neutral
+    estimated_f0_median_hz: 157
+    source: CMU_ARCTIC_AWB
+    notes: "synthetic_pitch_shift; AWB +350 cents → 157Hz"
+
+  - filename: audio/trans_fem_mid/synth_mid_rms_p1100.wav
+    category: trans_fem_mid
+    ground_truth_label: neutral
+    estimated_f0_median_hz: 163
+    source: CMU_ARCTIC_RMS
+    notes: "synthetic_pitch_shift; RMS +1100 cents → 163Hz"
+
+  # ── trans_fem_late ──────────────────────────────────────────────────────────
+  # SYNTHETIC ONLY. Expected: C1-T2.0 mean 0.70-0.88; accuracy (label=female) 75-95%
+
+  - filename: audio/trans_fem_late/synth_late_bdl_p600.wav
+    category: trans_fem_late
+    ground_truth_label: female
+    estimated_f0_median_hz: 185
+    source: CMU_ARCTIC_BDL
+    notes: "synthetic_pitch_shift; BDL +600 cents → 185Hz; formants still male"
+
+  - filename: audio/trans_fem_late/synth_late_bdl_p800.wav
+    category: trans_fem_late
+    ground_truth_label: female
+    estimated_f0_median_hz: 214
+    source: CMU_ARCTIC_BDL
+    notes: "synthetic_pitch_shift; BDL +800 cents → 214Hz"
+
+  - filename: audio/trans_fem_late/synth_late_rms_p1400.wav
+    category: trans_fem_late
+    ground_truth_label: female
+    estimated_f0_median_hz: 183
+    source: CMU_ARCTIC_RMS
+    notes: "synthetic_pitch_shift; RMS +1400 cents → 183Hz"
+
+  # ── trans_masc ──────────────────────────────────────────────────────────────
+  # SYNTHETIC ONLY. Simulates HRT-induced F0 lowering (female→male formants intact).
+
+  - filename: audio/trans_masc/synth_masc_slt_m500.wav
+    category: trans_masc
+    ground_truth_label: male
+    estimated_f0_median_hz: 148
+    source: CMU_ARCTIC_SLT
+    notes: "synthetic_pitch_shift; SLT -500 cents → 148Hz; HRT early/mid simulation"
+
+  - filename: audio/trans_masc/synth_masc_slt_m700.wav
+    category: trans_masc
+    ground_truth_label: male
+    estimated_f0_median_hz: 116
+    source: CMU_ARCTIC_SLT
+    notes: "synthetic_pitch_shift; SLT -700 cents → 116Hz; HRT stable simulation"
+
+  - filename: audio/trans_masc/synth_masc_clb_m600.wav
+    category: trans_masc
+    ground_truth_label: male
+    estimated_f0_median_hz: 126
+    source: CMU_ARCTIC_CLB
+    notes: "synthetic_pitch_shift; CLB -600 cents → 126Hz; HRT stable simulation"
+
+  # ── neutral ─────────────────────────────────────────────────────────────────
+  # NOTE: sox pitch-only shift does NOT produce acoustically neutral voices.
+  # Formants remain gendered even when F0 is in the overlap zone.
+  # Current synthetics show HIGH confidence (0.77-0.98) — not the low-confidence
+  # behavior we want to test. Replace with real low-F0 female or high-F0 male voices.
+  # Expected (for real neutral): C1-T2.0 mean 0.25-0.55
+
+  - filename: audio/neutral/synth_neutral_awb_p100.wav
+    category: neutral
+    ground_truth_label: neutral
+    estimated_f0_median_hz: 148
+    source: CMU_ARCTIC_AWB
+    notes: "synthetic_pitch_shift; AWB +100 cents → 148Hz; in Engine A uncertainty zone"
+
+  - filename: audio/neutral/synth_neutral_bdl_p300.wav
+    category: neutral
+    ground_truth_label: neutral
+    estimated_f0_median_hz: 150
+    source: CMU_ARCTIC_BDL
+    notes: "synthetic_pitch_shift; BDL +300 cents → 150Hz"
+
+  - filename: audio/neutral/synth_neutral_clb_m100.wav
+    category: neutral
+    ground_truth_label: neutral
+    estimated_f0_median_hz: 171
+    source: CMU_ARCTIC_CLB
+    notes: "synthetic_pitch_shift; CLB -100 cents → 171Hz (low female voice at boundary)"
+
+  # ── VCTK additions (CC-BY 4.0, CSTR Edinburgh) ─────────────────────────
+  # All files: 16kHz mono WAV, converted from VCTK 0.92 wav48_silence_trimmed/_mic1.flac
+  - filename: audio/cis_female/vctk_p248_003_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 200
+    source: VCTK_p248
+    notes: "Indian accent; mic1 omni-directional; sentence 003"
+
+  - filename: audio/cis_female/vctk_p248_005_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 221
+    source: VCTK_p248
+    notes: "Indian accent; mic1 omni-directional; sentence 005"
+
+  - filename: audio/cis_female/vctk_p248_008_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 207
+    source: VCTK_p248
+    notes: "Indian accent; mic1 omni-directional; sentence 008"
+
+  - filename: audio/cis_female/vctk_p277_006_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 212
+    source: VCTK_p277
+    notes: "NE England accent; mic1 omni-directional; sentence 006"
+
+  - filename: audio/cis_female/vctk_p277_007_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 205
+    source: VCTK_p277
+    notes: "NE England accent; mic1 omni-directional; sentence 007"
+
+  - filename: audio/cis_female/vctk_p277_012_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 189
+    source: VCTK_p277
+    notes: "NE England accent; mic1 omni-directional; sentence 012"
+
+  - filename: audio/cis_female/vctk_p283_006_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 202
+    source: VCTK_p283
+    notes: "Irish Cork accent; mic1 omni-directional; sentence 006"
+
+  - filename: audio/cis_female/vctk_p283_007_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 208
+    source: VCTK_p283
+    notes: "Irish Cork accent; mic1 omni-directional; sentence 007"
+
+  - filename: audio/cis_female/vctk_p283_012_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 191
+    source: VCTK_p283
+    notes: "Irish Cork accent; mic1 omni-directional; sentence 012"
+
+  - filename: audio/cis_female/vctk_p303_001_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 60
+    source: VCTK_p303
+    notes: "Canadian Toronto accent; mic1 omni-directional; sentence 001"
+
+  - filename: audio/cis_female/vctk_p303_007_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 208
+    source: VCTK_p303
+    notes: "Canadian Toronto accent; mic1 omni-directional; sentence 007"
+
+  - filename: audio/cis_female/vctk_p303_013_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 201
+    source: VCTK_p303
+    notes: "Canadian Toronto accent; mic1 omni-directional; sentence 013"
+
+  - filename: audio/cis_female/vctk_p305_002_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 217
+    source: VCTK_p305
+    notes: "American Philadelphia accent; mic1 omni-directional; sentence 002"
+
+  - filename: audio/cis_female/vctk_p305_003_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 226
+    source: VCTK_p305
+    notes: "American Philadelphia accent; mic1 omni-directional; sentence 003"
+
+  - filename: audio/cis_female/vctk_p305_004_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 225
+    source: VCTK_p305
+    notes: "American Philadelphia accent; mic1 omni-directional; sentence 004"
+
+  - filename: audio/cis_female/vctk_p333_001_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 174
+    source: VCTK_p333
+    notes: "American Indiana accent; mic1 omni-directional; sentence 001"
+
+  - filename: audio/cis_female/vctk_p333_006_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 191
+    source: VCTK_p333
+    notes: "American Indiana accent; mic1 omni-directional; sentence 006"
+
+  - filename: audio/cis_female/vctk_p333_012_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 176
+    source: VCTK_p333
+    notes: "American Indiana accent; mic1 omni-directional; sentence 012"
+
+  - filename: audio/cis_female/vctk_p335_003_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 199
+    source: VCTK_p335
+    notes: "NewZealand English accent; mic1 omni-directional; sentence 003"
+
+  - filename: audio/cis_female/vctk_p335_005_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 199
+    source: VCTK_p335
+    notes: "NewZealand English accent; mic1 omni-directional; sentence 005"
+
+  - filename: audio/cis_female/vctk_p335_008_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 198
+    source: VCTK_p335
+    notes: "NewZealand English accent; mic1 omni-directional; sentence 008"
+
+  - filename: audio/cis_female/vctk_p351_003_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 213
+    source: VCTK_p351
+    notes: "NorthernIrish Derry accent; mic1 omni-directional; sentence 003"
+
+  - filename: audio/cis_female/vctk_p351_005_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 213
+    source: VCTK_p351
+    notes: "NorthernIrish Derry accent; mic1 omni-directional; sentence 005"
+
+  - filename: audio/cis_female/vctk_p351_008_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 213
+    source: VCTK_p351
+    notes: "NorthernIrish Derry accent; mic1 omni-directional; sentence 008"
+
+  - filename: audio/cis_female/vctk_p361_002_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 162
+    source: VCTK_p361
+    notes: "American New Jersey accent; mic1 omni-directional; sentence 002"
+
+  - filename: audio/cis_female/vctk_p361_004_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 193
+    source: VCTK_p361
+    notes: "American New Jersey accent; mic1 omni-directional; sentence 004"
+
+  - filename: audio/cis_female/vctk_p361_008_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 188
+    source: VCTK_p361
+    notes: "American New Jersey accent; mic1 omni-directional; sentence 008"
+
+  - filename: audio/cis_female/vctk_s5_001_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 186
+    source: VCTK_s5
+    notes: "British accent; mic1 omni-directional; sentence 001"
+
+  - filename: audio/cis_female/vctk_s5_006_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 213
+    source: VCTK_s5
+    notes: "British accent; mic1 omni-directional; sentence 006"
+
+  - filename: audio/cis_female/vctk_s5_012_mic1.wav
+    category: cis_female
+    ground_truth_label: female
+    estimated_f0_median_hz: 82
+    source: VCTK_s5
+    notes: "British accent; mic1 omni-directional; sentence 012"
+
+  - filename: audio/cis_male_standard/vctk_p302_002_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 113
+    source: VCTK_p302
+    notes: "Canadian Montreal accent; mic1 omni-directional; sentence 002"
+
+  - filename: audio/cis_male_standard/vctk_p302_004_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 114
+    source: VCTK_p302
+    notes: "Canadian Montreal accent; mic1 omni-directional; sentence 004"
+
+  - filename: audio/cis_male_standard/vctk_p302_005_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 114
+    source: VCTK_p302
+    notes: "Canadian Montreal accent; mic1 omni-directional; sentence 005"
+
+  - filename: audio/cis_male_standard/vctk_p304_001_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 60
+    source: VCTK_p304
+    notes: "NorthernIrish Belfast accent; mic1 omni-directional; sentence 001"
+
+  - filename: audio/cis_male_standard/vctk_p304_006_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 93
+    source: VCTK_p304
+    notes: "NorthernIrish Belfast accent; mic1 omni-directional; sentence 006"
+
+  - filename: audio/cis_male_standard/vctk_p304_007_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 62
+    source: VCTK_p304
+    notes: "NorthernIrish Belfast accent; mic1 omni-directional; sentence 007"
+
+  - filename: audio/cis_male_standard/vctk_p334_006_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 91
+    source: VCTK_p334
+    notes: "American Chicago accent; mic1 omni-directional; sentence 006"
+
+  - filename: audio/cis_male_standard/vctk_p334_007_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 94
+    source: VCTK_p334
+    notes: "American Chicago accent; mic1 omni-directional; sentence 007"
+
+  - filename: audio/cis_male_standard/vctk_p334_012_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 94
+    source: VCTK_p334
+    notes: "American Chicago accent; mic1 omni-directional; sentence 012"
+
+  - filename: audio/cis_male_standard/vctk_p360_001_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 60
+    source: VCTK_p360
+    notes: "American New Jersey accent; mic1 omni-directional; sentence 001"
+
+  - filename: audio/cis_male_standard/vctk_p360_007_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 90
+    source: VCTK_p360
+    notes: "American New Jersey accent; mic1 omni-directional; sentence 007"
+
+  - filename: audio/cis_male_standard/vctk_p360_013_mic1.wav
+    category: cis_male_standard
+    ground_truth_label: male
+    estimated_f0_median_hz: 90
+    source: VCTK_p360
+    notes: "American New Jersey accent; mic1 omni-directional; sentence 013"
+

@@ -46,3 +46,7 @@ Thumbs.db
 # per-dev customization like publishing sidecar ports to the host, not for prod)
 docker-compose.override.yml
 docker-compose.override.yaml
+
+# Engine C sidecar local dev settings (Dockerfile generates this at build time;
+# baseline rebuild scripts also rely on a local copy pointing at miniconda mfa).
+voiceya/sidecars/visualizer-backend/settings.json

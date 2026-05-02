@@ -23,20 +23,103 @@ import re
 from typing import TYPE_CHECKING, Any, Literal
 
 from voiceya.config import CFG
+from voiceya.services.audio_analyser import resonance_calibration
 
 if TYPE_CHECKING:
     from voiceya.services.audio_analyser.seg_analyser import AnalyseResultItem
 
 logger = logging.getLogger(__name__)
 
-# Mandarin 每个汉字≈2 音素（声母+韵母），英文每个词≈3-4 个 ARPABET 音素。
+# Mandarin 每个汉字≈2 音素（声母+韵母），英文每个词≈3-4 个 ARPABET 音素，
+# 法语每个词≈2.5-3 个 IPA 音素（联诵 + 不发音尾辅音让平均值偏低）。
 # phone_ratio 低于阈值表示 MFA 只对齐到零星几个音素，多半是用户漏读/跑题。
 _LOW_PHONE_RATIO_ZH = 0.8  # phones / hanzi
 _LOW_PHONE_RATIO_EN = 1.5  # phones / word token
+_LOW_PHONE_RATIO_FR = 1.5  # phones / word token — 起步同英文，跑通 baseline 后再调
 # 对齐的音素区间 / 音频总时长；低于 30% 一般意味着用户只读了开头几秒就停了。
 _LOW_COVERAGE_THRESHOLD = 0.3
 # 匹配单个汉字（BMP 范围够用；扩展 A/B 区等生僻字几乎不会进日常脚本）。
 _HAN_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
+
+# IPA tone diacritics (matches resonance.py / ceiling_selector.py).  Mandarin
+# phone labels carry them (i\u02e5\u02e9, a\u02e5\u02e5); strip before bucketing so per-vowel
+# aggregation isn't fragmented by tone variants \u2014 tones colour F0, not F1/F2.
+_TONE_RE = re.compile(r"[\u02e5-\u02e9]+")
+
+# Vowel inventories per language \u2014 must match the vendored
+# acousticgender/library/resonance.py {ZH,FR}_VOWELS.  Worker-side copy here
+# because resonance.py only runs in the sidecar process.  en uses ARPABET
+# (cmudict / english_us_arpa) \u2014 see _EN_VOWELS + _ARPABET_STRESS_RE below.
+_ZH_VOWELS: frozenset[str] = frozenset(
+    {
+        "a",
+        "aj",
+        "aw",
+        "e",
+        "ej",
+        "i",
+        "io",
+        "o",
+        "ow",
+        "u",
+        "y",
+        "\u0259",
+        "\u0265",
+        "\u0290\u0329",
+        "z\u0329",
+    }
+)
+_FR_VOWELS: frozenset[str] = frozenset(
+    {
+        "a",
+        "\u0251",
+        "e",
+        "\u025b",
+        "i",
+        "o",
+        "\u0254",
+        "u",
+        "y",
+        "\u00f8",
+        "\u0153",
+        "\u0259",
+        "\u025b\u0303",
+        "\u0251\u0303",
+        "\u0254\u0303",
+        "\u0153\u0303",
+    }
+)
+# ARPABET vowel base classes (cmudict / english_us_arpa).  The MFA sidecar
+# emits stress-digited variants like ``IY1`` / ``AH0`` / ``EH2`` \u2014 strip the
+# trailing 0/1/2 before set membership.  No tone diacritics; en is single
+# accent (cmudict General American).
+_EN_VOWELS: frozenset[str] = frozenset(
+    {
+        "AA",
+        "AE",
+        "AH",
+        "AO",
+        "AW",
+        "AY",
+        "EH",
+        "ER",
+        "EY",
+        "IH",
+        "IY",
+        "OW",
+        "OY",
+        "UH",
+        "UW",
+    }
+)
+# ARPABET stress-digit suffix.  ``IY1.rstrip("012") == "IY"`` would do, but a
+# regex makes the intent explicit and matches scripts/audit_resonance_en.py.
+_ARPABET_STRESS_RE = re.compile(r"[012]$")
+# Per-vowel guidance is suppressed below this many tokens \u2014 single-digit
+# samples make medians too noisy to act on (one mis-aligned phone can swing
+# z_F2_med by 0.5 \u03c3).  Picked to roughly match the sidecar's >2 \u03c3 outlier
+# trim convention.
+_PER_VOWEL_MIN_TOKENS = 3
 
 # language 归一化：前端/上游传 BCP-47 形式（zh-CN、en-US），sidecar / 调度用短码。
 _LANG_SHORT: dict[str, str] = {
@@ -44,6 +127,8 @@ _LANG_SHORT: dict[str, str] = {
     "zh": "zh",
     "en-US": "en",
     "en": "en",
+    "fr-FR": "fr",
+    "fr": "fr",
 }
 
 
@@ -110,6 +195,10 @@ async def run_engine_c(
                 from voiceya.services.audio_analyser.engine_c_asr_en import (  # noqa: PLC0415
                     transcribe_en,
                 )
+            elif lang_short == "fr":
+                from voiceya.services.audio_analyser.engine_c_asr_fr import (  # noqa: PLC0415
+                    transcribe_fr,
+                )
             else:
                 from voiceya.services.audio_analyser.engine_c_asr import (  # noqa: PLC0415
                     transcribe_zh,
@@ -121,6 +210,8 @@ async def run_engine_c(
         try:
             if lang_short == "en":
                 transcript, word_timestamps = await transcribe_en(audio_bytes)
+            elif lang_short == "fr":
+                transcript, word_timestamps = await transcribe_fr(audio_bytes)
             else:
                 transcript = await transcribe_zh(audio_bytes)
         except Exception as exc:  # defensive — _transcribe itself swallows errors
@@ -191,12 +282,13 @@ async def run_engine_c(
     total_audio_sec = sum(r.duration for r in analyse_results)
     alignment_confidence = _alignment_confidence(phones, transcript, total_audio_sec, lang_short)
 
+    median_resonance = _safe_float(data.get("medianResonance"))
     summary = {
         "mean_pitch_hz": _safe_float(data.get("meanPitch")),
         "median_pitch_hz": _safe_float(data.get("medianPitch")),
         "stdev_pitch_hz": _safe_float(data.get("stdevPitch")),
         "mean_resonance": _safe_float(data.get("meanResonance")),
-        "median_resonance": _safe_float(data.get("medianResonance")),
+        "median_resonance": median_resonance,
         "stdev_resonance": _safe_float(data.get("stdevResonance")),
         "phone_count": len(phones),
         "word_count": len(data.get("words") or []),
@@ -207,6 +299,22 @@ async def run_engine_c(
         "script": script if mode == "script" else None,
         "language": language,
         "alignment_confidence": alignment_confidence,
+        # Adaptive Praat formant ceiling chosen by the sidecar's
+        # ceiling_selector (per-recording, in Hz).  None means one of:
+        #   (a) sidecar predates the 2026-05-01 multi-ceiling Praat patch
+        #       and the field isn't in the response,
+        #   (b) sidecar produced zero Praat TSVs (alignment empty), or
+        #   (c) MFA produced zero chunks → merge bypassed.
+        # en-US still pins to legacy 5000 because stats.json hasn't been
+        # re-trained at 5500 Hz yet.  Frontend / advice consumers must
+        # treat this as opt-in telemetry, not a gate.
+        "formant_ceiling_hz": _safe_int(data.get("formant_ceiling_hz")),
+        # Phase C surface — interpretation layer for advice_v2 / UI.  Both
+        # are advisory; the raw `median_resonance` and per-phone `phones`
+        # array remain authoritative for any consumer that wants to ignore
+        # the binning.
+        "resonance_zone_key": resonance_calibration.classify_zone(median_resonance, language),
+        "resonance_per_vowel": _aggregate_per_vowel(phones, lang_short),
     }
 
     logger.info(
@@ -244,6 +352,9 @@ def _alignment_confidence(
     if lang_short == "en":
         token_count = len(transcript.split())
         low_ratio_threshold = _LOW_PHONE_RATIO_EN
+    elif lang_short == "fr":
+        token_count = len(transcript.split())
+        low_ratio_threshold = _LOW_PHONE_RATIO_FR
     else:
         token_count = len(_HAN_CHAR_RE.findall(transcript))
         low_ratio_threshold = _LOW_PHONE_RATIO_ZH
@@ -305,6 +416,12 @@ def _build_phone_array(
             char = words[word_idx].get("word", "") or ""
 
         formants = p.get("F") or []
+        # F_stdevs from the sidecar are z-scores relative to the
+        # female reference distribution (resonance.compute_resonance line
+        # 64-69).  Surfaced as z_F1/z_F2/z_F3 so the worker / advice layer
+        # can do per-vowel guidance without re-reading stats files.  None
+        # for consonants whose phoneme isn't in stats[expected].
+        f_stdevs = p.get("F_stdevs") or []
         phones.append(
             {
                 "start": round(start, 3),
@@ -316,14 +433,120 @@ def _build_phone_array(
                 "F1": _safe_float(formants[1]) if len(formants) > 1 else None,
                 "F2": _safe_float(formants[2]) if len(formants) > 2 else None,
                 "F3": _safe_float(formants[3]) if len(formants) > 3 else None,
+                "z_F1": _safe_float(f_stdevs[1]) if len(f_stdevs) > 1 else None,
+                "z_F2": _safe_float(f_stdevs[2]) if len(f_stdevs) > 2 else None,
+                "z_F3": _safe_float(f_stdevs[3]) if len(f_stdevs) > 3 else None,
             }
         )
 
     return phones
 
 
+def _aggregate_per_vowel(
+    phones: list[dict[str, Any]],
+    lang_short: str,
+) -> list[dict[str, Any]]:
+    """Bucket phones by vowel class, return per-class median z + Hz medians.
+
+    Phase A baseline (2026-05-01) showed the clamped resonance score loses
+    diagnostic power on most vowels (sat_rate > 50 % for /a / aw / aj /…).
+    The raw F-vector z-scores still carry signal below the clamp, so
+    advice_v2 will use this aggregate to drive per-vowel coaching.
+
+    Output shape::
+
+        [{"vowel": "i", "n": 22,
+          "z_F1_med": -0.05, "z_F2_med": +0.10, "z_F3_med": -0.20,
+          "F1_med_hz": 380, "F2_med_hz": 2520, "F3_med_hz": 3100}, ...]
+
+    Sorted by descending sample count so the UI can naturally surface the
+    most-spoken vowel classes first.  Vowels with fewer than
+    ``_PER_VOWEL_MIN_TOKENS`` tokens are dropped (medians too noisy).
+
+    en uses ARPABET phone labels with stress digits (``IY1``, ``AH0``); the
+    digits are stripped before bucketing so all stress variants of a vowel
+    aggregate together.  stats.json's calibration is still 5000 Hz baseline
+    (en isn't in `_ADAPTIVE_LANGS` as of 2026-05-01) but the F_stdevs values
+    the sidecar attaches per-phone are computed against that same baseline,
+    so the per-vowel z-scores are internally consistent — they just live in
+    a slightly different overall distribution than zh / fr.
+    """
+    if not phones or lang_short not in ("zh", "fr", "en"):
+        return []
+    if lang_short == "zh":
+        vowel_set = _ZH_VOWELS
+        normalize = _TONE_RE.sub
+    elif lang_short == "fr":
+        vowel_set = _FR_VOWELS
+        normalize = lambda _r, p: p  # noqa: E731 — short identity for the dispatcher  # type: ignore[assignment]
+    else:  # en
+        vowel_set = _EN_VOWELS
+        normalize = _ARPABET_STRESS_RE.sub  # type: ignore[assignment]
+
+    buckets: dict[str, dict[str, list[float]]] = {}
+    for p in phones:
+        raw_label = p.get("phone") or ""
+        label = normalize("", raw_label) if lang_short in ("zh", "en") else raw_label
+        if label not in vowel_set:
+            continue
+        bucket = buckets.setdefault(
+            label,
+            {"z_F1": [], "z_F2": [], "z_F3": [], "F1": [], "F2": [], "F3": []},
+        )
+        for key in ("z_F1", "z_F2", "z_F3", "F1", "F2", "F3"):
+            v = p.get(key)
+            if v is not None:
+                bucket[key].append(float(v))
+
+    out: list[dict[str, Any]] = []
+    for vowel, b in buckets.items():
+        n = len(b["z_F1"])
+        if n < _PER_VOWEL_MIN_TOKENS:
+            continue
+        out.append(
+            {
+                "vowel": vowel,
+                "n": n,
+                "z_F1_med": _round_or_none(_median(b["z_F1"]), 3),
+                "z_F2_med": _round_or_none(_median(b["z_F2"]), 3),
+                "z_F3_med": _round_or_none(_median(b["z_F3"]), 3),
+                "F1_med_hz": _round_or_none(_median(b["F1"]), 0),
+                "F2_med_hz": _round_or_none(_median(b["F2"]), 0),
+                "F3_med_hz": _round_or_none(_median(b["F3"]), 0),
+            }
+        )
+    out.sort(key=lambda r: -r["n"])
+    return out
+
+
+def _median(values: list[float]) -> float | None:
+    if not values:
+        return None
+    s = sorted(values)
+    mid = len(s) // 2
+    if len(s) % 2:
+        return s[mid]
+    return 0.5 * (s[mid - 1] + s[mid])
+
+
+def _round_or_none(x: float | None, ndigits: int) -> float | int | None:
+    if x is None:
+        return None
+    r = round(x, ndigits)
+    # ndigits=0 returns float in py3 — cast to int so JSON stays compact
+    # for Hz fields ("F1_med_hz": 380 not 380.0).
+    return int(r) if ndigits == 0 else r
+
+
 def _safe_float(x: Any) -> float | None:
     try:
         return float(x) if x is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(x: Any) -> int | None:
+    try:
+        return int(x) if x is not None else None
     except (TypeError, ValueError):
         return None

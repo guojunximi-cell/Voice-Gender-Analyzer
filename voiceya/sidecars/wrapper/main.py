@@ -33,18 +33,17 @@ import subprocess
 import tempfile
 import traceback
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
-
 import acousticgender.library.phones as phones
 import acousticgender.library.preprocessing as preprocessing
 import acousticgender.library.resonance as resonance
 from acousticgender.library.settings import settings
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 
 # Wrapper-local helpers (siblings of main.py).  Relative imports because
 # uvicorn loads this module as ``wrapper.main`` so ``wrapper.chunker`` /
 # ``wrapper.multichunk`` are the right absolute names, but ``from .`` is
 # shorter and refactor-safe.
-from . import chunker, multichunk
+from . import ceiling_selector, chunker, multichunk
 from .preloaded_aligner import PreloadedAligner
 
 logger = logging.getLogger("engine_c.sidecar")
@@ -54,9 +53,9 @@ logger = logging.getLogger("engine_c.sidecar")
 # to root's "last resort" handler (WARNING+ only, hiding INFO traces).
 # Attach once at module load.  Idempotent — guard against reload doubling.
 _engine_c_handler = logging.StreamHandler()
-_engine_c_handler.setFormatter(logging.Formatter(
-    "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-))
+_engine_c_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+)
 for _name in (
     "engine_c.sidecar",
     "engine_c.chunker",
@@ -113,10 +112,26 @@ _LANG_ALIASES: dict[str, str] = {
     "en-us": "en",
     "en_us": "en",
     "english": "en",
+    "fr": "fr",
+    "fr-fr": "fr",
+    "fr_fr": "fr",
+    "french": "fr",
 }
-_LANG_WEIGHTS_FILE: dict[str, str] = {"zh": "weights_zh.json", "en": "weights.json"}
-_LANG_STATS_FILE: dict[str, str] = {"zh": "stats_zh.json", "en": "stats.json"}
-_LANG_DICT_FILE: dict[str, str] = {"zh": "mandarin_dict.txt", "en": "cmudict.txt"}
+_LANG_WEIGHTS_FILE: dict[str, str] = {
+    "zh": "weights_zh.json",
+    "en": "weights.json",
+    "fr": "weights_fr.json",
+}
+_LANG_STATS_FILE: dict[str, str] = {
+    "zh": "stats_zh.json",
+    "en": "stats.json",
+    "fr": "stats_fr.json",
+}
+_LANG_DICT_FILE: dict[str, str] = {
+    "zh": "mandarin_dict.txt",
+    "en": "cmudict.txt",
+    "fr": "french_mfa_dict.txt",
+}
 
 
 def _normalize_lang(raw: str | None) -> str:
@@ -141,7 +156,7 @@ def _lang_available(lang: str) -> bool:
     )
 
 
-_SUPPORTED_LANGS: list[str] = [lang for lang in ("zh", "en") if _lang_available(lang)]
+_SUPPORTED_LANGS: list[str] = [lang for lang in ("zh", "en", "fr") if _lang_available(lang)]
 _WEIGHTS_BY_LANG: dict[str, list[float]] = {lang: _load_weights(lang) for lang in _SUPPORTED_LANGS}
 if not _SUPPORTED_LANGS:
     logger.error(
@@ -162,7 +177,8 @@ if not _SUPPORTED_LANGS:
 # Set ENGINE_C_PRELOAD_ALIGNER=0 to force the old subprocess path
 # everywhere (safety knob for regressions).
 _PRELOAD_ENABLED = os.environ.get(
-    "ENGINE_C_PRELOAD_ALIGNER", "1",
+    "ENGINE_C_PRELOAD_ALIGNER",
+    "1",
 ).lower() in ("1", "true", "yes", "on")
 
 # Acoustic and dictionary names diverge for zh: the v3 mandarin_mfa
@@ -176,10 +192,12 @@ _PRELOAD_ENABLED = os.environ.get(
 _ACOUSTIC_NAME_BY_LANG: dict[str, str] = {
     "en": "english_us_arpa",
     "zh": "mandarin_mfa",
+    "fr": "french_mfa",
 }
 _DICT_NAME_BY_LANG: dict[str, str] = {
     "en": "english_us_arpa",
     "zh": "mandarin_china_mfa",
+    "fr": "french_mfa",
 }
 
 _PRELOADED_ALIGNERS: dict[str, PreloadedAligner] = {}
@@ -188,6 +206,7 @@ if _PRELOAD_ENABLED:
         from montreal_forced_aligner.models import (  # noqa: PLC0415
             MODEL_TYPES as _MFA_MODEL_TYPES,
         )
+
         for _lang in _SUPPORTED_LANGS:
             _acoustic_name = _ACOUSTIC_NAME_BY_LANG.get(_lang)
             _dict_name = _DICT_NAME_BY_LANG.get(_lang)
@@ -199,7 +218,8 @@ if _PRELOAD_ENABLED:
             except Exception as _exc:
                 logger.warning(
                     "preload skipped for %s: can't resolve model path (%s)",
-                    _lang, _exc,
+                    _lang,
+                    _exc,
                 )
                 continue
             _aligner = PreloadedAligner.load(_lang, _acoustic_path, _dict_path)
@@ -217,7 +237,8 @@ if _PRELOAD_ENABLED:
             _aligner.warmup()
     except ImportError as _exc:
         logger.warning(
-            "preload disabled — MFA/kalpy imports failed: %s", _exc,
+            "preload disabled — MFA/kalpy imports failed: %s",
+            _exc,
         )
 
 # ── MFA fast-mode patch ──────────────────────────────────────────────
@@ -299,13 +320,15 @@ def _run_chunked_path(
             chunks = chunker.plan_chunks(duration, word_timestamps, silence_ranges)
 
         if not chunks:
-            chunks = [{
-                "index": 0,
-                "start_sec": 0.0,
-                "end_sec": duration,
-                "transcript": transcript,
-                "word_count": len(transcript.split()),
-            }]
+            chunks = [
+                {
+                    "index": 0,
+                    "start_sec": 0.0,
+                    "end_sec": duration,
+                    "transcript": transcript,
+                    "word_count": len(transcript.split()),
+                }
+            ]
             logger.info(
                 "kalpy: single-chunk path (%s)  duration=%.1fs",
                 "preloaded aligner prefers it"
@@ -316,7 +339,8 @@ def _run_chunked_path(
         else:
             logger.info(
                 "subprocess MFA: %d chunks over %.1fs  durs=%s",
-                len(chunks), duration,
+                len(chunks),
+                duration,
                 [round(c["end_sec"] - c["start_sec"], 2) for c in chunks],
             )
 
@@ -325,7 +349,12 @@ def _run_chunked_path(
         # fallback) chdirs into tmp_dir.
         praat_script = os.path.join(saved_cwd, "textgrid-formants.praat")
         merged = multichunk.process_from_wav(
-            full_wav, chunks, tmp_dir, lang, settings, praat_script,
+            full_wav,
+            chunks,
+            tmp_dir,
+            lang,
+            settings,
+            praat_script,
             mfa_beam=_MFA_BEAM if _FAST_MFA else "",
             mfa_retry_beam=_MFA_RETRY_BEAM if _FAST_MFA else "",
             preloaded_aligner=preloaded,
@@ -632,15 +661,17 @@ async def analyze(
         # detected a broken chunk); None triggers the vendored single-block
         # subprocess MFA fallback below.
         data: dict | None = None
-        use_kalpy = (
-            _CHUNK_ENABLED
-            and lang in _PRELOADED_ALIGNERS
-        )
+        use_kalpy = _CHUNK_ENABLED and lang in _PRELOADED_ALIGNERS
         if use_kalpy:
             data = await asyncio.to_thread(
                 _run_chunked_path,
-                audio_bytes, transcript, word_timestamps, silence_ranges,
-                chunk_tmp, lang, saved_cwd,
+                audio_bytes,
+                transcript,
+                word_timestamps,
+                silence_ranges,
+                chunk_tmp,
+                lang,
+                saved_cwd,
             )
 
         if data is None:
@@ -651,7 +682,13 @@ async def analyze(
             praat_output = await asyncio.to_thread(
                 preprocessing.process, audio_bytes, transcript, tmp_dir, lang
             )
+            # voiceya patch (2026-05-01): adaptive formant ceiling — the
+            # patched textgrid-formants.praat now emits 5 ceilings; pick the
+            # optimum and rewrite the Phonemes section so phones.parse sees
+            # only the chosen ceiling's formants.
+            chosen_ceiling, praat_output = ceiling_selector.pick_best(praat_output, lang)
             data = phones.parse(praat_output, lang)
+            data["formant_ceiling_hz"] = chosen_ceiling
 
         if not data.get("phones"):
             raise RuntimeError("MFA produced no alignment output")

@@ -1,0 +1,6 @@
+# tests/test_french_ceiling_selector.py creates symlinks here on first run
+# so phones.parse + resonance.compute_resonance can find their lookup files
+# (they read by bare relative path).  Targets live in
+# voiceya/sidecars/visualizer-backend/ — these are dev-side aliases.
+stats_fr.json
+weights_fr.json

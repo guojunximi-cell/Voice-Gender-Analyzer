@@ -402,6 +402,9 @@ class PreloadedAligner:
         warmup_transcript = {
             "en": "the quick brown fox jumps over a lazy dog again",
             "zh": "你好",
+            # fr: short multi-vowel phrase — pays JIT cost without exhausting
+            # beam on silent audio (same constraint as zh's "你好").
+            "fr": "bonjour le monde",
         }.get(self.lang, "the")
         try:
             with tempfile.TemporaryDirectory() as tmp:

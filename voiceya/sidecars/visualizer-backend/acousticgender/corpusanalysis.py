@@ -2,6 +2,16 @@
 
 print('corpusanalysis.py: __package__ ->', __package__)
 
+# voiceya patch: Python 3.14 changed the default multiprocessing start method
+# from 'fork' to 'forkserver', which requires top-level code to be guarded by
+# `if __name__ == '__main__':`.  This script is a flat top-level module, so we
+# pin to 'fork' here.  Safe on Linux/macOS; sidecar Dockerfile pins MFA env.
+import multiprocessing as _mp
+try:
+	_mp.set_start_method('fork', force=True)
+except (RuntimeError, ValueError):
+	pass
+
 import os, sys, subprocess, json, argparse
 from collections import defaultdict
 from statistics import mean, median, stdev
@@ -37,6 +47,14 @@ parser.add_argument('--weights-kfold', type=int, default=10,
 	help='k-fold CV；<2 时退化为全量拟合')
 parser.add_argument('--weights-seed', type=int, default=42,
 	help='k-fold 打乱随机种子')
+# voiceya patch: spk-disjoint CV + F2 floor.
+# Default off → preserves the EN baseline pipeline behavior; opt-in for ZH.
+# 见 CHANGELOG_ZH.md v0.2.0 — utt-level CV 在大语料下 collapse 到 F1-only。
+parser.add_argument('--weights-spk-cv', action='store_true',
+	help='按说话人分 fold（解析 dir 名 {m|f}_{corpus}_{spk}_{utt}），并在 spk 级别测准确度。'
+	     '需要目录命名遵循该格式；否则回退到 utt-level。')
+parser.add_argument('--weights-min-f2', type=float, default=0.0,
+	help='对 weights[1] (F2 z) 设硬下限，过滤掉 F2 退化候选。建议 ZH 用 0.05–0.10。')
 args = parser.parse_args()
 
 lang = args.lang
@@ -49,19 +67,43 @@ weights_out = args.weights_out or ('weights.json' if lang == 'en' else 'weights_
 def phoneme_key(phone):
 	return _strip_tone(phone['phoneme']) if lang == 'zh' else phone['phoneme']
 
+# voiceya patch: capture the script's launch cwd once so _process_one can
+# restore it before each preprocessing.process() call.  preprocessing.process
+# os.chdir's into a tmp_dir that it later rmtree's — leaving each worker's
+# cwd pointing at a deleted path.  When the next call re-captures
+# `cwd = os.getcwd()` and joins `textgrid-formants.praat`, the path is
+# garbage and Praat fails with "Cannot open file".
+_LAUNCH_CWD = os.getcwd()
+
 def _process_one(directory, corpus_dir, processed_corpus_dir, lang):
+	# voiceya patch: restore launch cwd before invoking preprocessing.process —
+	# guards against the leftover cwd-in-rmtreed-dir problem above.
+	try:
+		os.chdir(_LAUNCH_CWD)
+	except OSError:
+		pass
+
 	# 每 worker 独立 MFA_ROOT_DIR，避免并发写 command_history.yaml / temp 冲突。
-	# 但要软链 pretrained_models / models / extracted_models / global_config.yaml
-	# 到默认 ~/Documents/MFA，否则找不到已下载的 mandarin_mfa。
+	# voiceya patch: copytree the extracted_models subtree per-worker (was a
+	# symlink to ~/Documents/MFA/extracted_models — multiple workers raced to
+	# extract mandarin_mfa.zip into the shared dir and corrupted each other's
+	# state).  pretrained_models / models / global_config.yaml are still safe
+	# to symlink (read-only inputs).
+	import shutil as _sh
 	mfa_root = os.path.abspath(processed_corpus_dir + '/.mfa-root-' + str(os.getpid()))
 	if not os.path.exists(mfa_root):
 		os.makedirs(mfa_root)
 		default_root = os.path.expanduser('~/Documents/MFA')
-		for sub in ('pretrained_models', 'models', 'extracted_models', 'global_config.yaml'):
+		for sub in ('pretrained_models', 'models', 'global_config.yaml'):
 			src = os.path.join(default_root, sub)
 			dst = os.path.join(mfa_root, sub)
 			if os.path.exists(src) and not os.path.exists(dst):
 				os.symlink(src, dst)
+		# Per-worker copy (not symlink) to dodge concurrent-extract races.
+		ext_src = os.path.join(default_root, 'extracted_models')
+		ext_dst = os.path.join(mfa_root, 'extracted_models')
+		if os.path.exists(ext_src) and not os.path.exists(ext_dst):
+			_sh.copytree(ext_src, ext_dst, symlinks=False)
 	os.environ['MFA_ROOT_DIR'] = mfa_root
 	transcript = ''
 	recording = None
@@ -113,10 +155,21 @@ if True:
 				done += 1
 				print(f'[{done}/{len(dirs)}]', r[0], 'ok' if r[1] else 'FAIL', r[2] or '')
 
+def _parse_spk(directory):
+	"""Extract `corpus:spk` from `{m|f}_{corpus}_{spk}_{utt}` dir names.
+	Returns None if the format doesn't match (caller treats utt as singleton).
+	"""
+	parts = directory.split('_', 3)
+	if len(parts) == 4 and parts[0] in ('m', 'f'):
+		return f"{parts[1]}:{parts[2]}"
+	return None
+
 m_count = 0
 f_count = 0
 m_data = []
 f_data = []
+m_dirs = []
+f_dirs = []
 for directory in os.listdir(processed_corpus_dir):
 	tsv_file =  (processed_corpus_dir + '/' + directory +
 	             '/output/recording.tsv')
@@ -126,15 +179,19 @@ for directory in os.listdir(processed_corpus_dir):
 
 		if directory[0] == 'm':
 			m_data.append(phones.parse(tsv_text, lang=lang))
+			m_dirs.append(directory)
 			m_count += 1
 		if directory[0] == 'f':
 			f_data.append(phones.parse(tsv_text, lang=lang))
+			f_dirs.append(directory)
 			f_count += 1
 
 if len(f_data) > len(m_data):
 	f_data = f_data[0:len(m_data)]
+	f_dirs = f_dirs[0:len(m_data)]
 if len(m_data) > len(f_data):
 	m_data = m_data[0:len(f_data)]
+	m_dirs = m_dirs[0:len(f_data)]
 
 print('lang', lang)
 print('m_count', m_count)
@@ -210,16 +267,24 @@ def _extract_Z(data):
 
 Z_list = []
 labels = []  # 0=m, 1=f
-for data in m_data:
+utt_spk = []  # parallel to Z_list — speaker key for spk-disjoint CV
+for data, dname in zip(m_data, m_dirs):
 	Z = _extract_Z(data)
-	if Z is not None: Z_list.append(Z); labels.append(0)
-for data in f_data:
+	if Z is not None:
+		Z_list.append(Z); labels.append(0)
+		utt_spk.append(_parse_spk(dname) or dname)
+for data, dname in zip(f_data, f_dirs):
 	Z = _extract_Z(data)
-	if Z is not None: Z_list.append(Z); labels.append(1)
+	if Z is not None:
+		Z_list.append(Z); labels.append(1)
+		utt_spk.append(_parse_spk(dname) or dname)
 
 labels = np.asarray(labels, dtype=np.int8)
 n_utts = len(Z_list)
 print(f'n_utts with valid Z: {n_utts} (m={int((labels==0).sum())}, f={int((labels==1).sum())})')
+if args.weights_spk_cv:
+	n_spk = len(set(utt_spk))
+	print(f'spk-CV: {n_spk} unique speakers (avg {n_utts/n_spk:.1f} utt/spk)')
 
 def _score_candidates(W):
 	"""W: (C, 3) → R: (n_utts, C) utt-level meanResonance."""
@@ -253,6 +318,68 @@ def _kfold_acc(R, labels, k, seed):
 		accs[fi] = correct.mean(axis=0)
 	return accs.mean(axis=0), accs.std(axis=0)
 
+
+# voiceya patch: speaker-disjoint k-fold + speaker-level test scoring.
+# Pre-compute utt→spk grouping once; each (fold, candidate) becomes a
+# vectorised aggregate over spk medians.  Used when --weights-spk-cv is set.
+def _build_spk_groups(spk_ids):
+	"""Return (unique_spks, spk_to_utt_idx, spk_label).
+	Assumes all utts of a speaker share one label (true here: dir prefix m/f).
+	"""
+	groups = defaultdict(list)
+	for i, s in enumerate(spk_ids):
+		groups[s].append(i)
+	unique = sorted(groups.keys())
+	spk_to_utt = [np.asarray(groups[s], dtype=int) for s in unique]
+	# label per spk = label of any of its utts
+	spk_label = np.asarray(
+		[int(labels[groups[s][0]]) for s in unique], dtype=np.int8)
+	return unique, spk_to_utt, spk_label
+
+def _kfold_acc_spk(R, labels, k, seed, spk_ids):
+	"""Speaker-disjoint k-fold, speaker-level accuracy.
+
+	Per spk: median over its utt-level meanResonance → spk-level score.
+	Per fold: threshold = median of *train* spk-level scores per candidate.
+	Test acc = fraction of test spks classified correctly at that threshold.
+	"""
+	n = R.shape[0]; C = R.shape[1]
+	unique_spks, spk_to_utt, spk_y = _build_spk_groups(spk_ids)
+	n_spk = len(unique_spks)
+	# Pre-aggregate spk-level scores: (n_spk, C)
+	spk_R = np.empty((n_spk, C), dtype=np.float64)
+	for si, idxs in enumerate(spk_to_utt):
+		spk_R[si] = np.median(R[idxs], axis=0)
+
+	# Shuffle speakers, split into k folds.
+	rng = _random.Random(seed)
+	order = list(range(n_spk)); rng.shuffle(order)
+	spk_folds = np.array_split(np.asarray(order, dtype=int), k)
+
+	accs = np.zeros((k, C), dtype=np.float64)
+	for fi, test_spk_idx in enumerate(spk_folds):
+		if test_spk_idx.size == 0:
+			continue
+		train_mask = np.ones(n_spk, dtype=bool); train_mask[test_spk_idx] = False
+		train_R = spk_R[train_mask]
+		test_R  = spk_R[test_spk_idx]
+		test_y  = spk_y[test_spk_idx]
+		thr = np.median(train_R, axis=0)  # (C,)
+		pred_m = test_R <= thr
+		pred_f = test_R >= thr
+		is_m = (test_y == 0)[:, None]
+		is_f = (test_y == 1)[:, None]
+		correct = (pred_m & is_m) | (pred_f & is_f)
+		accs[fi] = correct.mean(axis=0)
+	return accs.mean(axis=0), accs.std(axis=0)
+
+
+def _eval_kfold(R, labels, k, seed):
+	"""Dispatch to spk-disjoint or utt-level CV based on --weights-spk-cv."""
+	if args.weights_spk_cv:
+		return _kfold_acc_spk(R, labels, k, seed, utt_spk)
+	return _kfold_acc(R, labels, k, seed)
+
 def _gen_simplex(g):
 	"""{(i/g, j/g, k/g) : i+j+k=g, i,j,k>=0}"""
 	W = []
@@ -281,11 +408,20 @@ def _gen_box(center, half_width, steps):
 
 # 2) 粗搜（单纯形均匀）
 g = args.weights_granularity
-print(f'\n[coarse] granularity={g}, candidates={(g+1)*(g+2)//2}')
 W_coarse = _gen_simplex(g)
+# voiceya patch: F2 floor — drop candidates with weights[1] < min_f2.
+# Logged in CHANGELOG_ZH.md v0.2.0 — utt-level CV collapses to F1-only on
+# 5550-utt corpus; floor keeps the search out of the F2≈0 degenerate region.
+if args.weights_min_f2 > 0:
+	keep = W_coarse[:, 1] >= args.weights_min_f2 - 1e-9
+	dropped = int((~keep).sum())
+	W_coarse = W_coarse[keep]
+	print(f'[coarse] F2 floor ≥ {args.weights_min_f2} dropped {dropped} candidates')
+print(f'[coarse] granularity={g}, candidates={len(W_coarse)} '
+      f'({"spk-disjoint" if args.weights_spk_cv else "utt-level"} CV)')
 R_coarse = _score_candidates(W_coarse)
 if args.weights_kfold >= 2:
-	mean_acc, std_acc = _kfold_acc(R_coarse, labels, args.weights_kfold, args.weights_seed)
+	mean_acc, std_acc = _eval_kfold(R_coarse, labels, args.weights_kfold, args.weights_seed)
 	# 选 mean 最大；并列时 std 最小
 	score = mean_acc - 1e-6 * std_acc
 	best = int(np.argmax(score))
@@ -312,12 +448,18 @@ if args.weights_refine:
 	print(f'\n[refine] around {winner_W.tolist()} ±{hw}, steps={steps}, '
 	      f'candidates={N}, chunk={chunk}')
 	best_i = -1; best_mean = -1.0; best_std = 0.0
+	if args.weights_min_f2 > 0:
+		keep = W_fine[:, 1] >= args.weights_min_f2 - 1e-9
+		dropped = int((~keep).sum())
+		W_fine = W_fine[keep]
+		N = len(W_fine)
+		print(f'[refine] F2 floor ≥ {args.weights_min_f2} dropped {dropped} candidates → {N} remain')
 	for start in range(0, N, chunk):
 		end = min(start + chunk, N)
 		W_chunk = W_fine[start:end]
 		R_chunk = _score_candidates(W_chunk)
 		if args.weights_kfold >= 2:
-			m_acc, s_acc = _kfold_acc(R_chunk, labels, args.weights_kfold, args.weights_seed)
+			m_acc, s_acc = _eval_kfold(R_chunk, labels, args.weights_kfold, args.weights_seed)
 		else:
 			thr = np.median(R_chunk, axis=0)
 			m_acc = (((R_chunk <= thr) & (labels == 0)[:, None]) |

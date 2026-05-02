@@ -15,6 +15,14 @@ def _strip_tone(p):
 # Includes syllabic consonants used as nuclei (零韵母): ʐ̩ (zhi/chi/shi/ri), z̩ (zi/ci/si)
 ZH_VOWELS = {'a', 'aj', 'aw', 'e', 'ej', 'i', 'io', 'o', 'ow', 'u', 'y', 'ə', 'ɥ', 'ʐ̩', 'z̩'}
 
+# voiceya patch (2026-04-28): French MFA v3 vowel nuclei.  12 oral + 4 nasal.
+# Semi-vowels (j, w, ɥ) excluded — they're glides, not nuclei.  Nasal vowels
+# use base IPA + combining tilde U+0303 (no precomposed forms exist in Unicode).
+FR_VOWELS = {
+	'a', 'ɑ', 'e', 'ɛ', 'i', 'o', 'ɔ', 'u', 'y', 'ø', 'œ', 'ə',
+	'ɛ̃', 'ɑ̃', 'ɔ̃', 'œ̃',
+}
+
 def compute_resonance(data, weights=[2/5, 2/5, 1/5], lang='en'):
 	assert(abs(sum(weights) - 1) < .01)
 
@@ -40,11 +48,13 @@ def compute_resonance(data, weights=[2/5, 2/5, 1/5], lang='en'):
 				data['phones'][p]['outlier'] = True
 				data['phones'][p]['F'][i] = None
 		
-	stats_file = 'stats_zh.json' if lang == 'zh' else 'stats.json'
+	# voiceya patch: fr added 2026-04-28.  See voiceya/sidecars/README.md.
+	stats_file = {'zh': 'stats_zh.json', 'fr': 'stats_fr.json'}.get(lang, 'stats.json')
 	with open(stats_file) as f:
 		stats = json.loads(f.read())
 
 	for phone in data['phones']:
+		# fr has no tone marks; treat phoneme as-is (same as en path).
 		phoneme_key  = _strip_tone(phone.get('phoneme'))  if lang == 'zh' else phone.get('phoneme')
 		expected_key = _strip_tone(phone.get('expected')) if lang == 'zh' else phone.get('expected')
 		if (not (phoneme_key and expected_key and
@@ -67,6 +77,9 @@ def compute_resonance(data, weights=[2/5, 2/5, 1/5], lang='en'):
 			isVowel = currentPhone['phoneme'] and (
 				_strip_tone(currentPhone['phoneme']) in ZH_VOWELS
 			)
+		elif lang == 'fr':
+			# voiceya patch (2026-04-28): direct IPA membership; no tone strip.
+			isVowel = currentPhone['phoneme'] in FR_VOWELS
 		else:
 			isVowel = currentPhone['phoneme'] and len([
 				value for value in list(currentPhone['phoneme'])

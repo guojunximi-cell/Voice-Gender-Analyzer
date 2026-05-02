@@ -18,29 +18,25 @@ function animateCounter(el, target, suffix = "%", duration = 700) {
 // ─── Compute stats from analysis array ───────────────────────
 function computeStats(analysis) {
 	const totals = {};
-	let total = 0;
 	for (const seg of analysis) {
 		const d = seg.end_time - seg.start_time;
 		totals[seg.label] = (totals[seg.label] || 0) + d;
-		total += d;
 	}
-	return { totals, total };
+	return { totals };
 }
 
 // ─── Stats cards ─────────────────────────────────────────────
 export function renderStats(analysis) {
-	const { totals, total } = computeStats(analysis);
+	const { totals } = computeStats(analysis);
 	const maleDur = totals["male"] || 0;
 	const femaleDur = totals["female"] || 0;
-	const otherDur = total - maleDur - femaleDur;
 
-	const malePct = total ? Math.round((maleDur / total) * 100) : 0;
-	const femalePct = total ? Math.round((femaleDur / total) * 100) : 0;
-	const otherPct = Math.max(0, 100 - malePct - femalePct);
+	const mf = maleDur + femaleDur;
+	const malePct = mf ? Math.round((maleDur / mf) * 100) : 0;
+	const femalePct = mf ? 100 - malePct : 0;
 
 	animateCounter(document.getElementById("male-pct"), malePct);
 	animateCounter(document.getElementById("female-pct"), femalePct);
-	animateCounter(document.getElementById("other-pct"), otherPct);
 
 	const setDur = (id, sec) => {
 		const el = document.getElementById(id);
@@ -48,7 +44,6 @@ export function renderStats(analysis) {
 	};
 	setDur("male-duration", maleDur);
 	setDur("female-duration", femaleDur);
-	setDur("other-duration", otherDur);
 
 	requestAnimationFrame(() => {
 		const setBar = (id, pct) => {
@@ -57,16 +52,11 @@ export function renderStats(analysis) {
 		};
 		setBar("male-bar", malePct);
 		setBar("female-bar", femalePct);
-		setBar("other-bar", otherPct);
 	});
 
-	// Mark dominant voice type for visual emphasis
-	const maxPct = Math.max(malePct, femalePct, otherPct);
-	const domMap = { male: malePct, female: femalePct, other: otherPct };
-	for (const [key, pct] of Object.entries(domMap)) {
-		const el = document.querySelector(`.stat-${key}`);
-		if (el) el.classList.toggle("dominant", pct === maxPct && maxPct > 0);
-	}
+	// Mark dominant voice type
+	document.querySelector(".stat-male")?.classList.toggle("dominant", mf > 0 && malePct >= femalePct);
+	document.querySelector(".stat-female")?.classList.toggle("dominant", mf > 0 && femalePct > malePct);
 
 	const section = document.getElementById("stats-section");
 	if (section) section.hidden = false;
@@ -194,14 +184,13 @@ export function resetResults() {
 	if (statsSection) statsSection.hidden = true;
 	if (segmentsSection) segmentsSection.hidden = true;
 
-	const ids = ["male-pct", "female-pct", "other-pct", "male-duration", "female-duration", "other-duration"];
+	const ids = ["male-pct", "female-pct", "male-duration", "female-duration"];
 	ids.forEach((id) => {
 		const el = document.getElementById(id);
 		if (el) el.textContent = "—";
 	});
 
-	const bars = ["male-bar", "female-bar", "other-bar"];
-	bars.forEach((id) => {
+	["male-bar", "female-bar"].forEach((id) => {
 		const el = document.getElementById(id);
 		if (el) el.style.width = "0%";
 	});

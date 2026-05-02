@@ -9,7 +9,7 @@
  * is null (Engine C disabled or failed), the panel shows a static notice.
  */
 
-import { certaintTag, fmt, LABEL_META } from "../utils.js";
+import { certaintTag, fmt } from "../utils.js";
 import { t } from "./i18n.js";
 
 function animNum(el, target, suffix = "", duration = 600) {
@@ -71,18 +71,6 @@ function _weightedEngineA(analysis) {
 	const label = fDur >= mDur ? "female" : "male";
 	const conf = label === "female" ? fConf / fDur : mConf / mDur;
 	return { label, confidence: Math.min(1, Math.max(0, conf)), speechSec: mDur + fDur };
-}
-
-// ─── Gender spectrum bar ──────────────────────────────────────
-function renderGenderBar(confidence, label) {
-	const thumb = document.getElementById("mc-gender-thumb");
-	if (!thumb) return;
-	const scaledConf = Math.min(confidence, 1);
-	const pct = label === "female" ? 50 + scaledConf * 50 : 50 - scaledConf * 50;
-	requestAnimationFrame(() => {
-		thumb.style.left = `${pct}%`;
-	});
-	thumb.dataset.gender = label;
 }
 
 // ─── Public: render whole-file averages ──────────────────────
@@ -188,11 +176,8 @@ export function renderMetricsPanel(summary, analysis) {
 		});
 	}
 
-	// ── Duration-weighted Engine A bar ──────────────────────
+	// ── Duration-weighted Engine A summary ──────────────────
 	const weighted = _weightedEngineA(analysis);
-	if (weighted) {
-		renderGenderBar(weighted.confidence, weighted.label);
-	}
 
 	// ── Header label: overall speech duration ───────────────
 	const headerLabel = document.getElementById("mc-segment-label");
@@ -221,4 +206,44 @@ export function clearMetricsPanel() {
 	if (content) content.hidden = true;
 	const warnEl = document.getElementById("mc-align-warning");
 	if (warnEl) warnEl.hidden = true;
+	clearAdvicePanel();
+}
+
+// ─── Advice v2 panel ─────────────────────────────────────────
+// Renders summary.advice as a gating warning. The summary text is
+// suppressed because the F0 card + advice panels already convey the
+// same numbers and tendency.
+// See docs/plans/v2_redesign_measurement.md §1, §3.
+export function renderAdvicePanel(advice) {
+	const panel = document.getElementById("advice-panel");
+	if (!panel) return;
+	if (!advice) {
+		panel.hidden = true;
+		return;
+	}
+
+	const warnEl = document.getElementById("advice-warning");
+	const warnText = document.getElementById("advice-warning-text");
+	const firstWarn = advice.warnings?.[0];
+	if (warnEl && warnText && firstWarn) {
+		warnText.textContent = t(firstWarn.key, firstWarn.params || {});
+		warnEl.hidden = false;
+		const closeBtn = document.getElementById("advice-warning-close");
+		if (closeBtn && !closeBtn.dataset.bound) {
+			closeBtn.dataset.bound = "1";
+			closeBtn.addEventListener("click", () => {
+				warnEl.hidden = true;
+				panel.hidden = true;
+			});
+		}
+	} else if (warnEl) {
+		warnEl.hidden = true;
+	}
+
+	panel.hidden = !firstWarn;
+}
+
+export function clearAdvicePanel() {
+	const panel = document.getElementById("advice-panel");
+	if (panel) panel.hidden = true;
 }

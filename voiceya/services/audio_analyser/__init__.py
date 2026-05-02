@@ -10,6 +10,7 @@ import numpy as np
 from fastapi import HTTPException
 
 from voiceya.config import CFG
+from voiceya.services.audio_analyser.advice_v2 import compute_advice
 from voiceya.services.audio_analyser.audio_gate import audio_gate
 from voiceya.services.audio_analyser.audio_tools import normalize_audio_for_analysis
 from voiceya.services.audio_analyser.engine_a import do_segmentation
@@ -32,7 +33,7 @@ async def do_analyse(
     *,
     mode: Literal["free", "script"] = "free",
     script: str | None = None,
-    language: Literal["zh-CN", "en-US"] = "zh-CN",
+    language: Literal["zh-CN", "en-US", "fr-FR"] = "zh-CN",
 ):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     sample = await normalize_audio_for_analysis(content, publish)
@@ -113,13 +114,25 @@ async def do_analyse(
     result = do_statics(analyse_results)
     summary = result["summary"]
     summary["engine_c"] = engine_c_summary
+
+    duration_sec = float(len(y_full)) / float(sr_full) if sr_full else 0.0
+    summary["advice"] = compute_advice(
+        y_full,
+        int(sr_full),
+        analyse_results,
+        duration_sec,
+        summary.get("dominant_label"),
+        weighted_margin=summary.get("dominant_confidence", 0.0),
+    )
+
     logger.info(
-        "分析完成 — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.3f，Engine C=%s",
+        "分析完成 — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.3f，Engine C=%s，advice tier=%s",
         len(analyse_results),
         summary["overall_f0_median_hz"],
         summary["overall_gender_score"],
         summary["female_ratio"],
         "on" if engine_c_summary else "off/skip",
+        summary["advice"]["gating_tier"],
     )
 
     result["filename"] = "upload"
