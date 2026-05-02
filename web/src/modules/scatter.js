@@ -67,8 +67,8 @@ let _transitionStart = null;
 let _transitionFrom = null;
 let _transitionTo = null;
 
-// Tooltip (time mode only): cached element + hover-debounce timer + pending
-// id so a fast mouse-flick across dots doesn't show the wrong tooltip.
+// Tooltip (both modes): cached element + hover-debounce timer + pending
+// id so a fast mouse-flick across dots/strips doesn't show the wrong tooltip.
 const TOOLTIP_DELAY_MS = 240;
 let _tooltipEl = null;
 let _hoverTimer = null;
@@ -667,21 +667,21 @@ function _handleHover(e) {
 		canvas.style.cursor = newHovered ? "pointer" : "default";
 		_draw();
 	}
-	if (getScatterMode() === "time" && hit) {
+	if (hit) {
 		_scheduleTooltip(hit);
 	} else {
 		_hideTooltip();
 	}
 }
 
-// ─── Tooltip (time mode) ──────────────────────────────────────
+// ─── Tooltip (both modes) ─────────────────────────────────────
 function _scheduleTooltip(session) {
 	if (_pendingTooltipId === session.id) return;
 	_pendingTooltipId = session.id;
 	if (_hoverTimer) clearTimeout(_hoverTimer);
 	_hoverTimer = setTimeout(() => {
 		_hoverTimer = null;
-		if (_pendingTooltipId === session.id && getScatterMode() === "time") {
+		if (_pendingTooltipId === session.id) {
 			_showTooltip(session);
 		}
 	}, TOOLTIP_DELAY_MS);
@@ -696,9 +696,8 @@ function _hideTooltip() {
 
 function _showTooltip(session) {
 	if (!_tooltipEl || !canvas?.parentElement) return;
-	const { dots } = _layoutTime();
-	const dot = dots.get(session.id);
-	if (!dot) return;
+	const anchor = _tooltipAnchor(session);
+	if (!anchor) return;
 
 	// `getLang()` already returns BCP 47 ("zh-CN" / "en-US" / "fr-FR"), pass straight in.
 	const fmt = new Intl.DateTimeFormat(getLang(), {
@@ -709,11 +708,9 @@ function _showTooltip(session) {
 		minute: "2-digit",
 	});
 	const dateStr = session.createdAt ? fmt.format(new Date(session.createdAt)) : "";
-	const score = Math.round(_getScore(session));
 
 	_tooltipEl.querySelector(".scatter-tooltip-time").textContent = dateStr;
 	_tooltipEl.querySelector(".scatter-tooltip-name").textContent = session.filename ?? "";
-	_tooltipEl.querySelector(".scatter-tooltip-score").textContent = t("scatter.tooltip.scoreFmt", { n: score });
 
 	// Make visible (offscreen) so we can measure, then position.
 	_tooltipEl.style.left = "0px";
@@ -724,15 +721,26 @@ function _showTooltip(session) {
 	const ttW = _tooltipEl.offsetWidth;
 	const ttH = _tooltipEl.offsetHeight;
 
-	let left = dot.x + 8;
-	let top = dot.y - ttH - 8;
-	if (left + ttW > wrapW - 4) left = dot.x - ttW - 8;
+	let left = anchor.x + 8;
+	let top = anchor.y - ttH - 8;
+	if (left + ttW > wrapW - 4) left = anchor.x - ttW - 8;
 	if (left < 4) left = 4;
-	if (top < 4) top = dot.y + 8;
+	if (top < 4) top = anchor.y + 8;
 	if (top + ttH > wrapH - 4) top = wrapH - ttH - 4;
 
 	_tooltipEl.style.left = `${left}px`;
 	_tooltipEl.style.top = `${top}px`;
+}
+
+/** Anchor point for the tooltip in the active mode: dot center in time mode,
+ *  segment center in score mode. */
+function _tooltipAnchor(session) {
+	if (getScatterMode() === "time") {
+		const dot = _layoutTime().dots.get(session.id);
+		return dot ? { x: dot.x, y: dot.y } : null;
+	}
+	const seg = _layoutScore().segments.get(session.id);
+	return seg ? { x: seg.x + seg.w / 2, y: seg.y } : null;
 }
 
 // ─── Resize ───────────────────────────────────────────────────

@@ -177,6 +177,54 @@ body {
 	gap: 4px;
 }
 
+.lang-picker {
+	position: relative;
+	display: inline-flex;
+}
+.lang-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: 0;
+	min-width: 132px;
+	background: var(--surface);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	box-shadow: var(--shadow-md);
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	z-index: 50;
+}
+.lang-menu[hidden] {
+	display: none;
+}
+.lang-menu-item {
+	background: none;
+	border: none;
+	border-radius: var(--radius-sm);
+	padding: 6px 10px;
+	font: inherit;
+	font-size: 0.85rem;
+	color: var(--text-secondary);
+	text-align: left;
+	cursor: pointer;
+	transition:
+		background var(--transition),
+		color var(--transition);
+}
+.lang-menu-item:hover,
+.lang-menu-item:focus-visible {
+	background: var(--surface-hover);
+	color: var(--text-primary);
+	outline: none;
+}
+.lang-menu-item.is-active {
+	color: var(--text-primary);
+	font-weight: 600;
+	background: var(--surface-hover);
+}
+
 /* ============================================================
    MAIN LAYOUT
    ============================================================ */
@@ -653,10 +701,10 @@ body {
 	opacity: 1;
 }
 
-/* History scatter tooltip (time-mode only).  Shares the waveform tooltip's
+/* History scatter tooltip (both modes).  Shares the waveform tooltip's
    look-and-feel — surface bg, soft shadow, fade-in — but is positioned via
    explicit pixel left/top so it can flip horizontally / vertically when the
-   target dot is near the panel edge.  Hidden by default. */
+   target dot/strip is near the panel edge.  Hidden by default. */
 .scatter-tooltip {
 	position: absolute;
 	left: 0;
@@ -691,9 +739,6 @@ body {
 .scatter-tooltip-name {
 	color: var(--text-primary);
 	font-weight: 500;
-}
-.scatter-tooltip-score {
-	color: var(--text-secondary);
 }
 
 .waveform-loading {

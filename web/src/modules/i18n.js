@@ -31,6 +31,9 @@ const DICT = {
 		"header.langShort.zh": "中",
 		"header.langShort.en": "EN",
 		"header.langShort.fr": "FR",
+		"header.langName.zh": "中文",
+		"header.langName.en": "English",
+		"header.langName.fr": "Français",
 
 		"panel.history": "历史分析",
 		"panel.metrics": "综合声学特征",
@@ -47,7 +50,6 @@ const DICT = {
 		"scatter.tick.daysAgoFmt": "{n}天",
 		"scatter.tick.weekAgo": "1周",
 		"scatter.tick.monthAgo": "1月",
-		"scatter.tooltip.scoreFmt": "分数 {n}%",
 
 		"action.delete": "删除此记录",
 		"action.clear": "清空历史",
@@ -188,6 +190,10 @@ const DICT = {
 		"timeline.ariaResonanceDesc": "当前页的共鸣热力带；女声阈值 = 0.587",
 		"timeline.announceReady": "分析完成，共 {n} 个字",
 		"timeline.returnToCurrent": "回到当前",
+		"timeline.barModePhone": "音素",
+		"timeline.barModeWord": "整词平均",
+		"timeline.barModeAria": "切换条形显示粒度：每音素一格 / 整词时长加权平均",
+		"timeline.wordAvgLabel": "整词平均",
 
 		"fallback.noTimelineTitle": "无法生成逐字时间轴",
 		"fallback.noTimelineLead": "我们已经识别到音频，但未能完成逐字对齐分析。",
@@ -399,6 +405,9 @@ const DICT = {
 		"header.langShort.zh": "中",
 		"header.langShort.en": "EN",
 		"header.langShort.fr": "FR",
+		"header.langName.zh": "中文",
+		"header.langName.en": "English",
+		"header.langName.fr": "Français",
 
 		"panel.history": "Past sessions",
 		"panel.metrics": "Acoustic summary",
@@ -415,7 +424,6 @@ const DICT = {
 		"scatter.tick.daysAgoFmt": "{n}d",
 		"scatter.tick.weekAgo": "1w",
 		"scatter.tick.monthAgo": "1mo",
-		"scatter.tooltip.scoreFmt": "Score {n}%",
 
 		"action.delete": "Remove this session",
 		"action.clear": "Clear history",
@@ -561,6 +569,10 @@ const DICT = {
 		"timeline.ariaResonanceDesc": "Resonance heatmap for the current page. Palette midline = 0.5.",
 		"timeline.announceReady": "Analysis complete, {n} characters shown",
 		"timeline.returnToCurrent": "Jump to now",
+		"timeline.barModePhone": "Phones",
+		"timeline.barModeWord": "Word avg",
+		"timeline.barModeAria": "Bar granularity: one rect per phone / one rect per word (duration-weighted average)",
+		"timeline.wordAvgLabel": "word avg",
 
 		"fallback.noTimelineTitle": "Couldn't build the phone-level timeline",
 		"fallback.noTimelineLead": "We received the audio but couldn't finish phone-level alignment.",
@@ -625,10 +637,8 @@ const DICT = {
 		"advice.summary.mid_lower_not_clearly_leaning": "F0 median {f0} Hz, mid-low range. Not clearly leaning.",
 		"advice.summary.mid_neutral_leans_feminine": "F0 median {f0} Hz, acoustically neutral range. Leans feminine.",
 		"advice.summary.mid_neutral_leans_masculine": "F0 median {f0} Hz, acoustically neutral range. Leans masculine.",
-		"advice.summary.mid_neutral_weakly_feminine":
-			"F0 median {f0} Hz, acoustically neutral range. Slightly feminine.",
-		"advice.summary.mid_neutral_weakly_masculine":
-			"F0 median {f0} Hz, acoustically neutral range. Slightly masculine.",
+		"advice.summary.mid_neutral_weakly_feminine": "F0 median {f0} Hz, acoustically neutral range. Slightly feminine.",
+		"advice.summary.mid_neutral_weakly_masculine": "F0 median {f0} Hz, acoustically neutral range. Slightly masculine.",
 		"advice.summary.mid_neutral_not_clearly_leaning":
 			"F0 median {f0} Hz, acoustically neutral range. Not clearly leaning.",
 		"advice.summary.mid_upper_leans_feminine": "F0 median {f0} Hz, mid-high range. Leans feminine.",
@@ -781,6 +791,9 @@ const DICT = {
 		"header.langShort.zh": "中",
 		"header.langShort.en": "EN",
 		"header.langShort.fr": "FR",
+		"header.langName.zh": "中文",
+		"header.langName.en": "English",
+		"header.langName.fr": "Français",
 
 		"panel.history": "Sessions précédentes",
 		"panel.metrics": "Récapitulatif acoustique",
@@ -797,7 +810,6 @@ const DICT = {
 		"scatter.tick.daysAgoFmt": "{n} j",
 		"scatter.tick.weekAgo": "1 sem.",
 		"scatter.tick.monthAgo": "1 mois",
-		"scatter.tooltip.scoreFmt": "Score {n} %",
 
 		"action.delete": "Supprimer cette session",
 		"action.clear": "Vider l'historique",
@@ -945,6 +957,11 @@ const DICT = {
 		"timeline.ariaResonanceDesc": "Carte thermique de résonance pour la page courante. Médiane palette = 0,5.",
 		"timeline.announceReady": "Analyse terminée, {n} caractères affichés",
 		"timeline.returnToCurrent": "Revenir au moment présent",
+		"timeline.barModePhone": "Phonèmes",
+		"timeline.barModeWord": "Moyenne mot",
+		"timeline.barModeAria":
+			"Granularité des barres : un rect par phonème / un rect par mot (moyenne pondérée par durée)",
+		"timeline.wordAvgLabel": "moy. mot",
 
 		"fallback.noTimelineTitle": "Impossible de construire la timeline phonème par phonème",
 		"fallback.noTimelineLead": "L'audio a été reçu mais l'alignement phonème n'a pas pu aboutir.",
@@ -984,6 +1001,8 @@ const DICT = {
 		// Advice v2 — voir docs/plans/v2_redesign_measurement.md
 		"advice.tone.leans_feminine": "Tendance féminine",
 		"advice.tone.leans_masculine": "Tendance masculine",
+		"advice.tone.weakly_feminine": "Légèrement féminine",
+		"advice.tone.weakly_masculine": "Légèrement masculine",
 		"advice.tone.not_clearly_leaning": "Tendance peu marquée",
 		"advice.zone.low": "Basse",
 		"advice.zone.mid_lower": "Médium-bas",
@@ -997,20 +1016,32 @@ const DICT = {
 		"advice.warning.dismiss": "Masquer l'avertissement",
 		"advice.summary.low_leans_feminine": "F0 médiane {f0} Hz, plage basse. Tendance féminine.",
 		"advice.summary.low_leans_masculine": "F0 médiane {f0} Hz, plage basse. Tendance masculine.",
+		"advice.summary.low_weakly_feminine": "F0 médiane {f0} Hz, plage basse. Légèrement féminine.",
+		"advice.summary.low_weakly_masculine": "F0 médiane {f0} Hz, plage basse. Légèrement masculine.",
 		"advice.summary.low_not_clearly_leaning": "F0 médiane {f0} Hz, plage basse. Tendance peu marquée.",
 		"advice.summary.mid_lower_leans_feminine": "F0 médiane {f0} Hz, plage médium-basse. Tendance féminine.",
 		"advice.summary.mid_lower_leans_masculine": "F0 médiane {f0} Hz, plage médium-basse. Tendance masculine.",
+		"advice.summary.mid_lower_weakly_feminine": "F0 médiane {f0} Hz, plage médium-basse. Légèrement féminine.",
+		"advice.summary.mid_lower_weakly_masculine": "F0 médiane {f0} Hz, plage médium-basse. Légèrement masculine.",
 		"advice.summary.mid_lower_not_clearly_leaning": "F0 médiane {f0} Hz, plage médium-basse. Tendance peu marquée.",
 		"advice.summary.mid_neutral_leans_feminine": "F0 médiane {f0} Hz, plage acoustiquement neutre. Tendance féminine.",
 		"advice.summary.mid_neutral_leans_masculine":
 			"F0 médiane {f0} Hz, plage acoustiquement neutre. Tendance masculine.",
+		"advice.summary.mid_neutral_weakly_feminine":
+			"F0 médiane {f0} Hz, plage acoustiquement neutre. Légèrement féminine.",
+		"advice.summary.mid_neutral_weakly_masculine":
+			"F0 médiane {f0} Hz, plage acoustiquement neutre. Légèrement masculine.",
 		"advice.summary.mid_neutral_not_clearly_leaning":
 			"F0 médiane {f0} Hz, plage acoustiquement neutre. Tendance peu marquée.",
 		"advice.summary.mid_upper_leans_feminine": "F0 médiane {f0} Hz, plage médium-haute. Tendance féminine.",
 		"advice.summary.mid_upper_leans_masculine": "F0 médiane {f0} Hz, plage médium-haute. Tendance masculine.",
+		"advice.summary.mid_upper_weakly_feminine": "F0 médiane {f0} Hz, plage médium-haute. Légèrement féminine.",
+		"advice.summary.mid_upper_weakly_masculine": "F0 médiane {f0} Hz, plage médium-haute. Légèrement masculine.",
 		"advice.summary.mid_upper_not_clearly_leaning": "F0 médiane {f0} Hz, plage médium-haute. Tendance peu marquée.",
 		"advice.summary.high_leans_feminine": "F0 médiane {f0} Hz, plage haute. Tendance féminine.",
 		"advice.summary.high_leans_masculine": "F0 médiane {f0} Hz, plage haute. Tendance masculine.",
+		"advice.summary.high_weakly_feminine": "F0 médiane {f0} Hz, plage haute. Légèrement féminine.",
+		"advice.summary.high_weakly_masculine": "F0 médiane {f0} Hz, plage haute. Légèrement masculine.",
 		"advice.summary.high_not_clearly_leaning": "F0 médiane {f0} Hz, plage haute. Tendance peu marquée.",
 
 		"duck.msg1": "Le canard écoute la voix…",

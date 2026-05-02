@@ -1302,30 +1302,72 @@ async function initScatterFromStorage() {
 // ─── Language toggle ──────────────────────────────────────────
 // 顶部按钮既切 UI 又切管线：同一语言决定 DICT、示例稿件库以及 POST
 // /api/analyze-voice 的 `language` 字段（见 analyzer.js）。
-// 三态轮转：zh-CN → en-US → fr-FR → zh-CN。按钮 label 显示「下一个」语言的短名。
+// 点击按钮打开菜单，菜单内三选一。按钮 label 显示「当前」语言短名。
 // keep in sync with SUPPORTED in i18n.js
-const _LANG_ORDER = ["zh-CN", "en-US", "fr-FR"];
 const _LANG_SHORT_KEY = {
 	"zh-CN": "header.langShort.zh",
 	"en-US": "header.langShort.en",
 	"fr-FR": "header.langShort.fr",
 };
-function _nextLang(cur) {
-	const i = _LANG_ORDER.indexOf(cur);
-	return _LANG_ORDER[(i + 1) % _LANG_ORDER.length];
-}
 function _updateLangToggleLabel() {
 	const lbl = $("lang-toggle-label");
 	if (!lbl) return;
-	lbl.textContent = t(_LANG_SHORT_KEY[_nextLang(getLang())]);
+	lbl.textContent = t(_LANG_SHORT_KEY[getLang()]);
+}
+function _updateLangMenuActive() {
+	const menu = $("lang-menu");
+	if (!menu) return;
+	const cur = getLang();
+	menu.querySelectorAll(".lang-menu-item").forEach((btn) => {
+		const active = btn.dataset.lang === cur;
+		btn.classList.toggle("is-active", active);
+		if (active) btn.setAttribute("aria-current", "true");
+		else btn.removeAttribute("aria-current");
+	});
+}
+function _setLangMenuOpen(open) {
+	const btn = $("lang-toggle");
+	const menu = $("lang-menu");
+	if (!btn || !menu) return;
+	btn.setAttribute("aria-expanded", open ? "true" : "false");
+	menu.setAttribute("aria-hidden", open ? "false" : "true");
+	menu.hidden = !open;
+}
+function _isLangMenuOpen() {
+	return $("lang-toggle")?.getAttribute("aria-expanded") === "true";
 }
 
-$("lang-toggle")?.addEventListener("click", () => {
-	setLang(_nextLang(getLang()));
+$("lang-toggle")?.addEventListener("click", (e) => {
+	e.stopPropagation();
+	_setLangMenuOpen(!_isLangMenuOpen());
+});
+$("lang-menu")?.addEventListener("click", (e) => {
+	const item = e.target.closest(".lang-menu-item");
+	if (!item) return;
+	const code = item.dataset.lang;
+	_setLangMenuOpen(false);
+	if (code && code !== getLang()) {
+		setLang(code);
+		location.reload();
+		return;
+	}
+	$("lang-toggle")?.focus();
+});
+document.addEventListener("click", (e) => {
+	if (!_isLangMenuOpen()) return;
+	if (e.target.closest("#lang-picker")) return;
+	_setLangMenuOpen(false);
+});
+document.addEventListener("keydown", (e) => {
+	if (e.key === "Escape" && _isLangMenuOpen()) {
+		_setLangMenuOpen(false);
+		$("lang-toggle")?.focus();
+	}
 });
 
 onLangChange(() => {
 	_updateLangToggleLabel();
+	_updateLangMenuActive();
 	_updateClassifyModeSwitcher();
 	// 切语言后重刷依赖 t() 的动态区块：分段置信度、整段卡片、占比条。
 	// analysisData 非空说明已经跑过一次（或从历史还原 / 导入）——都可以安全重绘。
@@ -1339,6 +1381,7 @@ onLangChange(() => {
 initTheme();
 applyStaticDom();
 _updateLangToggleLabel();
+_updateLangMenuActive();
 setPhase("idle");
 _initInputMethodTabs();
 _initClassifyModeSwitcher();
