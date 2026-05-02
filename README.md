@@ -127,8 +127,6 @@ For the full training protocol see [`voiceya/sidecars/visualizer-backend/CHANGEL
 
 ### Frontend libraries
 
-[Vite](https://vitejs.dev/) · [WaveSurfer.js](https://wavesurfer.xyz/) · [uPlot](https://github.com/leeoniya/uPlot)
-
-## License & Disclaimer
+Source code is released under **MPL-2.0**. See [`LICENSE`](./LICENSE).
 
 See [`LICENSE`](./LICENSE).
