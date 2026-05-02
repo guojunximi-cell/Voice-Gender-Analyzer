@@ -57,18 +57,38 @@ _ZONES_ZH: tuple[tuple[str, float | None], ...] = (
     ("at_ceiling", None),
 )
 
-# Same boundaries for fr because we don't have a separate fr cis-population
-# baseline yet.  Empirically fr post-adaptive-ceiling sits in roughly the
-# same dynamic range as zh post-Phase-B (median F ≈ 0.67, gender gap ≈ 0.35
-# — Phase A fr vga.json check, 2026-05-01).  Re-anchor when an fr audit
-# corpus is available.
-_ZONES_FR = _ZONES_ZH
+# fr-specific anchoring from tests/reports/fr_resonance_baseline_2026-05-01.md
+# (50 F + 50 M speakers from Common Voice fr v17 train, adaptive ceiling on,
+# stats_fr.json @ 5000 baseline).  Snapshot:
+#
+#   sex  n   P5     P25    P50    P75    P95    mean
+#   F    50  0.420  0.580  0.669  0.795  0.943  0.679
+#   M    50  0.185  0.279  0.327  0.421  0.597  0.363
+#
+# Notably tighter than zh: F P95 = 0.943 (not saturated), so we use it
+# directly as the ``leans_female / clearly_female`` boundary instead of the
+# 0.98 cap zh needs.  fr has only 2 % F-saturation post-adaptive — the
+# clamp pressure that bothered zh-post-Phase-B (8 %) is mostly absent.
+_FR_F_P5 = 0.420
+_FR_F_P25 = 0.580
+_FR_F_P75 = 0.795
+_FR_F_P95 = 0.943
 
-# en: stats.json hasn't been re-trained at 5500 Hz, so the raw score
-# distribution still reflects the pre-Phase-B regime (slightly tighter
-# bunching at the top).  We classify anyway so the UI gets *some* zone
-# label, but the boundaries are imported as-is from zh — accept the
-# minor mis-calibration until en gets its own baseline.
+_ZONES_FR: tuple[tuple[str, float | None], ...] = (
+    ("clearly_below_female", _FR_F_P5),
+    ("leans_male", _FR_F_P25),
+    ("mid_neutral", _FR_F_P75),
+    ("leans_female", _FR_F_P95),
+    ("at_ceiling", None),
+)
+
+# en: stats.json hasn't been re-trained at 5500 Hz and en isn't yet in
+# `_ADAPTIVE_LANGS` (sidecar pins the legacy 5000 ceiling).  We classify
+# anyway so the UI gets *some* zone label, but the boundaries are imported
+# as-is from zh — accept the minor mis-calibration until en gets its own
+# baseline.  Open question: en may want a wider ``mid_neutral`` band
+# because its raw distribution is tighter (per the README "median 0.49 /
+# 0.89, gap +0.40" empirical note from earlier 5m+5f regression).
 _ZONES_EN = _ZONES_ZH
 
 

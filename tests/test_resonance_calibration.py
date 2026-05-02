@@ -37,7 +37,9 @@ def test_classify_zone_boundary_zh():
 
 
 def test_classify_zone_lang_aliases():
-    # BCP-47 ↔ short codes both routed; fr/en currently share the zh table.
+    # BCP-47 ↔ short codes both routed.  zh has its own anchored table
+    # (Phase B / 2026-05-01 baseline); fr has its own anchored table
+    # (audit_resonance_fr.py / 2026-05-01 baseline); en still inherits zh.
     for lang in ("zh-CN", "zh", "Zh-CN", "ZH"):
         assert resonance_calibration.classify_zone(0.7, lang) == "mid_neutral"
     for lang in ("fr-FR", "fr"):
@@ -46,6 +48,24 @@ def test_classify_zone_lang_aliases():
         assert resonance_calibration.classify_zone(0.7, lang) == "mid_neutral"
     # Unknown lang falls back to zh defaults — fail-safe for new locales.
     assert resonance_calibration.classify_zone(0.7, "xx-XX") == "mid_neutral"
+
+
+def test_classify_zone_fr_specific_boundaries():
+    # fr boundaries from tests/reports/fr_resonance_baseline_2026-05-01.md:
+    # < 0.420 / 0.580 / 0.795 / 0.943.  These differ from zh enough to
+    # produce visible misclassification at the corners — pin the diff.
+    assert resonance_calibration.classify_zone(0.419, "fr") == "clearly_below_female"
+    assert resonance_calibration.classify_zone(0.420, "fr") == "leans_male"
+    assert resonance_calibration.classify_zone(0.579, "fr") == "leans_male"
+    assert resonance_calibration.classify_zone(0.580, "fr") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.794, "fr") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.795, "fr") == "leans_female"
+    assert resonance_calibration.classify_zone(0.942, "fr") == "leans_female"
+    assert resonance_calibration.classify_zone(0.943, "fr") == "at_ceiling"
+    # Cross-check: a value that's "mid_neutral" in zh but "at_ceiling" in fr
+    # — proves the tables aren't aliased.
+    assert resonance_calibration.classify_zone(0.95, "zh") == "leans_female"
+    assert resonance_calibration.classify_zone(0.95, "fr") == "at_ceiling"
 
 
 def test_classify_zone_none_inputs():
@@ -91,13 +111,49 @@ def _phone(phone: str, *, z=(0.0, 0.0, 0.0), F=(400.0, 1500.0, 2500.0)) -> dict:
     }
 
 
-def test_aggregate_empty_and_en_noop():
+def test_aggregate_empty_and_unknown_lang_noop():
     assert engine_c._aggregate_per_vowel([], "zh") == []
-    # en intentionally returns [] until stats.json is re-trained — see
-    # _aggregate_per_vowel docstring for the rationale.
-    assert engine_c._aggregate_per_vowel([_phone("AA", z=(0.1, 0.2, 0.3))], "en") == []
-    # Unknown lang short → no-op (only zh / fr supported today).
+    # Unknown lang short → no-op (only zh / fr / en supported).
     assert engine_c._aggregate_per_vowel([_phone("a")], "xx") == []
+    # Sub-MIN_TOKENS samples drop out per language.
+    assert engine_c._aggregate_per_vowel([_phone("AA1", z=(0.1, 0.2, 0.3))], "en") == []
+    assert engine_c._aggregate_per_vowel([_phone("a", z=(0.1, 0.2, 0.3))], "fr") == []
+
+
+def test_aggregate_en_strips_stress_digits():
+    # en sidecar emits ARPABET phones with stress digits (IY1 / IY2 / IY0
+    # all = /i/ at different word positions).  After stripping the digit
+    # they bucket into a single ``IY`` row.
+    phones = [
+        _phone("IY1", z=(-0.1, +0.5, +0.2), F=(380.0, 2500.0, 3100.0)),
+        _phone("IY2", z=(-0.2, +0.4, +0.1), F=(375.0, 2480.0, 3050.0)),
+        _phone("IY0", z=(-0.05, +0.6, +0.3), F=(390.0, 2550.0, 3120.0)),
+        # Different stressed variant of /a/ (AA0/AA1) — must merge.
+        _phone("AA1", z=(+0.4, +0.1, -0.2), F=(900.0, 1130.0, 2900.0)),
+        _phone("AA0", z=(+0.5, +0.2, -0.1), F=(920.0, 1150.0, 2950.0)),
+        _phone("AA2", z=(+0.3, 0.0, -0.3), F=(880.0, 1100.0, 2870.0)),
+        # Consonants (no AEIOUY base, no stress digit) must be skipped.
+        _phone("S", z=(0.1, 0.2, 0.3)),
+        _phone("T", z=(0.0, 0.0, 0.0)),
+    ]
+    out = engine_c._aggregate_per_vowel(phones, "en")
+    by_vowel = {r["vowel"]: r for r in out}
+    assert set(by_vowel) == {"IY", "AA"}, f"got vowels {set(by_vowel)}"
+    assert by_vowel["IY"]["n"] == 3
+    assert by_vowel["IY"]["z_F2_med"] == 0.5  # median of {0.5, 0.4, 0.6}
+    assert by_vowel["IY"]["F1_med_hz"] == 380
+    assert by_vowel["AA"]["F1_med_hz"] == 900
+
+
+def test_aggregate_en_drops_non_arpabet_vowels():
+    # IPA-style ``i`` shouldn't accidentally bucket as ``IY`` (lowercase /
+    # mismatch).  Same for fr-only nasal ``ɛ̃`` arriving on en path —
+    # shouldn't appear in en output even with valid F-values.
+    phones = [_phone("i", z=(0, 0, 0)) for _ in range(5)] + [
+        _phone("ɛ̃", z=(0, 0, 0)) for _ in range(5)
+    ]
+    out = engine_c._aggregate_per_vowel(phones, "en")
+    assert out == [], f"en path must reject non-ARPABET phones, got {out}"
 
 
 def test_aggregate_zh_strips_tones_and_buckets():

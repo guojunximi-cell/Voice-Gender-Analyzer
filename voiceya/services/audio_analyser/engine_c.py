@@ -48,9 +48,8 @@ _TONE_RE = re.compile(r"[\u02e5-\u02e9]+")
 
 # Vowel inventories per language \u2014 must match the vendored
 # acousticgender/library/resonance.py {ZH,FR}_VOWELS.  Worker-side copy here
-# because resonance.py only runs in the sidecar process.  English keeps the
-# vendored heuristic ("any phone token containing AEIOUY") because cmudict
-# uses ARPABET phones (AA, IY, EH, etc.) that don't fit a flat set cleanly.
+# because resonance.py only runs in the sidecar process.  en uses ARPABET
+# (cmudict / english_us_arpa) \u2014 see _EN_VOWELS + _ARPABET_STRESS_RE below.
 _ZH_VOWELS: frozenset[str] = frozenset(
     {
         "a",
@@ -90,6 +89,32 @@ _FR_VOWELS: frozenset[str] = frozenset(
         "\u0153\u0303",
     }
 )
+# ARPABET vowel base classes (cmudict / english_us_arpa).  The MFA sidecar
+# emits stress-digited variants like ``IY1`` / ``AH0`` / ``EH2`` \u2014 strip the
+# trailing 0/1/2 before set membership.  No tone diacritics; en is single
+# accent (cmudict General American).
+_EN_VOWELS: frozenset[str] = frozenset(
+    {
+        "AA",
+        "AE",
+        "AH",
+        "AO",
+        "AW",
+        "AY",
+        "EH",
+        "ER",
+        "EY",
+        "IH",
+        "IY",
+        "OW",
+        "OY",
+        "UH",
+        "UW",
+    }
+)
+# ARPABET stress-digit suffix.  ``IY1.rstrip("012") == "IY"`` would do, but a
+# regex makes the intent explicit and matches scripts/audit_resonance_en.py.
+_ARPABET_STRESS_RE = re.compile(r"[012]$")
 # Per-vowel guidance is suppressed below this many tokens \u2014 single-digit
 # samples make medians too noisy to act on (one mis-aligned phone can swing
 # z_F2_med by 0.5 \u03c3).  Picked to roughly match the sidecar's >2 \u03c3 outlier
@@ -438,18 +463,30 @@ def _aggregate_per_vowel(
     most-spoken vowel classes first.  Vowels with fewer than
     ``_PER_VOWEL_MIN_TOKENS`` tokens are dropped (medians too noisy).
 
-    en is intentionally a no-op for now: its ARPABET phone inventory and
-    pre-Phase-B stats.json calibration mean per-vowel medians wouldn't be
-    interpretable next to fr / zh.  Returns ``[]`` for en.
+    en uses ARPABET phone labels with stress digits (``IY1``, ``AH0``); the
+    digits are stripped before bucketing so all stress variants of a vowel
+    aggregate together.  stats.json's calibration is still 5000 Hz baseline
+    (en isn't in `_ADAPTIVE_LANGS` as of 2026-05-01) but the F_stdevs values
+    the sidecar attaches per-phone are computed against that same baseline,
+    so the per-vowel z-scores are internally consistent — they just live in
+    a slightly different overall distribution than zh / fr.
     """
-    if not phones or lang_short not in ("zh", "fr"):
+    if not phones or lang_short not in ("zh", "fr", "en"):
         return []
-    vowel_set = _ZH_VOWELS if lang_short == "zh" else _FR_VOWELS
+    if lang_short == "zh":
+        vowel_set = _ZH_VOWELS
+        normalize = _TONE_RE.sub
+    elif lang_short == "fr":
+        vowel_set = _FR_VOWELS
+        normalize = lambda _r, p: p  # noqa: E731 — short identity for the dispatcher  # type: ignore[assignment]
+    else:  # en
+        vowel_set = _EN_VOWELS
+        normalize = _ARPABET_STRESS_RE.sub  # type: ignore[assignment]
 
     buckets: dict[str, dict[str, list[float]]] = {}
     for p in phones:
         raw_label = p.get("phone") or ""
-        label = _TONE_RE.sub("", raw_label) if lang_short == "zh" else raw_label
+        label = normalize("", raw_label) if lang_short in ("zh", "en") else raw_label
         if label not in vowel_set:
             continue
         bucket = buckets.setdefault(
