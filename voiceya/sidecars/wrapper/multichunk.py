@@ -36,13 +36,25 @@ import os
 import subprocess
 import sys
 import wave
+from collections import Counter
 
 import acousticgender.library.phones as phones
+
+# Production: uvicorn loads us as ``wrapper.multichunk`` so the relative form
+# resolves.  Tests import this module directly with ``wrapper/`` on sys.path
+# (mirroring the ``acousticgender.*`` absolute-import style above), so the
+# fallback covers that too.  Both branches bind the same ``ceiling_selector``
+# name; the fallback is exercised by tests/test_multichunk_*.py.
+try:
+    from . import ceiling_selector
+except ImportError:
+    import ceiling_selector  # noqa: F401
 
 logger = logging.getLogger("engine_c.multichunk")
 
 
 # ── Audio decode + slice ─────────────────────────────────────────────
+
 
 def decode_to_wav(audio_bytes: bytes, dst_wav: str, ffmpeg: str) -> float:
     """Decode arbitrary audio bytes to 16 kHz mono pcm_s16le WAV.
@@ -55,9 +67,7 @@ def decode_to_wav(audio_bytes: bytes, dst_wav: str, ffmpeg: str) -> float:
         with open(src, "wb") as f:
             f.write(audio_bytes)
         subprocess.check_output(
-            [ffmpeg, "-y", "-i", src,
-             "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000",
-             dst_wav],
+            [ffmpeg, "-y", "-i", src, "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000", dst_wav],
             stderr=subprocess.STDOUT,
         )
     finally:
@@ -100,12 +110,23 @@ def slice_chunks(
         # Re-encode to the same pcm_s16le 16k mono so MFA doesn't complain
         # about format drift across chunks.
         subprocess.check_output(
-            [ffmpeg, "-y",
-             "-ss", f"{c['start_sec']:.3f}",
-             "-t", f"{dur:.3f}",
-             "-i", src_wav,
-             "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000",
-             wav_path],
+            [
+                ffmpeg,
+                "-y",
+                "-ss",
+                f"{c['start_sec']:.3f}",
+                "-t",
+                f"{dur:.3f}",
+                "-i",
+                src_wav,
+                "-acodec",
+                "pcm_s16le",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                wav_path,
+            ],
             stderr=subprocess.STDOUT,
         )
         with open(txt_path, "w", encoding="utf-8") as f:
@@ -115,6 +136,7 @@ def slice_chunks(
 
 
 # ── MFA invocation ───────────────────────────────────────────────────
+
 
 def build_mfa_cmd(settings_dict: dict) -> tuple[list[str], dict]:
     """Construct the platform-appropriate ``mfa`` invocation prefix + env.
@@ -131,13 +153,15 @@ def build_mfa_cmd(settings_dict: dict) -> tuple[list[str], dict]:
         mfa_python = os.path.join(env_dir, "python.exe")
         mfa_script = os.path.join(scripts_dir, "mfa-script.py")
         cmd = [mfa_python, mfa_script]
-        path_additions = os.pathsep.join([
-            os.path.join(env_dir, "Library", "bin"),
-            os.path.join(env_dir, "Library", "mingw-w64", "bin"),
-            os.path.join(env_dir, "Library", "usr", "bin"),
-            os.path.join(env_dir, "Scripts"),
-            env_dir,
-        ])
+        path_additions = os.pathsep.join(
+            [
+                os.path.join(env_dir, "Library", "bin"),
+                os.path.join(env_dir, "Library", "mingw-w64", "bin"),
+                os.path.join(env_dir, "Library", "usr", "bin"),
+                os.path.join(env_dir, "Scripts"),
+                env_dir,
+            ]
+        )
         env["PATH"] = path_additions + os.pathsep + env.get("PATH", "")
     else:
         cmd = [settings_dict["mfa"]]
@@ -181,9 +205,13 @@ def run_mfa(
         mfa_acoustic = mfa_dict = "english_us_arpa"
     args = mfa_cmd + [
         "align",
-        "./corpus/", mfa_dict, mfa_acoustic, "./output/",
+        "./corpus/",
+        mfa_dict,
+        mfa_acoustic,
+        "./output/",
         "--clean",
-        "--num_jobs", str(num_jobs),
+        "--num_jobs",
+        str(num_jobs),
     ]
     if beam:
         args += ["--beam", beam]
@@ -220,6 +248,7 @@ def run_mfa(
 
 
 # ── Praat per-chunk ──────────────────────────────────────────────────
+
 
 def run_praat_per_chunk(
     tmp_dir: str,
@@ -272,6 +301,7 @@ def run_praat_per_chunk(
 
 # ── Parse + merge ────────────────────────────────────────────────────
 
+
 def merge_parses(
     chunks: list[dict],
     praat_tsvs: dict[int, str],
@@ -305,7 +335,8 @@ def merge_parses(
         if not parsed.get("phones"):
             logger.warning(
                 "multichunk: chunk %d parsed to zero phones (tsv len=%d)",
-                c["index"], len(tsv),
+                c["index"],
+                len(tsv),
             )
             return None
 
@@ -313,27 +344,34 @@ def merge_parses(
         word_idx_shift = len(merged_words)
 
         for w in parsed["words"]:
-            merged_words.append({
-                "time": float(w["time"]) + offset,
-                "word": w["word"],
-                "expected": w["expected"],
-            })
+            merged_words.append(
+                {
+                    "time": float(w["time"]) + offset,
+                    "word": w["word"],
+                    "expected": w["expected"],
+                }
+            )
 
         for p in parsed["phones"]:
-            merged_phones.append({
-                "time": (float(p["time"]) + offset) if p.get("time") is not None else None,
-                "phoneme": p["phoneme"],
-                "word_index": p["word_index"] + word_idx_shift,
-                "word": p["word"],  # reference — compute_resonance doesn't use this
-                "word_time": (float(p["word_time"]) + offset) if p.get("word_time") is not None else None,
-                "expected": p["expected"],
-                "F": list(p["F"]) if p.get("F") is not None else [None, None, None, None],
-            })
+            merged_phones.append(
+                {
+                    "time": (float(p["time"]) + offset) if p.get("time") is not None else None,
+                    "phoneme": p["phoneme"],
+                    "word_index": p["word_index"] + word_idx_shift,
+                    "word": p["word"],  # reference — compute_resonance doesn't use this
+                    "word_time": (float(p["word_time"]) + offset)
+                    if p.get("word_time") is not None
+                    else None,
+                    "expected": p["expected"],
+                    "F": list(p["F"]) if p.get("F") is not None else [None, None, None, None],
+                }
+            )
 
     return {"words": merged_words, "phones": merged_phones}
 
 
 # ── Orchestration ────────────────────────────────────────────────────
+
 
 def process_from_wav(
     full_wav: str,
@@ -372,8 +410,13 @@ def process_from_wav(
         mfa_cmd, mfa_env = build_mfa_cmd(settings_dict)
         num_jobs = min(len(chunks), os.cpu_count() or 1)
         run_mfa(
-            tmp_dir, lang, num_jobs, mfa_cmd, mfa_env,
-            beam=mfa_beam, retry_beam=mfa_retry_beam,
+            tmp_dir,
+            lang,
+            num_jobs,
+            mfa_cmd,
+            mfa_env,
+            beam=mfa_beam,
+            retry_beam=mfa_retry_beam,
         )
 
     # Confirm alignment produced something before Praat — fast-fail with
@@ -385,9 +428,45 @@ def process_from_wav(
         return None
 
     praat_tsvs = run_praat_per_chunk(
-        tmp_dir, chunks, settings_dict["praat"], praat_script_path,
+        tmp_dir,
+        chunks,
+        settings_dict["praat"],
+        praat_script_path,
     )
-    return merge_parses(chunks, praat_tsvs, lang)
+
+    rewritten_tsvs, recording_ceiling = _apply_ceiling_selector(praat_tsvs, lang)
+    merged = merge_parses(chunks, rewritten_tsvs, lang)
+    if merged is not None and recording_ceiling is not None:
+        merged["formant_ceiling_hz"] = recording_ceiling
+    return merged
+
+
+# voiceya patch (2026-05-01): per-chunk adaptive formant ceiling.  Each
+# chunk's Praat TSV carries a Multi-Ceiling-Formants section (5 candidate
+# ceilings × 3 formants per phone).  Pick the per-chunk optimum and rewrite
+# the Phonemes section so merge_parses + phones.parse see only the chosen
+# ceiling's formants.  Extracted from process_from_wav so it can be unit-
+# tested without spinning up ffmpeg / MFA / Praat.
+def _apply_ceiling_selector(
+    praat_tsvs: dict[int, str],
+    lang: str,
+) -> tuple[dict[int, str], int | None]:
+    """Pick per-chunk optimal ceiling, rewrite each chunk's Phonemes section.
+
+    Returns ``(rewritten_tsvs, recording_level_ceiling_hz | None)``.  The
+    recording-level ceiling is the most-common pick across chunks (typical
+    5–60 s clips rarely span enough vocal-tract change for chunks to
+    disagree); ``None`` only when ``praat_tsvs`` is empty.
+    """
+    chosen_ceilings: dict[int, int] = {}
+    rewritten_tsvs: dict[int, str] = {}
+    for idx, tsv in praat_tsvs.items():
+        ceiling_hz, rewritten = ceiling_selector.pick_best(tsv, lang)
+        chosen_ceilings[idx] = ceiling_hz
+        rewritten_tsvs[idx] = rewritten
+    if not chosen_ceilings:
+        return rewritten_tsvs, None
+    return rewritten_tsvs, Counter(chosen_ceilings.values()).most_common(1)[0][0]
 
 
 def _align_with_kalpy(
@@ -419,5 +498,7 @@ def _align_with_kalpy(
         grid = grid_dir / (stem + ".TextGrid")
         aligner.align_one(wav, c["transcript"], grid)
     logger.info(
-        "kalpy aligned %d chunks in %.2fs", len(chunks), time.perf_counter() - t0,
+        "kalpy aligned %d chunks in %.2fs",
+        len(chunks),
+        time.perf_counter() - t0,
     )

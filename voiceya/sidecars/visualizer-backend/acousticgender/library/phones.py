@@ -15,6 +15,16 @@ def parse(praat_output, lang='en'):
 		if line == "Phonemes:":
 			active_list = phoneme_lines
 			continue
+		# voiceya patch (2026-05-01): the patched textgrid-formants.praat appends
+		# a "Multi-Ceiling-Formants:" section after "Phonemes:" so the wrapper's
+		# ceiling_selector can pick the optimal ceiling per recording.  Without
+		# this guard, phones.parse would happily keep appending those rows to
+		# phoneme_lines, blowing past the word boundaries with IndexError.
+		# Any unrecognised section header (line ending in ":" with no tabs)
+		# closes the current section.
+		if line and line.endswith(":") and "\t" not in line and active_list is not None:
+			active_list = None
+			continue
 
 		if active_list is not None:
 			active_list.append(line)

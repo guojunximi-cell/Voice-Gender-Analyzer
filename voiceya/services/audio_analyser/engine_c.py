@@ -217,6 +217,17 @@ async def run_engine_c(
         "script": script if mode == "script" else None,
         "language": language,
         "alignment_confidence": alignment_confidence,
+        # Adaptive Praat formant ceiling chosen by the sidecar's
+        # ceiling_selector (per-recording, in Hz).  None means one of:
+        #   (a) sidecar predates the 2026-05-01 multi-ceiling Praat patch
+        #       and the field isn't in the response,
+        #   (b) sidecar produced zero Praat TSVs (alignment empty), or
+        #   (c) MFA produced zero chunks → merge bypassed.
+        # zh-CN / en-US always pin to 5000 (legacy ceiling) because their
+        # stats files are calibrated for that — the field is still
+        # populated, not None.  Frontend / advice consumers must treat
+        # this as opt-in telemetry, not a gate.
+        "formant_ceiling_hz": _safe_int(data.get("formant_ceiling_hz")),
     }
 
     logger.info(
@@ -338,5 +349,12 @@ def _build_phone_array(
 def _safe_float(x: Any) -> float | None:
     try:
         return float(x) if x is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(x: Any) -> int | None:
+    try:
+        return int(x) if x is not None else None
     except (TypeError, ValueError):
         return None

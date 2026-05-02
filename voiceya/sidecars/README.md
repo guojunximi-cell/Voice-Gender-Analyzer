@@ -59,7 +59,13 @@ cp /path/to/gender-voice-visualization/cmudict.txt \
 |------|------------------|------|
 | `preprocessing.py` | L87 `mfa_model = ...` | 改成 3-way map：`{'zh':'mandarin_mfa','fr':'french_mfa'}.get(lang,'english_mfa')` |
 | `phones.py` | L25-44 `pronunciation_dict` 装载块 | 加 `elif lang == 'fr'` 分支，`french_mfa_dict.txt` UTF-8；`if lang == 'zh':` 解析判断扩成 `lang in ('zh', 'fr')`；`word_key` 的 upper 例外同步扩 fr |
+| `phones.py` | L17 `if line == "Phonemes:": ...` 之后 | 加 section-boundary 短路：识别任意以 `:` 结尾且不含 tab 的 header 视为新 section，把 `active_list` 置 None。`textgrid-formants.praat` 多 ceiling 版会追加 `Multi-Ceiling-Formants:` section，没这块兜底 phones.parse 会把多 ceiling 行也当 phoneme 解析→ IndexError |
 | `resonance.py` | L14-16 `ZH_VOWELS` 旁 / L43 `stats_file` / L66 `isVowel` | 加 `FR_VOWELS = {a,ɑ,e,ɛ,i,o,ɔ,u,y,ø,œ,ə,ɛ̃,ɑ̃,ɔ̃,œ̃}`；`stats_file` 改 3-way map；`isVowel` 加 `elif lang == 'fr'` 直查 FR_VOWELS |
+| `textgrid-formants.praat` | 整脚本 | 单 ceiling 5000 Hz → 多 ceiling sweep（4500 / 5000 / 5500 / 6000 / 6500 Hz），原 `Phonemes:` section 保留以兼容老 wrapper（5000 Hz baseline），追加 `Multi-Ceiling-Formants:` section 给 `wrapper/ceiling_selector.py` 挑最优 ceiling 用。详见脚本头部注释 |
+
+`wrapper/ceiling_selector.py` 不属于 vendor — 它在 wrapper 层消费 `Multi-Ceiling-Formants:` section，按"同元音类内 F1/F2/F3 变异最小"挑 ceiling，重写 `Phonemes:` section 后给 `phones.parse` 喂回。`multichunk.process_from_wav` 与 `main.py` 单 chunk 路径都接进去了，输出多一个 `formant_ceiling_hz` 字段供 worker 透传。回归测试在 `tests/test_french_ceiling_selector.py`（含 4 男 + 4 女 fr CommonVoice fixture）。
+
+**语言门控**：`_ADAPTIVE_LANGS = {"fr", "zh"}`。两个共同特点：女声 /i / y / e/ 的 F2 在 5000 Hz ceiling 下会被 LPC 错误地折叠到 1500-1900 Hz（真实值 2200-2700 Hz），把女声共振峰 z-score 系统性压成"男向"。fr 是 voiceya 自训 baseline；zh 在 2026-05-01 用 AISHELL-3 train（5000 段，scripts/train_stats_zh.py）重训了 5500 Hz baseline 的 stats_zh.json（53 个 phoneme），把 /i/ F2 mean 从 1843 → 2264 Hz 拉回到接近文献值。en 暂时还在门外——`stats.json` 仍是 5000 Hz baseline，要等同样的重训才能开。门控之外只是 selector 本身的判断—— Praat 多 ceiling sweep 跑全语言（开销 +0.2 s/clip，可忽略），phones.py section-boundary 短路也是全语言生效，因为产物里始终有 `Multi-Ceiling-Formants:` section 等着被跳过。
 
 法语资源（与中英文并列堆 `visualizer-backend/`）：
 - `stats_fr.json`：voiceya 自训 baseline，由 `scripts/train_stats_fr.py` 跑

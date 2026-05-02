@@ -24,7 +24,6 @@ os.chdir(os.path.join(REPO, "voiceya", "sidecars", "visualizer-backend"))
 
 import multichunk  # noqa: E402
 
-
 # Minimal Praat-output fragments in the exact format phones.parse expects.
 # Format reminder (from phones.py:11-20):
 #   "Words:\n" header, then lines "<time>\t<word>"
@@ -59,7 +58,13 @@ Phonemes:
 
 def test_basic_merge_offsets_and_shifts():
     chunks = [
-        {"index": 0, "start_sec": 2.0, "end_sec": 3.5, "transcript": "hello world", "word_count": 2},
+        {
+            "index": 0,
+            "start_sec": 2.0,
+            "end_sec": 3.5,
+            "transcript": "hello world",
+            "word_count": 2,
+        },
         {"index": 1, "start_sec": 5.0, "end_sec": 6.5, "transcript": "foo bar", "word_count": 2},
     ]
     tsvs = {0: _CHUNK0_TSV, 1: _CHUNK1_TSV}
@@ -98,7 +103,13 @@ def test_basic_merge_offsets_and_shifts():
 
 def test_phone_formants_preserved():
     chunks = [
-        {"index": 0, "start_sec": 0.0, "end_sec": 1.0, "transcript": "hello world", "word_count": 2},
+        {
+            "index": 0,
+            "start_sec": 0.0,
+            "end_sec": 1.0,
+            "transcript": "hello world",
+            "word_count": 2,
+        },
     ]
     merged = multichunk.merge_parses(chunks, {0: _CHUNK0_TSV}, lang="en")
     assert merged is not None
@@ -139,7 +150,13 @@ def test_chunks_out_of_order_still_merged_in_time_order():
     output regardless of dict insertion order."""
     chunks = [
         {"index": 1, "start_sec": 5.0, "end_sec": 6.5, "transcript": "foo bar", "word_count": 2},
-        {"index": 0, "start_sec": 2.0, "end_sec": 3.5, "transcript": "hello world", "word_count": 2},
+        {
+            "index": 0,
+            "start_sec": 2.0,
+            "end_sec": 3.5,
+            "transcript": "hello world",
+            "word_count": 2,
+        },
     ]
     tsvs = {0: _CHUNK0_TSV, 1: _CHUNK1_TSV}
     merged = multichunk.merge_parses(chunks, tsvs, lang="en")
@@ -149,7 +166,122 @@ def test_chunks_out_of_order_still_merged_in_time_order():
     assert merged["words"][-1]["word"] == "BAR"
 
 
+# ── Ceiling selector hook (multichunk._apply_ceiling_selector) ─────
+
+
+def _multi_ceiling_tsv(phonemes: list[tuple[str, float, list[tuple[float, float, float]]]]) -> str:
+    """Build a Praat TSV in the new schema: Words / Phonemes / Multi-Ceiling-Formants.
+
+    `phonemes`: [(phone, start, [(F1@C0, F2@C0, F3@C0), ..., (F1@C4, F2@C4, F3@C4)])]
+    where C0..C4 are the ceiling_selector.CEILINGS list (4500..6500).  Phonemes
+    section uses ceiling index 1 (5000 Hz baseline) — same convention the
+    patched textgrid-formants.praat uses.
+    """
+    import ceiling_selector  # noqa: PLC0415  — local: matches multichunk's import flavour
+
+    n_ceil = len(ceiling_selector.CEILINGS)
+    lines = ["Words:", "0.000\tword"]
+    lines.append("Phonemes:")
+    for phone, start, ceil_rows in phonemes:
+        f1, f2, f3 = ceil_rows[1]
+        lines.append(f"{start:.3f}\t{phone}\t150\t{f1}\t{f2}\t{f3}")
+    lines.append("Multi-Ceiling-Formants:")
+    lines.append(f"# ceilings: {' '.join(str(c) for c in ceiling_selector.CEILINGS)}")
+    for phone, start, ceil_rows in phonemes:
+        assert len(ceil_rows) == n_ceil
+        row = [f"{start:.3f}", phone, "150"]
+        for f1, f2, f3 in ceil_rows:
+            row += [f"{f1}", f"{f2}", f"{f3}"]
+        lines.append("\t".join(row))
+    return "\n".join(lines)
+
+
+def _fr_clustering_tsv(at_ceiling_idx: int) -> str:
+    """Synthesise a fr-FR multi-ceiling TSV whose CV is minimised at the given
+    ceiling index.  Mirrors the synthetic builder in test_french_ceiling_selector.
+    """
+    rows: list[tuple[str, float, list[tuple[float, float, float]]]] = []
+    t = 0.0
+    for cls, base_f2 in [("a", 1500.0), ("i", 2700.0), ("e", 2000.0), ("u", 900.0)]:
+        for tok in range(3):
+            ceil_rows = []
+            for k in range(5):
+                # zero spread at the target ceiling, growing linearly away
+                spread = abs(k - at_ceiling_idx) * 100
+                ceil_rows.append((400.0, base_f2 + spread * (tok - 1), 2400.0))
+            rows.append((cls, t, ceil_rows))
+            t += 0.1
+    return _multi_ceiling_tsv(rows)
+
+
+def test_apply_ceiling_selector_picks_per_chunk_and_aggregates():
+    # 3 chunks, each clustered at a different ceiling index.  Expect:
+    #   - per-chunk pick_best matches the synthetic minimum;
+    #   - recording-level summary = the most-common pick;
+    #   - rewritten TSVs no longer contain "Multi-Ceiling-Formants:".
+    tsvs = {
+        0: _fr_clustering_tsv(at_ceiling_idx=2),  # → 5500
+        1: _fr_clustering_tsv(at_ceiling_idx=2),  # → 5500
+        2: _fr_clustering_tsv(at_ceiling_idx=3),  # → 6000
+    }
+    rewritten, recording_ceiling = multichunk._apply_ceiling_selector(tsvs, lang="fr")
+    assert recording_ceiling == 5500, f"expected most-common 5500, got {recording_ceiling}"
+    for idx, tsv in rewritten.items():
+        assert "Multi-Ceiling-Formants:" not in tsv, f"chunk {idx} kept the multi section"
+    # Empty input → None summary, empty dict
+    rewritten_empty, summary_empty = multichunk._apply_ceiling_selector({}, lang="fr")
+    assert summary_empty is None
+    assert rewritten_empty == {}
+
+
+def test_apply_ceiling_selector_en_pins_to_legacy():
+    # As of 2026-05-01 zh is in _ADAPTIVE_LANGS (stats_zh.json was re-trained
+    # at 5500 Hz, see scripts/train_stats_zh.py + sidecars/README.md).  Only
+    # en stays pinned to legacy 5000 because stats.json is still 5000-baked.
+    tsv = _fr_clustering_tsv(at_ceiling_idx=2)
+    rewritten, summary = multichunk._apply_ceiling_selector({0: tsv}, lang="en")
+    assert summary == 5000, f"en: expected legacy 5000, got {summary}"
+    assert rewritten[0] == tsv, "en: TSV should be returned unchanged"
+
+
+def test_apply_ceiling_selector_zh_uses_adaptive_picker():
+    # zh joined _ADAPTIVE_LANGS on 2026-05-01.  Same fr-clustering fixture
+    # at ceiling_idx=2 must therefore exit the selector with the data-driven
+    # pick (5500 by construction), not the legacy bypass.
+    tsv = _fr_clustering_tsv(at_ceiling_idx=2)
+    rewritten, summary = multichunk._apply_ceiling_selector({0: tsv}, lang="zh")
+    assert summary == 5500, f"zh: expected adaptive pick 5500, got {summary}"
+    # Selector must have rewritten the Phonemes section (different bytes).
+    assert rewritten[0] != tsv, "zh: rewritten TSV should differ from input"
+    assert "Multi-Ceiling-Formants:" not in rewritten[0]
+
+
+def test_phones_parse_skips_multi_ceiling_section():
+    # Direct exercise of the phones.py section-boundary patch — without it,
+    # phones.parse appends Multi-Ceiling rows to phoneme_lines and overruns
+    # word_index → IndexError.  Build a minimal multi-section TSV with a
+    # single phone in each section; assert phones.parse only counts the
+    # Phonemes section's phone.
+    from acousticgender.library import phones as phones_mod  # noqa: PLC0415
+
+    tsv = (
+        "Words:\n"
+        "0.000\thello\n"
+        "Phonemes:\n"
+        "0.000\tHH\t120\t500\t1500\t2500\n"
+        "Multi-Ceiling-Formants:\n"
+        "# ceilings: 4500 5000 5500 6000 6500\n"
+        "0.000\tHH\t120\t450\t1450\t2400\t500\t1500\t2500\t540\t1540\t2540\t580\t1580\t2580\t620\t1620\t2620\n"
+    )
+    data = phones_mod.parse(tsv, lang="en")
+    assert len(data["phones"]) == 1, (
+        f"expected 1 phone (skip multi-section), got {len(data['phones'])}"
+    )
+    assert data["phones"][0]["phoneme"] == "HH"
+
+
 # ── Runner ───────────────────────────────────────────────────────────
+
 
 def _run_all():
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
