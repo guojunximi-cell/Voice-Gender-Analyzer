@@ -95,8 +95,11 @@ confirm() {
 cd "$(dirname "$0")/.."
 PROJECT_ROOT="$PWD"
 
-# 状态文件放到 .git/ 里（git 永远不追踪，且 worktree 隔离）
-STATE_FILE="$PROJECT_ROOT/.git/deploy-prev-commit"
+# 状态文件放到 .git/ 里（git 永远不追踪，且 worktree 隔离）。两个文件分担两种语义：
+# - deploy-prev-commit：上次部署成功后的 commit，detect_rebuild / --status 读它
+# - deploy-rollback-from：build 前的 commit，--rollback 读它（build 失败也能正确回滚）
+DEPLOYED_FILE="$PROJECT_ROOT/.git/deploy-prev-commit"
+ROLLBACK_FILE="$PROJECT_ROOT/.git/deploy-rollback-from"
 
 # ──────────── 校验环境 ────────────
 [[ -f .env ]] || { err ".env 不存在；先 cp .env.example .env"; exit 1; }
@@ -107,16 +110,20 @@ if grep -q '^ENGINE_C_ENABLED=true' .env; then
 	ENGINE_C_FLAG="--profile engine-c"
 fi
 
-# 已部署 commit（可能不存在 = 第一次部署）
-read_deployed_commit() {
-	[[ -f "$STATE_FILE" ]] || return 1
+# 通用 commit-state 文件读取
+read_state_commit() {
+	local file=$1
+	[[ -f "$file" ]] || return 1
 	local c
-	c=$(head -1 "$STATE_FILE" | tr -d '[:space:]')
+	c=$(head -1 "$file" | tr -d '[:space:]')
 	[[ -n "$c" ]] || return 1
-	# 校验该 commit 在当前 git 库里能找到
 	git rev-parse --verify --quiet "$c^{commit}" >/dev/null || return 1
 	printf '%s' "$c"
 }
+# 已部署 commit（detect_rebuild + --status 用）
+read_deployed_commit() { read_state_commit "$DEPLOYED_FILE"; }
+# 回滚锚点（--rollback 用；build 失败也保有效）
+read_rollback_commit() { read_state_commit "$ROLLBACK_FILE"; }
 
 # ──────────── 仅显示状态 ────────────
 if [[ $STATUS_ONLY -eq 1 ]]; then
@@ -138,9 +145,13 @@ fi
 
 # ──────────── 回滚分支 ────────────
 if [[ $ROLLBACK -eq 1 ]]; then
-	if ! PREV=$(read_deployed_commit); then
-		err "找不到有效的 .git/deploy-prev-commit，无法回滚"
-		exit 1
+	# 优先读 rollback 锚点；不存在则 fallback 到已部署 commit（向后兼容）
+	if ! PREV=$(read_rollback_commit); then
+		if ! PREV=$(read_deployed_commit); then
+			err "找不到有效的回滚锚点（.git/deploy-rollback-from 或 deploy-prev-commit）"
+			exit 1
+		fi
+		warn "用旧版 deploy-prev-commit 作为回滚锚点（建议下次成功部署后会自动迁移）"
 	fi
 	log "回滚到 commit: ${PREV:0:8}"
 	git log --oneline -1 "$PREV" >&2 || true
@@ -340,9 +351,10 @@ fi
 log "rebuild 范围：$REBUILD"
 confirm "继续部署？" || exit 1
 
-# 记录回滚点（dry-run 不写）
+# Build 前：写回滚锚点（dry-run 不写）。这只是"build 失败时回退到这"的标记，
+# 不代表"已部署"——detect_rebuild 不读这个文件
 if [[ $DRY_RUN -eq 0 ]]; then
-	echo "$COMPARE_FROM" > "$STATE_FILE"
+	echo "$COMPARE_FROM" > "$ROLLBACK_FILE"
 fi
 
 # ──────────── 标记 :rollback 镜像 ────────────
@@ -417,6 +429,11 @@ if [[ $DRY_RUN -eq 0 ]]; then
 		warn "回滚：bash scripts/deploy.sh --rollback"
 		exit 1
 	fi
+fi
+
+# 健康检查通过 → 标记本次为"已成功部署"。从此 detect_rebuild 用 TARGET_COMMIT 当基准
+if [[ $DRY_RUN -eq 0 ]]; then
+	echo "$TARGET_COMMIT" > "$DEPLOYED_FILE"
 fi
 
 # ──────────── 清理 ────────────
