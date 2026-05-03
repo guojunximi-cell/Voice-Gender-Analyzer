@@ -134,6 +134,7 @@ async def do_analyse(
         summary.get("dominant_label"),
         weighted_margin=summary.get("dominant_confidence", 0.0),
         f0_panel=f0_panel,
+        engine_c=engine_c_summary,
     )
 
     # INFO 日志只记录结构事件（任务完成 + Engine C 是否参与），不带任何用户测量值；
