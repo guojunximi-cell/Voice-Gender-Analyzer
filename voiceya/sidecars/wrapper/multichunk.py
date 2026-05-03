@@ -497,7 +497,8 @@ def _align_with_kalpy(
         grid_dir.mkdir(parents=True, exist_ok=True)
         grid = grid_dir / (stem + ".TextGrid")
         aligner.align_one(wav, c["transcript"], grid)
-    logger.info(
+    # 块数和耗时都和用户音频长度相关，下放 DEBUG。
+    logger.debug(
         "kalpy aligned %d chunks in %.2fs",
         len(chunks),
         time.perf_counter() - t0,

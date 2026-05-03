@@ -84,7 +84,9 @@ async def new_analyse(
     buf.seek(0)
     is_valid_audio_file(buf.read(12))
 
-    logger.info("收到文件 (%d B, mode=%s, language=%s)", buf.tell(), mode, language)
+    # 字节数是用户文件指纹，下放 DEBUG；INFO 只保留低基数路由标签。
+    logger.info("收到文件 (mode=%s, language=%s)", mode, language)
+    logger.debug("收到文件字节数=%d", buf.tell())
     buf.seek(0)
 
     # ── 时长限制 ───────────────────────────────────────────

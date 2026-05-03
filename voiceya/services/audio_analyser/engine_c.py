@@ -317,10 +317,11 @@ async def run_engine_c(
         "resonance_per_vowel": _aggregate_per_vowel(phones, lang_short),
     }
 
-    logger.info(
-        "Engine C done — lang=%s mode=%s, %d phones, mean_pitch=%s Hz, mean_resonance=%s, align=%s",
-        language,
-        mode,
+    # INFO 不带用户解析数值（pitch / resonance / 对齐分数 / phone 数量都是结果指纹），
+    # 只留 lang+mode 两个低基数标签；详情下放 DEBUG。
+    logger.info("Engine C done — lang=%s mode=%s", language, mode)
+    logger.debug(
+        "Engine C done detail — %d phones, mean_pitch=%s Hz, mean_resonance=%s, align=%s",
         summary["phone_count"],
         summary["mean_pitch_hz"],
         summary["mean_resonance"],

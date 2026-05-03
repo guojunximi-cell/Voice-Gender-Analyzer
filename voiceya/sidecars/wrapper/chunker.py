@@ -143,11 +143,14 @@ def plan_chunks(
     max_n = max_chunks if max_chunks is not None else _DEFAULT_MAX_CHUNKS
 
     # 1. Preconditions.
+    # 用户音频指纹（词数 / 时长 / 候选切点）下放 DEBUG；INFO 只保留分支路径。
     if not word_timestamps or len(word_timestamps) < 2:
-        logger.info("chunker: skip — word_timestamps insufficient (%d)", len(word_timestamps or []))
+        logger.info("chunker: skip — word_timestamps insufficient")
+        logger.debug("chunker: word_timestamps insufficient (%d)", len(word_timestamps or []))
         return None
     if audio_duration_sec < min_chunk * 2:
-        logger.info("chunker: skip — audio %.2fs < 2*min_chunk (%.2f)",
+        logger.info("chunker: skip — audio shorter than 2*min_chunk")
+        logger.debug("chunker: audio %.2fs < 2*min_chunk (%.2f)",
                     audio_duration_sec, min_chunk * 2)
         return None
 
@@ -159,8 +162,9 @@ def plan_chunks(
         if word_timestamps[i]["start"] > word_timestamps[i - 1]["end"]
     )
     if positive_gaps < 2:
-        logger.info(
-            "chunker: degenerate word timestamps (positive_gaps=%d), skipping",
+        logger.info("chunker: skip — degenerate word timestamps")
+        logger.debug(
+            "chunker: degenerate word timestamps (positive_gaps=%d)",
             positive_gaps,
         )
         return None
@@ -183,7 +187,8 @@ def plan_chunks(
             continue
         candidates.append(mid)
     candidates.sort()
-    logger.info(
+    # 输入指纹（音频时长、词数、候选切点）走 DEBUG；INFO 仅记录工作量级别。
+    logger.debug(
         "chunker: audio=%.2fs  words=%d  silences=%d  candidates=%s  "
         "(knobs: min=%.1f max=%.1f target=%.1f min_sil=%.2f max_n=%d)",
         audio_duration_sec, len(word_timestamps), len(silence_ranges),
@@ -247,10 +252,9 @@ def plan_chunks(
         if not chunk_words:
             # A zero-word chunk would feed MFA an empty transcript → abort
             # the whole plan.  Caller falls back to single-block.
-            logger.warning(
-                "chunker: chunk %d (%.2f-%.2fs) got no words, aborting plan",
-                idx, s, e,
-            )
+            # WARNING 只带 chunk 序号（低基数）；chunk 起止秒数是用户音频指纹，下放 DEBUG。
+            logger.warning("chunker: chunk %d got no words, aborting plan", idx)
+            logger.debug("chunker: aborted chunk %d span=%.2f-%.2fs", idx, s, e)
             return None
         result.append({
             "index": idx,

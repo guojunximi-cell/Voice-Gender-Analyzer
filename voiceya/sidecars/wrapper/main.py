@@ -329,15 +329,17 @@ def _run_chunked_path(
                     "word_count": len(transcript.split()),
                 }
             ]
+            # duration / chunk 数都是用户音频指纹，下放 DEBUG；INFO 只留路径分支。
             logger.info(
-                "kalpy: single-chunk path (%s)  duration=%.1fs",
+                "kalpy: single-chunk path (%s)",
                 "preloaded aligner prefers it"
                 if preloaded is not None
                 else "no word_ts or chunker declined",
-                duration,
             )
+            logger.debug("kalpy single-chunk duration=%.1fs", duration)
         else:
-            logger.info(
+            logger.info("subprocess MFA: multi-chunk path")
+            logger.debug(
                 "subprocess MFA: %d chunks over %.1fs  durs=%s",
                 len(chunks),
                 duration,
@@ -588,7 +590,8 @@ async def analyze(
         except json.JSONDecodeError as exc:
             logger.warning("word_timestamps_json ignored (parse error: %s)", exc)
     if word_timestamps is not None:
-        logger.info("Engine C: received %d word timestamps", len(word_timestamps))
+        # 词数是用户转写长度指纹，下放 DEBUG。
+        logger.debug("Engine C: received %d word timestamps", len(word_timestamps))
 
     lang = _normalize_lang(language)
     if not lang:

@@ -188,7 +188,9 @@ async def transcribe_en(audio_bytes: bytes) -> tuple[str, list[dict] | None]:
     cached = _cache_get(key)
     if cached is not None:
         text, word_ts = cached
-        logger.info(
+        # 命中事件保留 INFO；字符/词数是用户转写指纹，下放 DEBUG。
+        logger.info("faster-whisper cache hit")
+        logger.debug(
             "faster-whisper cache hit (%d chars, %s words)",
             len(text),
             len(word_ts) if word_ts else "no",

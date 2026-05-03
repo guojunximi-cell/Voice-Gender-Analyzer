@@ -98,7 +98,8 @@ def do_statics(
         ]
     )
     if confs.size:
-        logger.info(
+        # 单次录音的 confidence 分布是用户解析结果指纹（mean/std/分位数），下放到 DEBUG。
+        logger.debug(
             "confidence dist — n=%d mean=%.3f std=%.3f p10/p50/p90=[%.2f,%.2f,%.2f] hi(>0.9)=%d lo(<0.1)=%d",
             confs.size,
             confs.mean(),

@@ -25,13 +25,14 @@ def get_duraton_sec(s: InputContainer) -> float:
 
     # 某些容器（webm/mka 等）流级 duration 为 None，退回容器级 duration
     # （单位为 AV_TIME_BASE = 1e6 微秒）。
+    # 时长是用户音频指纹（每次上传都不同），下放 DEBUG。
     if i_stm.duration is not None:
         duration = float(i_stm.duration * i_stm.time_base)  # type: ignore
-        logger.info("音频时长 %.2f 秒", duration)
+        logger.debug("音频时长 %.2f 秒", duration)
         return duration
     if s.duration is not None:
         duration = s.duration / 1_000_000
-        logger.info("音频时长 %.2f 秒", duration)
+        logger.debug("音频时长 %.2f 秒", duration)
         return duration
 
     # 浏览器 MediaRecorder 产出的 webm/ogg 两级 duration 都缺失 —
@@ -48,7 +49,7 @@ def get_duraton_sec(s: InputContainer) -> float:
                     n_pkts += 1
             if n_pkts > 0 and ticks > 0:
                 duration = float(ticks * tb)
-                logger.info("duration 回退到包时长累加：%d 包 / %.2f 秒", n_pkts, duration)
+                logger.debug("duration 回退到包时长累加：%d 包 / %.2f 秒", n_pkts, duration)
                 return duration
         except av.FFmpegError as e:
             logger.warning("demux 累加包时长失败，回退到 decode 数采样: %s", e)
@@ -66,7 +67,7 @@ def get_duraton_sec(s: InputContainer) -> float:
     if n_samples <= 0:
         raise HTTPException(status_code=400, detail="无法读取音频时长")
     duration = n_samples / sample_rate
-    logger.info("duration 回退到样本计数：%d 采样 / %.2f 秒", n_samples, duration)
+    logger.debug("duration 回退到样本计数：%d 采样 / %.2f 秒", n_samples, duration)
     return duration
 
 

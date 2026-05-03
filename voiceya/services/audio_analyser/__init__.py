@@ -52,7 +52,11 @@ async def do_analyse(
     violations = audio_gate(y_full.astype(np.float32), int(sr_full))
     if violations:
         reasons = "; ".join(v["message"] for v in violations)
-        logger.warning("音频闸门拒绝：%s", reasons)
+        # 警告日志只暴露分类（i18n_key + metric 名），具体测量值（dBFS / clipping_ratio /
+        # voiced_ratio）下放到 DEBUG —— 这些数值是用户音频质量指纹，不进生产日志。
+        keys = ",".join(v.get("i18n_key") or v.get("metric") or "?" for v in violations)
+        logger.warning("音频闸门拒绝 (%d 项): %s", len(violations), keys)
+        logger.debug("音频闸门拒绝详情：%s", reasons)
         raise HTTPException(
             status_code=400,
             detail=json.dumps(
@@ -132,13 +136,15 @@ async def do_analyse(
         f0_panel=f0_panel,
     )
 
-    logger.info(
-        "分析完成 — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.3f，Engine C=%s，advice tier=%s",
+    # INFO 日志只记录结构事件（任务完成 + Engine C 是否参与），不带任何用户测量值；
+    # F0 / gender_score / female_ratio / advice tier 都是用户解析结果，下放到 DEBUG。
+    logger.info("分析完成 (Engine C=%s)", "on" if engine_c_summary else "off/skip")
+    logger.debug(
+        "分析完成详情 — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.3f，advice tier=%s",
         len(analyse_results),
         summary["overall_f0_median_hz"],
         summary["overall_gender_score"],
         summary["female_ratio"],
-        "on" if engine_c_summary else "off/skip",
         summary["advice"]["gating_tier"],
     )
 
