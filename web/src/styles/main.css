@@ -1419,6 +1419,82 @@ body {
 	outline: none;
 }
 
+/* ── Resonance panel ──────────────────────────────────────────
+   Phoneme-aligned breakdown: zone tag, summary line, weakness
+   vowel cards. Sits between #advice-panel and #metrics-content. */
+.resonance-panel {
+	padding: 12px 14px 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	border-bottom: 1px solid var(--border-strong);
+}
+
+.resonance-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.resonance-title {
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.resonance-summary {
+	font-size: 0.8rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+}
+
+.resonance-median {
+	font-size: 0.72rem;
+	color: var(--text-secondary);
+	font-variant-numeric: tabular-nums;
+}
+
+.resonance-weakness-section {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 2px;
+}
+
+.resonance-weakness-title {
+	font-size: 0.72rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.resonance-weakness-list {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+
+.resonance-weakness-card {
+	padding: 8px 10px;
+	background: color-mix(in srgb, var(--accent) 6%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+	border-radius: var(--radius-sm);
+	font-size: 0.76rem;
+	line-height: 1.45;
+	color: var(--text-primary);
+}
+
+.resonance-weakness-empty {
+	font-size: 0.74rem;
+	color: var(--text-secondary);
+	opacity: 0.85;
+	font-style: italic;
+}
+
 #metrics-content {
 	padding: 14px 14px 32px;
 	display: flex;

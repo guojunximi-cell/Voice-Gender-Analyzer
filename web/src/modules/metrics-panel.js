@@ -11,6 +11,7 @@
 
 import { certaintTag, fmt } from "../utils.js";
 import { t } from "./i18n.js";
+import { clearResonancePanel } from "./resonance-panel.js";
 
 function animNum(el, target, suffix = "", duration = 600) {
 	if (!el) return;
@@ -207,6 +208,7 @@ export function clearMetricsPanel() {
 	const warnEl = document.getElementById("mc-align-warning");
 	if (warnEl) warnEl.hidden = true;
 	clearAdvicePanel();
+	clearResonancePanel();
 }
 
 // ─── Advice v2 panel ─────────────────────────────────────────

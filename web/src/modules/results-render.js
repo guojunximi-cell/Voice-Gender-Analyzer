@@ -9,6 +9,7 @@
 import { getMode } from "./classify-mode.js";
 import { classifyForMode } from "./classify.js";
 import { renderAdvicePanel, renderMetricsPanel } from "./metrics-panel.js";
+import { renderResonancePanel } from "./resonance-panel.js";
 import { renderSegments, renderStats } from "./results.js";
 
 /**
@@ -21,5 +22,6 @@ export function renderFromSummary({ summary, analysis }) {
 	renderSegments(analysis);
 	renderMetricsPanel(summary, analysis);
 	renderAdvicePanel(summary?.advice);
+	renderResonancePanel(summary?.advice?.resonance_panel);
 	return segs;
 }
