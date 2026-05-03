@@ -268,6 +268,26 @@ const DICT = {
 		"advice.summary.high_weakly_masculine": "F0 中位数 {f0} Hz，位于高基频区间。声学轻微偏男。",
 		"advice.summary.high_not_clearly_leaning": "F0 中位数 {f0} Hz，位于高基频区间。倾向不明显。",
 
+		"advice.resonance.title": "共振表现",
+		"advice.resonance.median_label": "共振中位数",
+		"advice.resonance.weakness_section_title": "重点练习",
+		"advice.resonance.no_weakness": "未发现明显偏低的元音。",
+		"advice.resonance.zone.clearly_below_female": "明显低于典型女声",
+		"advice.resonance.zone.leans_male": "偏男声共振区间",
+		"advice.resonance.zone.mid_neutral": "中性共振区间",
+		"advice.resonance.zone.leans_female": "偏女声共振区间",
+		"advice.resonance.zone.at_ceiling": "已达共振分上限",
+		"advice.resonance.summary.clearly_below_female": "共振峰整体明显低于女声基准。先专注 F2 抬升。",
+		"advice.resonance.summary.leans_male": "共振偏男声区间，元音色彩偏低沉。",
+		"advice.resonance.summary.mid_neutral": "共振处于中性区间，离女声基准还有距离。",
+		"advice.resonance.summary.leans_female": "共振已偏向女声区间，可继续加强稳定性。",
+		"advice.resonance.summary.at_ceiling": "共振分已达上限；用 per-vowel z 看进步更准。",
+		"advice.resonance.weakness.F1_low": "/{vowel}/ 的 F1 偏低（{z}σ，实测 {hz} Hz）。可以把嘴张开些。",
+		"advice.resonance.weakness.F2_low": "/{vowel}/ 的 F2 偏低（{z}σ，实测 {hz} Hz）。试试舌位前移、嘴角后拉。",
+		"advice.resonance.weakness.F3_low": "/{vowel}/ 的 F3 偏低（{z}σ，实测 {hz} Hz）。试试嘴唇微撑、口腔前拉。",
+		"advice.resonance.caveat.score_clamp": "共振评分上限 1.0，部分元音可能已封顶；看具体元音的 z 值更准。",
+		"advice.resonance.caveat.low_alignment": "对齐质量较低，本次结果仅供参考。",
+
 		"duck.msg1": "正在聆听声纹…",
 		"duck.msg2": "鸭鸭努力工作中…",
 		"duck.msg3": "鸭鸭竖起了耳朵…",
@@ -653,6 +673,31 @@ const DICT = {
 		"advice.summary.high_weakly_feminine": "F0 median {f0} Hz, high range. Slightly feminine.",
 		"advice.summary.high_weakly_masculine": "F0 median {f0} Hz, high range. Slightly masculine.",
 		"advice.summary.high_not_clearly_leaning": "F0 median {f0} Hz, high range. Not clearly leaning.",
+
+		"advice.resonance.title": "Resonance",
+		"advice.resonance.median_label": "Median resonance",
+		"advice.resonance.weakness_section_title": "Focus on",
+		"advice.resonance.no_weakness": "No notably low-formant vowels.",
+		"advice.resonance.zone.clearly_below_female": "Clearly below typical female",
+		"advice.resonance.zone.leans_male": "Leans male resonance",
+		"advice.resonance.zone.mid_neutral": "Mid-neutral resonance",
+		"advice.resonance.zone.leans_female": "Leans female resonance",
+		"advice.resonance.zone.at_ceiling": "At resonance score ceiling",
+		"advice.resonance.summary.clearly_below_female":
+			"Formants sit clearly below the female reference. Start by lifting F2.",
+		"advice.resonance.summary.leans_male": "Resonance leans male; vowel colour is on the darker side.",
+		"advice.resonance.summary.mid_neutral": "Resonance is mid-neutral — still some distance from the female reference.",
+		"advice.resonance.summary.leans_female": "Resonance already leans female; keep working on consistency.",
+		"advice.resonance.summary.at_ceiling": "Score is at ceiling; per-vowel z is a finer gauge of progress.",
+		"advice.resonance.weakness.F1_low":
+			"/{vowel}/ has low F1 ({z}σ, measured {hz} Hz). Try opening your mouth a touch more.",
+		"advice.resonance.weakness.F2_low":
+			"/{vowel}/ has low F2 ({z}σ, measured {hz} Hz). Try fronting the tongue and pulling the lip corners back.",
+		"advice.resonance.weakness.F3_low":
+			"/{vowel}/ has low F3 ({z}σ, measured {hz} Hz). Try slight lip spreading and pulling the cavity forward.",
+		"advice.resonance.caveat.score_clamp":
+			"Resonance score caps at 1.0; some vowels may already be saturated. Per-vowel z is more diagnostic.",
+		"advice.resonance.caveat.low_alignment": "Alignment quality is low — treat results as approximate.",
 
 		"duck.msg1": "Listening to the voiceprint…",
 		"duck.msg2": "Quacking hard at the data…",
@@ -1046,6 +1091,33 @@ const DICT = {
 		"advice.summary.high_weakly_feminine": "F0 médiane {f0} Hz, plage haute. Légèrement féminine.",
 		"advice.summary.high_weakly_masculine": "F0 médiane {f0} Hz, plage haute. Légèrement masculine.",
 		"advice.summary.high_not_clearly_leaning": "F0 médiane {f0} Hz, plage haute. Tendance peu marquée.",
+
+		// TODO(fr): native review of resonance copy
+		"advice.resonance.title": "Résonance",
+		"advice.resonance.median_label": "Résonance médiane",
+		"advice.resonance.weakness_section_title": "À travailler",
+		"advice.resonance.no_weakness": "Aucune voyelle aux formants nettement bas.",
+		"advice.resonance.zone.clearly_below_female": "Nettement sous la référence féminine",
+		"advice.resonance.zone.leans_male": "Tendance masculine en résonance",
+		"advice.resonance.zone.mid_neutral": "Résonance médio-neutre",
+		"advice.resonance.zone.leans_female": "Tendance féminine en résonance",
+		"advice.resonance.zone.at_ceiling": "Plafond du score atteint",
+		"advice.resonance.summary.clearly_below_female":
+			"Les formants sont nettement sous la référence féminine. Commencez par lever F2.",
+		"advice.resonance.summary.leans_male": "Résonance plutôt masculine ; couleur vocalique sombre.",
+		"advice.resonance.summary.mid_neutral": "Résonance médio-neutre — encore loin de la référence féminine.",
+		"advice.resonance.summary.leans_female": "Résonance déjà féminine ; travaillez la régularité.",
+		"advice.resonance.summary.at_ceiling":
+			"Score plafonné ; le z par voyelle est plus précis pour mesurer les progrès.",
+		"advice.resonance.weakness.F1_low":
+			"/{vowel}/ a un F1 bas ({z}σ, mesuré {hz} Hz). Essayez d'ouvrir un peu plus la bouche.",
+		"advice.resonance.weakness.F2_low":
+			"/{vowel}/ a un F2 bas ({z}σ, mesuré {hz} Hz). Avancez la langue et tirez les coins des lèvres.",
+		"advice.resonance.weakness.F3_low":
+			"/{vowel}/ a un F3 bas ({z}σ, mesuré {hz} Hz). Étirez légèrement les lèvres et avancez la cavité.",
+		"advice.resonance.caveat.score_clamp":
+			"Le score de résonance plafonne à 1,0 ; certaines voyelles peuvent être saturées. Le z par voyelle est plus diagnostique.",
+		"advice.resonance.caveat.low_alignment": "Qualité d'alignement faible — résultats à titre indicatif.",
 
 		"duck.msg1": "Le canard écoute la voix…",
 		"duck.msg2": "Le canard travaille fort…",
