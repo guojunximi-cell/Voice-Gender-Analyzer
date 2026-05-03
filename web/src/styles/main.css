@@ -1495,6 +1495,49 @@ body {
 	font-style: italic;
 }
 
+/* ── Disclosure modal (Stage 0) ───────────────────────────────
+   Re-uses .vga-help-modal chrome; adds list + button styling. */
+.disclosure-points {
+	margin: 6px 0 0;
+	padding-left: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	color: var(--text-primary);
+	font-size: 0.86rem;
+	line-height: 1.55;
+}
+
+.disclosure-resources {
+	margin: 6px 0 0;
+	padding-left: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 0.84rem;
+	line-height: 1.5;
+}
+
+.disclosure-resources a {
+	color: var(--accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.disclosure-resources a:hover,
+.disclosure-resources a:focus-visible {
+	color: var(--accent-hover);
+}
+
+.disclosure-resource-note {
+	color: var(--text-secondary);
+}
+
+.disclosure-acknowledge {
+	margin-top: 18px;
+	width: 100%;
+}
+
 #metrics-content {
 	padding: 14px 14px 32px;
 	display: flex;

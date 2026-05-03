@@ -26,6 +26,7 @@ const DICT = {
 		"app.logoAria": "声音分析鸭 GitHub 仓库",
 		"app.name": "声音分析鸭",
 		"header.help": "使用帮助",
+		"header.disclosure": "使用前须知",
 		"header.theme": "切换主题",
 		"header.lang": "切换语言 / Language / Langue",
 		"header.langShort.zh": "中",
@@ -288,6 +289,18 @@ const DICT = {
 		"advice.resonance.caveat.score_clamp": "共振评分上限 1.0，部分元音可能已封顶；看具体元音的 z 值更准。",
 		"advice.resonance.caveat.low_alignment": "对齐质量较低，本次结果仅供参考。",
 
+		"disclosure.title": "使用前请先了解",
+		"disclosure.intro": "这个工具帮你测量声音的几个声学指标，作为练习参考。它不是诊断、不是评分、不是替代专业老师。",
+		"disclosure.point.measurement": "显示的是测量值，不是给你的指令——具体怎么练你说了算。",
+		"disclosure.point.model_judgment": "数字是模型判断，不一定等同于人耳听感。模型在某些声音上会出错。",
+		"disclosure.point.not_teacher": "不替代 voice teacher / SLP——这些数字读不出技巧细节，老师可以。",
+		"disclosure.point.dysphoria": "如果当下情绪不太稳，结果可能让你感觉更糟。可以先关掉，状态好一点再回来。",
+		"disclosure.resources.heading": "推荐资源",
+		"disclosure.resources.transvoice_note": "— Zheanna Erose 的频道，TVT 社区最常推荐的入门教学。",
+		"disclosure.resources.sumian_note": "— Sumian 的频道，覆盖 resonance / pitch / weight 等技巧。",
+		"disclosure.acknowledge": "我已了解，开始使用",
+		"disclosure.close": "关闭",
+
 		"duck.msg1": "正在聆听声纹…",
 		"duck.msg2": "鸭鸭努力工作中…",
 		"duck.msg3": "鸭鸭竖起了耳朵…",
@@ -421,6 +434,7 @@ const DICT = {
 		"app.logoAria": "Voiceduck GitHub repository",
 		"app.name": "Voiceduck",
 		"header.help": "Help",
+		"header.disclosure": "Before you start",
 		"header.theme": "Toggle theme",
 		"header.lang": "Switch language / 切换语言 / Langue",
 		"header.langShort.zh": "中",
@@ -699,6 +713,24 @@ const DICT = {
 			"Resonance score caps at 1.0; some vowels may already be saturated. Per-vowel z is more diagnostic.",
 		"advice.resonance.caveat.low_alignment": "Alignment quality is low — treat results as approximate.",
 
+		"disclosure.title": "Before you start",
+		"disclosure.intro":
+			"This tool measures a few acoustic features of your voice as a training reference. It isn't a diagnosis, a score, or a substitute for a teacher.",
+		"disclosure.point.measurement":
+			"You're seeing measurements, not instructions — what you do with them is up to you.",
+		"disclosure.point.model_judgment":
+			"The numbers are model output and don't always match what a human ear hears. The model gets some voices wrong.",
+		"disclosure.point.not_teacher":
+			"Not a replacement for a voice teacher or SLP — they can read technique details these numbers can't.",
+		"disclosure.point.dysphoria":
+			"If you're in a rough headspace, the readout may make it worse. It's fine to close this and come back when you're feeling steadier.",
+		"disclosure.resources.heading": "Recommended resources",
+		"disclosure.resources.transvoice_note":
+			"— Zheanna Erose's channel, the most-recommended starting point in the TVT community.",
+		"disclosure.resources.sumian_note": "— Sumian's channel, covering resonance / pitch / weight technique work.",
+		"disclosure.acknowledge": "I understand — let's go",
+		"disclosure.close": "Close",
+
 		"duck.msg1": "Listening to the voiceprint…",
 		"duck.msg2": "Quacking hard at the data…",
 		"duck.msg3": "Duck is perking up its ears…",
@@ -833,6 +865,7 @@ const DICT = {
 		"app.logoAria": "Dépôt GitHub de Voiceduck",
 		"app.name": "Voiceduck",
 		"header.help": "Aide",
+		"header.disclosure": "À lire avant de commencer",
 		"header.theme": "Changer de thème",
 		"header.lang": "Changer de langue / Switch language / 切换语言",
 		"header.langShort.zh": "中",
@@ -1118,6 +1151,26 @@ const DICT = {
 		"advice.resonance.caveat.score_clamp":
 			"Le score de résonance plafonne à 1,0 ; certaines voyelles peuvent être saturées. Le z par voyelle est plus diagnostique.",
 		"advice.resonance.caveat.low_alignment": "Qualité d'alignement faible — résultats à titre indicatif.",
+
+		// TODO(fr): native review of disclosure copy
+		"disclosure.title": "À lire avant de commencer",
+		"disclosure.intro":
+			"Cet outil mesure quelques caractéristiques acoustiques de votre voix, à titre de référence pour le travail vocal. Ce n'est ni un diagnostic, ni un score, ni un substitut à un·e enseignant·e.",
+		"disclosure.point.measurement":
+			"Vous voyez des mesures, pas des instructions — ce que vous en faites vous appartient.",
+		"disclosure.point.model_judgment":
+			"Les chiffres sont des sorties de modèle et ne correspondent pas toujours à ce que l'oreille humaine entend. Le modèle se trompe sur certaines voix.",
+		"disclosure.point.not_teacher":
+			"Ne remplace pas un·e enseignant·e vocal·e ou un·e orthophoniste — iels lisent des détails techniques que ces chiffres ne montrent pas.",
+		"disclosure.point.dysphoria":
+			"Si vous êtes dans une mauvaise passe émotionnelle, ces résultats peuvent vous faire du mal. Il est tout à fait correct de fermer et de revenir quand vous serez plus posé·e.",
+		"disclosure.resources.heading": "Ressources recommandées",
+		"disclosure.resources.transvoice_note":
+			"— La chaîne de Zheanna Erose, la référence d'entrée la plus recommandée dans la communauté TVT.",
+		"disclosure.resources.sumian_note":
+			"— La chaîne de Sumian, qui couvre résonance / hauteur / weight et autres techniques.",
+		"disclosure.acknowledge": "J'ai compris, on y va",
+		"disclosure.close": "Fermer",
 
 		"duck.msg1": "Le canard écoute la voix…",
 		"duck.msg2": "Le canard travaille fort…",

@@ -117,6 +117,30 @@
 							<line x1="12" y1="17" x2="12.01" y2="17" />
 						</svg>
 					</button>
+					<button
+						id="disclosure-toggle"
+						class="icon-btn"
+						data-i18n-aria-label="header.disclosure"
+						data-i18n-title="header.disclosure"
+						aria-label="使用前须知"
+						title="使用前须知"
+					>
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<circle cx="12" cy="12" r="10" />
+							<line x1="12" y1="8" x2="12" y2="12" />
+							<line x1="12" y1="16" x2="12.01" y2="16" />
+						</svg>
+					</button>
 					<button id="theme-toggle" class="icon-btn" data-i18n-aria-label="header.theme" aria-label="切换主题">
 						<svg
 							class="icon-sun"
@@ -1104,6 +1128,78 @@
 				</section>
 			</div>
 		</div>
+
+		<!-- 首次启动 disclosure 浮层（同 vga-help-modal 视觉，独立逻辑） -->
+		<div
+			id="disclosure-modal"
+			class="vga-help-modal"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="disclosure-title"
+		>
+			<div class="vga-help-backdrop" id="disclosure-backdrop"></div>
+			<div class="vga-help-overlay-card card">
+				<div class="vga-help-header">
+					<span id="disclosure-title" data-i18n="disclosure.title">使用前请先了解</span>
+					<button
+						id="disclosure-close"
+						class="icon-btn"
+						data-i18n-aria-label="disclosure.close"
+						aria-label="关闭"
+						hidden
+					>
+						✕
+					</button>
+				</div>
+				<section class="vga-help-section">
+					<p data-i18n="disclosure.intro">
+						这个工具帮你测量声音的几个声学指标，作为练习参考。它不是诊断、不是评分、不是替代专业老师。
+					</p>
+					<ul class="disclosure-points">
+						<li data-i18n="disclosure.point.measurement">显示的是测量值，不是给你的指令——具体怎么练你说了算。</li>
+						<li data-i18n="disclosure.point.model_judgment">
+							数字是模型判断，不一定等同于人耳听感。模型在某些声音上会出错。
+						</li>
+						<li data-i18n="disclosure.point.not_teacher">
+							不替代 voice teacher / SLP——这些数字读不出技巧细节，老师可以。
+						</li>
+						<li data-i18n="disclosure.point.dysphoria">
+							如果当下情绪不太稳，结果可能让你感觉更糟。可以先关掉，状态好一点再回来。
+						</li>
+					</ul>
+				</section>
+				<section class="vga-help-section">
+					<h4 data-i18n="disclosure.resources.heading">推荐资源</h4>
+					<ul class="disclosure-resources">
+						<li>
+							<a href="https://www.youtube.com/@TransVoiceLessons" target="_blank" rel="noopener noreferrer">
+								TransVoiceLessons
+							</a>
+							<span class="disclosure-resource-note" data-i18n="disclosure.resources.transvoice_note">
+								— Zheanna Erose 的频道，TVT 社区最常推荐的入门教学。
+							</span>
+						</li>
+						<li>
+							<a href="https://www.youtube.com/@SumianVoice" target="_blank" rel="noopener noreferrer">
+								Sumian Voice
+							</a>
+							<span class="disclosure-resource-note" data-i18n="disclosure.resources.sumian_note">
+								— Sumian 的频道，覆盖 resonance / pitch / weight 等技巧。
+							</span>
+						</li>
+					</ul>
+				</section>
+				<button
+					type="button"
+					id="disclosure-acknowledge"
+					class="btn-primary disclosure-acknowledge"
+					data-i18n="disclosure.acknowledge"
+				>
+					我已了解，开始使用
+				</button>
+			</div>
+		</div>
+
 		<style>
 			/* ── Overlay container ───────────────────────────── */
 			.vga-help-modal {

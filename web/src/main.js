@@ -3,6 +3,7 @@ import * as audioCache from "./modules/audio-cache.js";
 import { readEmbeddedCreatedAt } from "./modules/audio-metadata.js";
 import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
+import { mountDisclosureModal, showDisclosure } from "./modules/disclosure-modal.js";
 import { buildExportPayload, downloadExport, parseImportFile } from "./modules/export-import.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
 import { applyStaticDom, getLang, onLangChange, setLang, t } from "./modules/i18n.js";
@@ -1441,3 +1442,8 @@ _updateClassifyModeSwitcher();
 _initScatterModeSwitcher();
 _updateScatterModeSwitcher();
 initScatterFromStorage();
+
+// Stage 0: ethical disclosure gate. Force-shows on first visit;
+// header "About" button (#disclosure-toggle) re-opens it later.
+mountDisclosureModal();
+document.getElementById("disclosure-toggle")?.addEventListener("click", showDisclosure);
