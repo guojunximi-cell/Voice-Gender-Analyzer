@@ -89,6 +89,7 @@ def compute_advice(
     dominant_label: str | None,
     *,
     weighted_margin: float | None = None,
+    f0_panel: dict | None = None,
 ) -> dict:
     """Build the summary.advice panel.
 
@@ -101,11 +102,17 @@ def compute_advice(
     helper (`statics.weighted_confidence`) owns the weighting formula. When
     None (tests / standalone use), it is recomputed via the same helper —
     no parallel implementation here.
+
+    `f0_panel` lets callers pre-compute pyin once and pass it in (the
+    pipeline does this so `do_statics.overall_f0_median_hz` and
+    `advice.f0_panel.median_hz` come from the same pyin pass). Tests and
+    standalone callers can leave it None — we'll compute it ourselves.
     """
     duration_sec = round(float(duration_sec), 2)
     tier = _gating_tier(duration_sec)
 
-    f0_panel = compute_f0_panel(y, sr, duration_sec)
+    if f0_panel is None:
+        f0_panel = compute_f0_panel(y, sr, duration_sec)
     distribution = _label_distribution(analyse_results, duration_sec)
     if weighted_margin is None:
         weighted_margin = weighted_confidence(analyse_results, label_filter=dominant_label)

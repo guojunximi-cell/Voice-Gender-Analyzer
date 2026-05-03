@@ -1,9 +1,10 @@
 """Advice v2: file-level F0 measurement (pyin[60-250]).
 
-Used by advice_v2.compute_advice. Separate from acoustic_analyzer._extract_f0
-because it intentionally narrows pyin range to avoid octave-doubling on
-low-F0 speakers (verified by tests/stress_f0_window.py): pyin[60-1047] gives
-~316 Hz on a 176 Hz cis male; pyin[60-250] gives the correct 172 Hz.
+Used by advice_v2.compute_advice and (since Engine B was decommissioned
+2026-04-07) also by do_statics for summary.overall_f0_median_hz. The
+narrowed pyin range avoids octave-doubling on low-F0 speakers (verified by
+tests/stress_f0_window.py): pyin[60-1047] gives ~316 Hz on a 176 Hz cis
+male; pyin[60-250] gives the correct 172 Hz.
 
 Voicing is gated by pyin's own `voiced_flag` (viterbi-smoothed). An earlier
 revision layered `voiced_prob > 0.5` on top, but that only retained the

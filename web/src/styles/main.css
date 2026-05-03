@@ -1610,20 +1610,6 @@ body {
 	margin-top: 4px;
 }
 
-/* Segment acoustic dot indicator */
-.segment-acoustic-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: var(--accent);
-	justify-self: center;
-	flex-shrink: 0;
-}
-
-.segment-item.no-acoustics {
-	opacity: 0.65;
-}
-
 /* Confidence micro-bar in segment list */
 .segment-conf-bar {
 	width: 28px;

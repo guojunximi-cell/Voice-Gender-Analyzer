@@ -15,7 +15,7 @@ const LABEL_VARS = {
 // ─── Module state ─────────────────────────────────────────────
 let ws = null;
 let duration = 0;
-let segments = []; // full segment objects (including acoustics)
+let segments = []; // full segment objects from Engine A
 let resizeObserver = null;
 let _tooltip = null;
 let _selectedTint = null; // currently selected tint rect

@@ -77,11 +77,9 @@ export function renderSegments(analysis) {
 	analysis.forEach((seg, i) => {
 		const meta = LABEL_META[seg.label] || { zh: seg.label, cssVar: "var(--noise)" };
 		const dur = seg.end_time - seg.start_time;
-		const hasAcoustics = !!seg.acoustics;
 
 		const item = document.createElement("div");
 		item.className = "segment-item";
-		if (!hasAcoustics) item.classList.add("no-acoustics");
 		item.dataset.index = i;
 
 		const swatch = document.createElement("span");
@@ -100,18 +98,10 @@ export function renderSegments(analysis) {
 		duration.className = "segment-duration";
 		duration.textContent = fmt(dur);
 
-		// Acoustic indicator dot (shows that Engine B data is available)
 		item.appendChild(swatch);
 		item.appendChild(label);
 		item.appendChild(time);
 		item.appendChild(duration);
-
-		if (hasAcoustics) {
-			const dot = document.createElement("span");
-			dot.className = "segment-acoustic-dot";
-			dot.title = t("segments.acousticDot");
-			item.appendChild(dot);
-		}
 
 		// Confidence micro-bar for voiced segments
 		const voiced = seg.label === "female" || seg.label === "male";

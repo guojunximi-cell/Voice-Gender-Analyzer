@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
 from pydantic import BaseModel
 
-from voiceya.services.audio_analyser.acoustic_analyzer import analyze_segment
-from voiceya.services.sse import ProgressSSE
-
 if TYPE_CHECKING:
-    from voiceya.services.events_stream import PublisherT
+    from voiceya.services.events_stream import PublisherT  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +19,9 @@ class AnalyseResultItem(BaseModel):
     duration: float  # = end_time - start_time
     confidence: float | None = None  # = seg_item[3] if len(seg_item) > 3 else None
     confidence_frames: list[float] | None = None  # = seg_item[4] if len(seg_item) > 4 else None
-    acoustics: dict | None = None
-
-
-def _is_analyzable(label: str, duration: float) -> bool:
-    # Engine B 只对够长的有声段抽声学特征；短段或非语音段 F0/共振峰都不稳。
-    return label in ("female", "male") and duration >= 0.5
+    # acoustics 永远是 None。Engine B (acoustic_analyzer) 已下线；保留字段是为
+    # 旧导出的 .vga.json 还能反序列化。前端不再依赖它。
+    acoustics: None = None
 
 
 async def do_analyse_segments(
@@ -36,17 +29,12 @@ async def do_analyse_segments(
     sr_full: int,
     segmentation_results: list[tuple],
     publish: PublisherT,
-    end_pct: int = 95,
 ):
-    # 音频已由 do_analyse 提前 load + 闸门校验，这里只需切片做声学分析。
-    # start_pct 紧跟 do_analyse 里 organize 事件（pct=35）后面 2pt，避免长跳。
-    start_pct = 37
-    await publish(ProgressSSE(pct=start_pct, msg="鸭鸭正在载入音频…", msg_key="progress.loadAudio"))
+    # Engine B 下线后这里只剩"把 ina 元组转 pydantic 模型 + 丢碎屑"——纯
+    # CPU 内存操作，<1ms，无需进度事件，也不再切片做 LPC。signature 还保留
+    # publish 形参以便 do_analyse 调用方少改字段，但本函数不再 emit。
+    _ = publish  # silence unused-arg lint
 
-    total_voiced = sum(1 for s in segmentation_results if _is_analyzable(s[0], s[2] - s[1]))
-    span = max(end_pct - start_pct, 0)
-
-    i = 0
     results: list[AnalyseResultItem] = list()
     for seg_item in segmentation_results:
         r = AnalyseResultItem(
@@ -56,43 +44,11 @@ async def do_analyse_segments(
             duration=round(seg_item[2] - seg_item[1], 2),
             confidence=round(seg_item[3], 4) if len(seg_item) > 3 else None,
             confidence_frames=seg_item[4] if len(seg_item) > 4 else None,
-            acoustics=None,
         )
 
         # 丢掉短时非语音碎屑，避免时间轴被噪声挤满。
         if r.label not in ("female", "male") and r.duration < 0.5:
             continue
-
-        # 进度计数与声学分析严格对齐：只对 _is_analyzable 的段推进进度，
-        # 否则 i 会越过 total_voiced，百分比冲破 95% 留下样式 bug。
-        if _is_analyzable(r.label, r.duration):
-            i += 1
-            pct = start_pct + round(span * i / max(total_voiced, 1), 1)
-            await publish(
-                ProgressSSE(
-                    pct=round(pct),
-                    msg=f"鸭鸭在分析第 {i}/{total_voiced} 段…",
-                    msg_key="progress.analyseSegment",
-                    msg_params={"i": i, "total": total_voiced},
-                )
-            )
-
-            start = int(r.start_time * sr_full)
-            end = int(r.end_time * sr_full)
-            try:
-                y_seg = y_full[start:end]
-                # numpy ndarray 不能直接当 bool 用（多元素会抛
-                # "truth value of an array is ambiguous"），这里只关心切片非空。
-                if y_seg.size:
-                    r.acoustics = await asyncio.to_thread(analyze_segment, y_seg, int(sr_full))
-
-            except Exception as e:
-                logger.warning(
-                    "Engine B 跳过 [%.1f~%.1fs]: %s",
-                    r.start_time,
-                    r.end_time,
-                    e,
-                )
 
         r.start_time = round(r.start_time, 2)
         r.end_time = round(r.end_time, 2)

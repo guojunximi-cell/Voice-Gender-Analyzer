@@ -139,7 +139,6 @@ const DICT = {
 
 		"segments.title": "分段详情",
 		"segments.countSuffix": "段",
-		"segments.acousticDot": "含声学分析",
 		"segments.confTitle": "置信度 {pct}%",
 
 		"mobile.tabSegments": "分段详情",
@@ -515,7 +514,6 @@ const DICT = {
 
 		"segments.title": "Segments",
 		"segments.countSuffix": "segs",
-		"segments.acousticDot": "Includes acoustic analysis",
 		"segments.confTitle": "Classifier confidence {pct}%",
 
 		"mobile.tabSegments": "Segments",
@@ -903,7 +901,6 @@ const DICT = {
 
 		"segments.title": "Segments",
 		"segments.countSuffix": "segs",
-		"segments.acousticDot": "Inclut une analyse acoustique",
 		"segments.confTitle": "Confiance du classificateur {pct} %",
 
 		"mobile.tabSegments": "Segments",

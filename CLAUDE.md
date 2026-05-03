@@ -55,7 +55,6 @@ docker compose --profile engine-c up -d --build
             └─ worker 进程    → voiceya/tasks/analyser.py::analyse_voice
                  └─ services/audio_analyser/__init__.py::do_analyse
                       ├─ Engine A: do_segmentation()
-                      ├─ Engine B: do_analyse_segments()（仍在代码里但2026-04-07已下线，结果不再对外）
                       └─ Engine C: run_engine_c()（feature-flagged）
 
 浏览器 GET /status/{task_id}  （Accept: text/event-stream）
@@ -65,16 +64,20 @@ docker compose --profile engine-c up -d --build
 
 API 进程与 worker 进程是分离的：**API 不加载 TF 模型**（省 ~500 MB），只做任务分发与 SSE 转发；`load_seg()` 只在 `broker.is_worker_process` 时触发。SSE 事件用 Redis Streams（非 pub/sub），迟到的客户端能从头回放。
 
-## 分析管线：三引擎并存
+## 分析管线：A + C 双引擎
 
 | 引擎 | 文件 | 职责 | 依赖 |
 |------|------|------|------|
 | Engine A | `voiceya/services/audio_analyser/engine_a.py` | VAD + 性别分段（inaSpeechSegmenter） | Keras/TF |
-| Engine B | `voiceya/services/audio_analyser/acoustic_analyzer.py` | LPC 共振峰 + 合成性别评分（**已下线，代码保留**） | librosa/scipy |
 | Engine C | `voiceya/services/audio_analyser/engine_c.py` + sidecar | ASR → MFA 对齐 → Praat 共振峰 → 音素级 z-score（**feature-flagged**） | funasr + faster-whisper + visualizer-backend sidecar |
 
+Engine B（`acoustic_analyzer.py`，LPC 共振峰 + 合成性别评分）2026-04-07 下线，
+代码已删除。`summary.overall_f0_median_hz` 现在来自 `f0_panel.py`（pyin[60-250]，
+advice_v2 与 do_statics 共用一次结果）；`summary.overall_gender_score` 改由
+`statics._femininity_score()` 从 Engine A 的置信度 + label 推导。
+
 Engine C 默认关闭（`ENGINE_C_ENABLED=false`）；开启需同时起 sidecar：
-`docker compose --profile engine-c up -d --build`。失败/不可达时 `summary.engine_c = null`，不影响 A/B 结果。
+`docker compose --profile engine-c up -d --build`。失败/不可达时 `summary.engine_c = null`，不影响 Engine A 结果。
 
 ## Advice v2 输出 schema
 
