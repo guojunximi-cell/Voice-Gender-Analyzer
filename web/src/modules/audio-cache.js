@@ -46,7 +46,24 @@ export async function get(id) {
 				}
 				const name = row.name || id;
 				const mime = row.mime || row.blob.type || "";
-				resolve(new File([row.blob], name, { type: mime }));
+				// 复原 File 时一定要带 lastModified —— 否则 File 构造器会默认成 Date.now()，
+				// 把"再点一次历史散点重新分析"的 createdAt 洗成现在。
+				// row.lastModified 来自原始上传/导入 File 的 mtime（_put 写入）；
+				// 缺失时退化为 row.createdAt（IDB 行写入时刻），仍比 Date.now() 接近真值。
+				const lastModified =
+					Number.isFinite(row.lastModified) && row.lastModified > 0
+						? row.lastModified
+						: Number.isFinite(row.createdAt) && row.createdAt > 0
+							? row.createdAt
+							: Date.now();
+				const file = new File([row.blob], name, { type: mime, lastModified });
+				// 把已经推断出来的录音时间塞回 File 实例，省掉重新 box 解析。
+				if (Number.isFinite(row.inferredCreatedAt) && row.inferredCreatedAt > 0) {
+					try {
+						file.__inferredCreatedAt = row.inferredCreatedAt;
+					} catch {}
+				}
+				resolve(file);
 			};
 			r.onerror = () => reject(r.error);
 		});
@@ -90,7 +107,13 @@ async function _put(id, file) {
 		name: file.name || id,
 		mime: file.type || "",
 		size: file.size || 0,
+		// IDB 行写入时刻——LRU 淘汰用，与下面 lastModified（音频本体的 mtime）含义不同。
 		createdAt: Date.now(),
+		// 音频本体的 mtime / 录音时间。复原 File 时塞回 lastModified，避免 Date.now() 默认。
+		lastModified: Number.isFinite(file.lastModified) && file.lastModified > 0 ? file.lastModified : null,
+		// _audioRecordedAt 已经从 MP4 元数据推断过的录音时间——存下来避免下次复原后重解析。
+		inferredCreatedAt:
+			Number.isFinite(file.__inferredCreatedAt) && file.__inferredCreatedAt > 0 ? file.__inferredCreatedAt : null,
 	};
 	await new Promise((resolve, reject) => {
 		const tx = db.transaction(STORE_AUDIO, "readwrite");

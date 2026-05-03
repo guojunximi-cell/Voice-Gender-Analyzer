@@ -79,7 +79,7 @@ function buildExportFilename(basename, date = new Date()) {
  * 注意：confidence_frames 无论如何都丢弃（前端不消费，体积可观）。
  */
 async function _serializeSession(session, { includeAudio, includeEngineC, audioFile }) {
-	const { summary, analysis, filename } = session;
+	const { summary, analysis, filename, createdAt } = session;
 	const slimAnalysis = (Array.isArray(analysis) ? analysis : []).map((seg) => {
 		const { confidence_frames: _drop, ...rest } = seg ?? {};
 		return rest;
@@ -94,12 +94,17 @@ async function _serializeSession(session, { includeAudio, includeEngineC, audioF
 		summary: slimSummary,
 		analysis: slimAnalysis,
 	};
+	// 历史排序需要原始"音频创建时间"。导出时透传 session.createdAt 和 audio.lastModified，
+	// 导入侧才能把散点图的时间轴还原回正确位置（否则全部塞在 "now"）。
+	if (Number.isFinite(createdAt) && createdAt > 0) out.created_at = createdAt;
 	if (includeAudio && audioFile) {
 		out.audio = {
 			mime: audioFile.type || "application/octet-stream",
 			name: audioFile.name || filename || "",
 			base64: await blobToBase64(audioFile),
 			size_bytes: audioFile.size || 0,
+			last_modified:
+				Number.isFinite(audioFile.lastModified) && audioFile.lastModified > 0 ? audioFile.lastModified : undefined,
 		};
 	}
 	return out;
@@ -193,6 +198,15 @@ export async function parseImportFile(file) {
 		err.i18n = "import.errMalformed";
 		throw err;
 	}
+	// Pre-createdAt 导出文件既没顶层 session.created_at 也没 audio.last_modified；
+	// wrapper 的 exported_at 自 schema v1 起就存在，是兜底"原始时间"的最后一根稻草——
+	// 不一定等于录音时刻，但远比"导入时刻"接近真相。
+	const exportedAtMs = (() => {
+		const v = obj?.exported_at;
+		if (typeof v !== "string") return null;
+		const ms = Date.parse(v);
+		return Number.isFinite(ms) && ms > 0 ? ms : null;
+	})();
 	const sessions = arr.map((s) => {
 		if (!s?.summary || !Array.isArray(s.analysis)) {
 			const err = new Error(t("import.errMalformed"));
@@ -204,11 +218,24 @@ export async function parseImportFile(file) {
 			summary: s.summary,
 			analysis: s.analysis,
 		};
+		// 录音时间 fallback 链：session 顶层 created_at → audio.last_modified → 包级 exported_at。
+		// 先把候选值算出来；再把同一个值塞进 audioFile 的 lastModified——否则
+		// `new File(..., { lastModified: undefined })` 会被规范默认成 Date.now()，
+		// 让 _audioRecordedAt(audioFile) 拿到错误值。
+		const audioLm = Number.isFinite(s.audio?.last_modified) && s.audio.last_modified > 0 ? s.audio.last_modified : null;
+		let candidate = Number.isFinite(s.created_at) && s.created_at > 0 ? s.created_at : null;
+		if (candidate == null && audioLm != null) candidate = audioLm;
+		if (candidate == null && exportedAtMs != null) candidate = exportedAtMs;
+		if (candidate != null) out.createdAt = candidate;
 		if (s.audio?.base64) {
 			try {
 				const blob = base64ToBlob(s.audio.base64, s.audio.mime);
 				const name = s.audio.name || out.filename;
-				out.audioFile = new File([blob], name, { type: s.audio.mime || blob.type });
+				out.audioFile = new File([blob], name, {
+					type: s.audio.mime || blob.type,
+					// 优先 audio.last_modified（音频本体的录音时间），再退到上面整条 candidate 链。
+					lastModified: audioLm ?? candidate ?? Date.now(),
+				});
 			} catch {
 				out.audioFile = null;
 			}

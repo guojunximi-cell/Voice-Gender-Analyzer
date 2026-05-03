@@ -1,5 +1,6 @@
 import { analyzeAudio, cancelAnalysis } from "./modules/analyzer.js";
 import * as audioCache from "./modules/audio-cache.js";
+import { readEmbeddedCreatedAt } from "./modules/audio-metadata.js";
 import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
 import { buildExportPayload, downloadExport, parseImportFile } from "./modules/export-import.js";
@@ -59,6 +60,36 @@ const $ = (id) => document.getElementById(id);
 function setAudioUnavailableHint(show) {
 	const el = $("audio-unavailable-hint");
 	if (el) el.hidden = !show;
+}
+
+// 历史里的"音频录制时间"。优先级：
+//   1. MP4/M4A 容器内嵌的 mvhd / com.apple.quicktime.creationdate（手机录音的真值，
+//      iCloud / 微信 / AirDrop 转一手不会被冲刷）
+//   2. File.lastModified（操作系统 mtime；纯录音 / 桌面文件能用，但同步过的不准）
+//   3. Date.now() —— 最后兜底
+// 结果缓存到 File 实例的 __inferredCreatedAt 上（onFileSelected → analyze
+// 链路里同一个 File 会被读两次：保存 session + 入 audio-cache）。
+async function _audioRecordedAt(file) {
+	if (!file) return Date.now();
+	if (file.__inferredCreatedAt != null) return file.__inferredCreatedAt;
+	let inferred = null;
+	try {
+		const m = await readEmbeddedCreatedAt(file);
+		if (m && Number.isFinite(m.createdAt) && m.createdAt > 0) inferred = m.createdAt;
+	} catch {
+		// readEmbeddedCreatedAt 已经吞过一层异常，这里再保险。
+	}
+	if (inferred == null) {
+		const lm = file.lastModified;
+		if (Number.isFinite(lm) && lm > 0) inferred = lm;
+	}
+	if (inferred == null) inferred = Date.now();
+	try {
+		file.__inferredCreatedAt = inferred;
+	} catch {
+		// 某些 File 实例（File from showOpenFilePicker 在严格模式下）禁止扩展属性。
+	}
+	return inferred;
 }
 
 // ─── Record mode (free-speech vs. script mode for Engine C) ──────
@@ -614,6 +645,7 @@ async function _silentAnalyzeAndSave(file) {
 			const session = {
 				id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
 				filename: data.filename,
+				createdAt: await _audioRecordedAt(file),
 				f0_median: data.summary.overall_f0_median_hz,
 				gender_score: data.summary.overall_gender_score,
 				confidence: data.summary.overall_confidence,
@@ -730,7 +762,7 @@ async function initUploaders() {
 				await _loadImportedSession(sessions[0]);
 				showToast(t("import.successFmt", { name: sessions[0].filename }));
 			} else {
-				for (const s of sessions) _appendImportedToHistory(s);
+				for (const s of sessions) await _appendImportedToHistory(s);
 				showToast(t("import.successMultiFmt", { n: sessions.length }));
 			}
 		} catch (err) {
@@ -825,6 +857,7 @@ $("analyze-btn")?.addEventListener("click", async () => {
 			const session = {
 				id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
 				filename: data.filename,
+				createdAt: await _audioRecordedAt(currentFile),
 				f0_median: data.summary.overall_f0_median_hz,
 				gender_score: data.summary.overall_gender_score,
 				confidence: data.summary.overall_confidence,
@@ -1087,12 +1120,13 @@ function onScatterDeselect() {
 }
 
 // 追加单条导入项到历史 + 散点图（不打开详情）。多 session 导入用。
-function _appendImportedToHistory({ summary, analysis, filename, audioFile }) {
+async function _appendImportedToHistory({ summary, analysis, filename, audioFile, createdAt }) {
 	if (summary?.overall_f0_median_hz == null) return null;
 	const sessionId = Date.now().toString() + Math.random().toString(36).slice(2, 8);
 	const session = {
 		id: sessionId,
 		filename: filename || "imported",
+		createdAt: createdAt ?? (await _audioRecordedAt(audioFile)),
 		f0_median: summary.overall_f0_median_hz,
 		gender_score: summary.overall_gender_score,
 		confidence: summary.overall_confidence,
@@ -1110,13 +1144,14 @@ function _appendImportedToHistory({ summary, analysis, filename, audioFile }) {
 // ─── Import previously exported result ──────────────────────
 // 走和"点散点图历史 dot"几乎一样的还原路径。如果导出文件包含音频，
 // 还能完整还原 player + 波形 + 卡拉 OK 同步——用户体验从冷态变成热态。
-async function _loadImportedSession({ summary, analysis, filename, audioFile }) {
+async function _loadImportedSession({ summary, analysis, filename, audioFile, createdAt }) {
 	if (phase === "analyzing") cancelAnalysis();
 
 	const sessionId = Date.now().toString() + Math.random().toString(36).slice(2, 8);
 	const session = {
 		id: sessionId,
 		filename: filename || "imported",
+		createdAt: createdAt ?? (await _audioRecordedAt(audioFile)),
 		f0_median: summary.overall_f0_median_hz,
 		gender_score: summary.overall_gender_score,
 		confidence: summary.overall_confidence,
