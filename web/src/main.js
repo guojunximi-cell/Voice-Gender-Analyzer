@@ -745,28 +745,41 @@ async function initUploaders() {
 		},
 	});
 
-	// Import previously exported .vga.json — single-file, JSON only.
+	// Import previously exported .vga.json — multi-file capable, JSON only.
 	// 走和散点图历史还原一样的路径，把 summary/analysis/audio 灌回 UI。
 	$("import-result-btn")?.addEventListener("click", () => {
 		$("import-input")?.click();
 	});
 	$("import-input")?.addEventListener("change", async (e) => {
-		const file = e.target.files?.[0];
+		const files = [...(e.target.files || [])];
 		e.target.value = "";
-		if (!file) return;
-		try {
-			const { sessions } = await parseImportFile(file);
-			// 单 session：自动打开详情（最常见用例）。
-			// 多 session：仅追加到历史，让用户在散点图自己选要看哪条。
-			if (sessions.length === 1) {
-				await _loadImportedSession(sessions[0]);
-				showToast(t("import.successFmt", { name: sessions[0].filename }));
-			} else {
-				for (const s of sessions) await _appendImportedToHistory(s);
-				showToast(t("import.successMultiFmt", { n: sessions.length }));
+		if (files.length === 0) return;
+
+		// 顺序解析：每个文件 base64→Blob 解码会驻留在内存，并行 N 份会把 RSS 吹起来。
+		const allSessions = [];
+		const errors = [];
+		for (const file of files) {
+			try {
+				const { sessions } = await parseImportFile(file);
+				allSessions.push(...sessions);
+			} catch (err) {
+				errors.push({ name: file.name, message: err.message });
 			}
-		} catch (err) {
-			showToast(err.message, "error");
+		}
+
+		for (const { name, message } of errors) {
+			showToast(`${name}: ${message}`, "error");
+		}
+
+		if (allSessions.length === 0) return;
+		// 只有"单文件单 session 且无错"才自动打开详情，沿用旧的 UX 契约。
+		// 其它情况一律入历史，让用户在散点图自己选要看哪条。
+		if (files.length === 1 && allSessions.length === 1 && errors.length === 0) {
+			await _loadImportedSession(allSessions[0]);
+			showToast(t("import.successFmt", { name: allSessions[0].filename }));
+		} else {
+			for (const s of allSessions) await _appendImportedToHistory(s);
+			showToast(t("import.successMultiFmt", { n: allSessions.length }));
 		}
 	});
 }

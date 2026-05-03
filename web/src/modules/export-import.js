@@ -15,6 +15,12 @@ import { getLang, t } from "./i18n.js";
 
 export const EXPORT_SCHEMA_VERSION = "1";
 
+// 导入安全边界：覆盖 50 sessions × ~6 MB 内联音频的真实导出，但够紧让恶意/损坏文件
+// 不能阻塞 tab。三个上限分别对应：单文件 JSON 体积、单条音频 base64 长度、文件内 session 数。
+export const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
+export const MAX_AUDIO_B64_BYTES = 12 * 1024 * 1024;
+export const MAX_SESSIONS_PER_FILE = 100;
+
 // vite define 注入；非 build 环境兜底成 0.0.0。
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
 
@@ -170,6 +176,13 @@ export function downloadExport(exportObj) {
  * audioFile 是从 base64 还原的 File 对象（可塞回 audioCache）。
  */
 export async function parseImportFile(file) {
+	if (Number.isFinite(file?.size) && file.size > MAX_IMPORT_BYTES) {
+		const mb = (file.size / 1024 / 1024).toFixed(1);
+		const limit = (MAX_IMPORT_BYTES / 1024 / 1024).toFixed(0);
+		const err = new Error(t("import.errTooLarge", { mb, limit }));
+		err.i18n = "import.errTooLarge";
+		throw err;
+	}
 	let text;
 	try {
 		text = await file.text();
@@ -196,6 +209,11 @@ export async function parseImportFile(file) {
 	if (!Array.isArray(arr) || arr.length === 0) {
 		const err = new Error(t("import.errMalformed"));
 		err.i18n = "import.errMalformed";
+		throw err;
+	}
+	if (arr.length > MAX_SESSIONS_PER_FILE) {
+		const err = new Error(t("import.errTooManySessions", { n: arr.length, limit: MAX_SESSIONS_PER_FILE }));
+		err.i18n = "import.errTooManySessions";
 		throw err;
 	}
 	// Pre-createdAt 导出文件既没顶层 session.created_at 也没 audio.last_modified；
@@ -228,16 +246,22 @@ export async function parseImportFile(file) {
 		if (candidate == null && exportedAtMs != null) candidate = exportedAtMs;
 		if (candidate != null) out.createdAt = candidate;
 		if (s.audio?.base64) {
-			try {
-				const blob = base64ToBlob(s.audio.base64, s.audio.mime);
-				const name = s.audio.name || out.filename;
-				out.audioFile = new File([blob], name, {
-					type: s.audio.mime || blob.type,
-					// 优先 audio.last_modified（音频本体的录音时间），再退到上面整条 candidate 链。
-					lastModified: audioLm ?? candidate ?? Date.now(),
-				});
-			} catch {
+			// 单条音频 base64 超限：跳过音频本体（音色/波形不可还原），但仍保留 summary/analysis。
+			// 优雅降级，让用户至少看到分析结果而不是整次导入失败。
+			if (s.audio.base64.length > MAX_AUDIO_B64_BYTES) {
 				out.audioFile = null;
+			} else {
+				try {
+					const blob = base64ToBlob(s.audio.base64, s.audio.mime);
+					const name = s.audio.name || out.filename;
+					out.audioFile = new File([blob], name, {
+						type: s.audio.mime || blob.type,
+						// 优先 audio.last_modified（音频本体的录音时间），再退到上面整条 candidate 链。
+						lastModified: audioLm ?? candidate ?? Date.now(),
+					});
+				} catch {
+					out.audioFile = null;
+				}
 			}
 		}
 		return out;
