@@ -1297,13 +1297,74 @@ body {
 }
 
 /* ── Advice v2 panel ──────────────────────────────────────────
-   One-sentence summary + gating warning. */
+   Summary one-liner + zone/tendency tags + caveat + warnings.
+   Behind VITE_ADVICE_PANEL_V2 (default on). */
 .advice-panel {
 	padding: 14px 14px 8px;
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
 	border-bottom: 1px solid var(--border-strong);
+}
+
+.advice-summary {
+	font-size: 0.86rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+	font-weight: 500;
+}
+
+.advice-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.advice-tag {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px 9px;
+	border-radius: 999px;
+	font-size: 0.72rem;
+	line-height: 1.4;
+	font-weight: 500;
+	background: color-mix(in srgb, var(--text-secondary) 8%, transparent);
+	border: 1px solid color-mix(in srgb, var(--text-secondary) 18%, transparent);
+	color: var(--text-secondary);
+}
+
+.advice-tag-zone {
+	background: color-mix(in srgb, var(--accent) 8%, transparent);
+	border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+	color: var(--accent);
+}
+
+.advice-tag-tone-leans_feminine,
+.advice-tag-tone-weakly_feminine {
+	background: color-mix(in srgb, var(--female) 12%, transparent);
+	border-color: color-mix(in srgb, var(--female) 35%, transparent);
+	color: var(--female);
+}
+
+.advice-tag-tone-leans_masculine,
+.advice-tag-tone-weakly_masculine {
+	background: color-mix(in srgb, var(--male) 12%, transparent);
+	border-color: color-mix(in srgb, var(--male) 35%, transparent);
+	color: var(--male);
+}
+
+.advice-caveat {
+	font-size: 0.72rem;
+	line-height: 1.45;
+	color: var(--text-secondary);
+	opacity: 0.85;
+	padding-left: 2px;
+}
+
+.advice-warnings {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
 
 .advice-warning {

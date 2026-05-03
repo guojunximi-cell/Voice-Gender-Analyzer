@@ -210,10 +210,30 @@ export function clearMetricsPanel() {
 }
 
 // ─── Advice v2 panel ─────────────────────────────────────────
-// Renders summary.advice as a gating warning. The summary text is
-// suppressed because the F0 card + advice panels already convey the
-// same numbers and tendency.
+// Renders the summary.advice panels: summary one-liner, f0 zone +
+// tone tendency tags, ina caveat, and all gating warnings. Behind
+// VITE_ADVICE_PANEL_V2 (default ON) so we can fall back to the
+// legacy "warnings[0] only" view as a kill-switch in week 1.
 // See docs/plans/v2_redesign_measurement.md §1, §3.
+const ADVICE_V2_ENABLED = import.meta.env?.VITE_ADVICE_PANEL_V2 !== "0";
+
+const _WARN_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+const _CLOSE_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+function _buildWarningNode(text, onDismiss) {
+	const wrap = document.createElement("div");
+	wrap.className = "advice-warning";
+	wrap.innerHTML = `${_WARN_SVG}<span class="advice-warning-text">${text}</span><button type="button" class="advice-warning-close" data-i18n-aria-label="advice.warning.dismiss" aria-label="${t("advice.warning.dismiss")}">${_CLOSE_SVG}</button>`;
+	const btn = wrap.querySelector(".advice-warning-close");
+	btn?.addEventListener("click", onDismiss);
+	return wrap;
+}
+
+function _hide(id) {
+	const el = document.getElementById(id);
+	if (el) el.hidden = true;
+}
+
 export function renderAdvicePanel(advice) {
 	const panel = document.getElementById("advice-panel");
 	if (!panel) return;
@@ -222,28 +242,84 @@ export function renderAdvicePanel(advice) {
 		return;
 	}
 
-	const warnEl = document.getElementById("advice-warning");
-	const warnText = document.getElementById("advice-warning-text");
-	const firstWarn = advice.warnings?.[0];
-	if (warnEl && warnText && firstWarn) {
-		warnText.textContent = t(firstWarn.key, firstWarn.params || {});
-		warnEl.hidden = false;
-		const closeBtn = document.getElementById("advice-warning-close");
-		if (closeBtn && !closeBtn.dataset.bound) {
-			closeBtn.dataset.bound = "1";
-			closeBtn.addEventListener("click", () => {
-				warnEl.hidden = true;
-				panel.hidden = true;
-			});
+	let any = false;
+
+	// ── Rich content (V2 only) ─────────────────────────────
+	if (ADVICE_V2_ENABLED) {
+		// Summary one-liner
+		const summaryEl = document.getElementById("advice-summary");
+		const sp = advice.summary_panel;
+		if (summaryEl && sp?.text_key) {
+			summaryEl.textContent = t(sp.text_key, sp.text_params || {});
+			summaryEl.hidden = false;
+			any = true;
+		} else if (summaryEl) {
+			summaryEl.hidden = true;
 		}
-	} else if (warnEl) {
-		warnEl.hidden = true;
+
+		// Tags: F0 zone + tone tendency
+		const tagsEl = document.getElementById("advice-tags");
+		if (tagsEl) {
+			tagsEl.replaceChildren();
+			const zone = advice.f0_panel?.range_zone_key;
+			if (zone) {
+				const span = document.createElement("span");
+				span.className = "advice-tag advice-tag-zone";
+				span.textContent = t(`advice.zone.${zone}`);
+				tagsEl.appendChild(span);
+			}
+			const tendency = advice.tone_panel?.tone_tendency_key;
+			if (tendency) {
+				const span = document.createElement("span");
+				span.className = `advice-tag advice-tag-tone advice-tag-tone-${tendency}`;
+				span.textContent = t(`advice.tone.${tendency}`);
+				tagsEl.appendChild(span);
+			}
+			tagsEl.hidden = tagsEl.childElementCount === 0;
+			if (!tagsEl.hidden) any = true;
+		}
+
+		// Tone caveat (ina F0 bias)
+		const caveatEl = document.getElementById("advice-tone-caveat");
+		const caveatKey = advice.tone_panel?.caveat_key;
+		if (caveatEl && caveatKey) {
+			caveatEl.textContent = t(caveatKey);
+			caveatEl.hidden = false;
+			any = true;
+		} else if (caveatEl) {
+			caveatEl.hidden = true;
+		}
+	} else {
+		_hide("advice-summary");
+		_hide("advice-tags");
+		_hide("advice-tone-caveat");
 	}
 
-	panel.hidden = !firstWarn;
+	// ── Warnings (V2 = all, legacy = first only) ───────────
+	const warningsEl = document.getElementById("advice-warnings");
+	if (warningsEl) {
+		warningsEl.replaceChildren();
+		const list = advice.warnings || [];
+		const renderList = ADVICE_V2_ENABLED ? list : list.slice(0, 1);
+		for (const w of renderList) {
+			const node = _buildWarningNode(t(w.key, w.params || {}), () => {
+				node.remove();
+				if (warningsEl.childElementCount === 0 && !any) panel.hidden = true;
+			});
+			warningsEl.appendChild(node);
+		}
+		if (renderList.length) any = true;
+	}
+
+	panel.hidden = !any;
 }
 
 export function clearAdvicePanel() {
 	const panel = document.getElementById("advice-panel");
 	if (panel) panel.hidden = true;
+	_hide("advice-summary");
+	_hide("advice-tags");
+	_hide("advice-tone-caveat");
+	const warningsEl = document.getElementById("advice-warnings");
+	if (warningsEl) warningsEl.replaceChildren();
 }
