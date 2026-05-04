@@ -269,6 +269,9 @@ const DICT = {
 		"advice.summary.high_weakly_masculine": "F0 中位数 {f0} Hz，位于高基频区间。声学轻微偏男。",
 		"advice.summary.high_not_clearly_leaning": "F0 中位数 {f0} Hz，位于高基频区间。倾向不明显。",
 
+		"ina.f0_bias_caveat":
+			"声学倾向标签来自 inaSpeechSegmenter（CNN 分类器），主要由 F0 驱动；共振 / 共振峰只占很小权重。对应「音色倾向」而非完整的人耳听感。",
+
 		"advice.resonance.title": "共振表现",
 		"advice.resonance.median_label": "共振中位数",
 		"advice.resonance.weakness_section_title": "重点练习",
@@ -687,6 +690,9 @@ const DICT = {
 		"advice.summary.high_weakly_feminine": "F0 median {f0} Hz, high range. Slightly feminine.",
 		"advice.summary.high_weakly_masculine": "F0 median {f0} Hz, high range. Slightly masculine.",
 		"advice.summary.high_not_clearly_leaning": "F0 median {f0} Hz, high range. Not clearly leaning.",
+
+		"ina.f0_bias_caveat":
+			"The tone tendency comes from inaSpeechSegmenter (a CNN classifier) and is dominated by F0; resonance / formants carry very little weight. Read it as a vocal-tone proxy, not a full human-ear judgement.",
 
 		"advice.resonance.title": "Resonance",
 		"advice.resonance.median_label": "Median resonance",
@@ -1124,6 +1130,9 @@ const DICT = {
 		"advice.summary.high_weakly_feminine": "F0 médiane {f0} Hz, plage haute. Légèrement féminine.",
 		"advice.summary.high_weakly_masculine": "F0 médiane {f0} Hz, plage haute. Légèrement masculine.",
 		"advice.summary.high_not_clearly_leaning": "F0 médiane {f0} Hz, plage haute. Tendance peu marquée.",
+
+		"ina.f0_bias_caveat":
+			"L'étiquette de tendance vient d'inaSpeechSegmenter (un classificateur CNN) et dépend essentiellement de F0 ; la résonance et les formants pèsent très peu. À lire comme un indicateur du timbre, pas un jugement perceptif complet.",
 
 		// TODO(fr): native review of resonance copy
 		"advice.resonance.title": "Résonance",
