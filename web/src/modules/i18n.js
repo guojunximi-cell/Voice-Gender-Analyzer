@@ -276,16 +276,11 @@ const DICT = {
 		"advice.resonance.median_label": "共振中位数",
 		"advice.resonance.weakness_section_title": "重点练习",
 		"advice.resonance.no_weakness": "未发现明显偏低的元音。",
-		"advice.resonance.summary.clearly_below_female":
-			"共振低于女声参考下限（F P5 = 0.49）。calibration_v1 男声 median ≈ 0.38；常见首步是抬升 F2。",
-		"advice.resonance.summary.leans_male":
-			"在男女重叠带（女声 P5–P25，0.49–0.62）。男声 P95 ≈ 0.66——再上一步即进入女声主区。",
-		"advice.resonance.summary.mid_neutral":
-			"在女声参考分布中段（F P25–P75，0.62–0.85）——大多数顺性女性在此区间。",
-		"advice.resonance.summary.leans_female":
-			"在女声参考分布上半段（≥ F P75 = 0.85）。",
-		"advice.resonance.summary.at_ceiling":
-			"共振分已触测量上限（≥ 0.98）。calibration_v1 实测约 22% 顺性女性 zh 也触顶——下方逐元音数据更精细。",
+		"advice.resonance.summary.clearly_below_female": "顺性别男性区间",
+		"advice.resonance.summary.leans_male": "倾向于顺性别男性",
+		"advice.resonance.summary.mid_neutral": "无性别区间",
+		"advice.resonance.summary.leans_female": "顺性别女性区间",
+		"advice.resonance.summary.at_ceiling": "顺性别女性区间",
 		"advice.resonance.weakness.F1_low": "F1 偏低",
 		"advice.resonance.weakness.F2_low": "F2 偏低",
 		"advice.resonance.weakness.F3_low": "F3 偏低",
@@ -706,16 +701,11 @@ const DICT = {
 		"advice.resonance.median_label": "Median resonance",
 		"advice.resonance.weakness_section_title": "Focus on",
 		"advice.resonance.no_weakness": "No notably low-formant vowels.",
-		"advice.resonance.summary.clearly_below_female":
-			"Resonance below the female-reference floor (F P5 = 0.53). calibration_v1 male median ≈ 0.49; lifting F2 is the usual first step.",
-		"advice.resonance.summary.leans_male":
-			"In the male/female overlap zone (F P5–P25, 0.53–0.69). Male P95 = 1.00 (en male distribution is wide); per-vowel detail is the more reliable signal.",
-		"advice.resonance.summary.mid_neutral":
-			"Inside the typical female range (F P25–P75, 0.69–0.99). Most cis-female speakers live here.",
-		"advice.resonance.summary.leans_female":
-			"Upper portion of the typical female range (≥ F P75 = 0.99).",
-		"advice.resonance.summary.at_ceiling":
-			"Score is at the measurement ceiling (≥ 0.98). calibration_v1 shows ~30% of cis-female en speakers also clip here — per-vowel detail is the finer gauge.",
+		"advice.resonance.summary.clearly_below_female": "Cis-male range",
+		"advice.resonance.summary.leans_male": "Leans cis-male",
+		"advice.resonance.summary.mid_neutral": "Androgynous range",
+		"advice.resonance.summary.leans_female": "Cis-female range",
+		"advice.resonance.summary.at_ceiling": "Cis-female range",
 		"advice.resonance.weakness.F1_low": "low F1",
 		"advice.resonance.weakness.F2_low": "low F2",
 		"advice.resonance.weakness.F3_low": "low F3",
@@ -1151,16 +1141,11 @@ const DICT = {
 		"advice.resonance.median_label": "Résonance médiane",
 		"advice.resonance.weakness_section_title": "À travailler",
 		"advice.resonance.no_weakness": "Aucune voyelle aux formants nettement bas.",
-		"advice.resonance.summary.clearly_below_female":
-			"Résonance sous le seuil féminin de référence (F P5 = 0,43). Médiane masculine calibration_v1 ≈ 0,35 ; lever F2 est généralement la première étape utile.",
-		"advice.resonance.summary.leans_male":
-			"Dans la zone de chevauchement masculin/féminin (F P5–P25, 0,43–0,55). P95 masculin ≈ 0,60 — un pas de plus et vous êtes dans la plage féminine principale.",
-		"advice.resonance.summary.mid_neutral":
-			"À l'intérieur de la plage typique féminine (F P25–P75, 0,55–0,75). La plupart des locutrices cis se situent ici.",
-		"advice.resonance.summary.leans_female":
-			"Partie supérieure de la plage typique féminine (≥ F P75 = 0,75).",
-		"advice.resonance.summary.at_ceiling":
-			"Score plafonné par la mesure (≥ 0,96). calibration_v1 : seulement ~3 % des locutrices cis fr plafonnent — clipping rare, le détail par voyelle reste plus précis.",
+		"advice.resonance.summary.clearly_below_female": "Plage cis-masculine",
+		"advice.resonance.summary.leans_male": "Tendance cis-masculine",
+		"advice.resonance.summary.mid_neutral": "Plage androgyne",
+		"advice.resonance.summary.leans_female": "Plage cis-féminine",
+		"advice.resonance.summary.at_ceiling": "Plage cis-féminine",
 		"advice.resonance.weakness.F1_low": "F1 bas",
 		"advice.resonance.weakness.F2_low": "F2 bas",
 		"advice.resonance.weakness.F3_low": "F3 bas",
