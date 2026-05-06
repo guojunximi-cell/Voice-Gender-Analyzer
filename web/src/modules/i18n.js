@@ -131,7 +131,7 @@ const DICT = {
 		"stats.modeResonance": "共鸣",
 		"stats.modeATip": "依 inaSpeechSegmenter 神经网络标签",
 		"stats.modePitchTip": "依每个音素的基频（165 Hz 为中性线）",
-		"stats.modeResonanceTip": "依每个音素的共鸣值（0.5 为中性线）",
+		"stats.modeResonanceTip": "依每个音素的共鸣值（0.5 = 女性参考均值，不是男女中线；实测男声 median ≈ 0.35–0.49）",
 		"stats.lockedTip": "该文件无 Engine C 音素数据（可能 Engine C 未启用或失败）",
 		"label.male": "男声",
 		"label.female": "女声",
@@ -189,7 +189,7 @@ const DICT = {
 		"timeline.ariaPitch": "音高热力带，每个单位的音高（不发声辅音继承该单位的元音值）",
 		"timeline.ariaPitchDesc": "当前页的音高热力带",
 		"timeline.ariaResonance": "共鸣热力带，每格代表一个音素的共鸣值 0–1",
-		"timeline.ariaResonanceDesc": "当前页的共鸣热力带；女声阈值 = 0.587",
+		"timeline.ariaResonanceDesc": "当前页的共鸣热力带；0.5 = 女性参考均值，女声阈值 = 0.587",
 		"timeline.announceReady": "分析完成，共 {n} 个字",
 		"timeline.returnToCurrent": "回到当前",
 		"timeline.barModePhone": "音素",
@@ -220,7 +220,7 @@ const DICT = {
 		"legend.neutral": "中性",
 		"legend.female": "女声方向",
 		"legend.infoAria": "色系说明",
-		"legend.sci1": "<strong>共鸣色条</strong>的中性点为 0.5（参考语料库均值），女声阈值 = <strong>{res}</strong>。",
+		"legend.sci1": "<strong>共鸣色条</strong>的 0.5 是<strong>女性参考均值</strong>（不是男女中线——实测男声 median ≈ 0.35–0.49，女声 median ≈ 0.65–0.81，因语言而异），女声阈值 = <strong>{res}</strong>。",
 		"legend.sci2": "该阈值基于 AISHELL-3 语料库（134 男 + 134 女）的 10-fold 交叉验证，精度 <strong>0.900</strong>。",
 		"legend.sci3":
 			"<strong>音高参考</strong>：{neutral} Hz 为男声上限 / 女声下限交界，{fem} Hz 为声音训练常用的女声感知阈值。",
@@ -397,7 +397,7 @@ const DICT = {
 		"help.heatmap.h": "热力图中",
 		"help.heatmap.resonanceDT": "共鸣",
 		"help.heatmap.resonanceDD":
-			"音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。大于 50% 即意味着女性化。",
+			"音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考——0.5 是<strong>女性参考均值</strong>，不是男女中线。calibration_v1 实测：男声 median ≈ 35–49%，女声 median ≈ 65–81%（视语言而异，详见 tests/reports/calibration_v1）。",
 		"help.heatmap.pitchDT": "音高",
 		"help.heatmap.pitchDD": "音素内的 F0。被认为是男女性化声音的主要边界。",
 		"help.overall.h": "整段分析",
@@ -552,7 +552,7 @@ const DICT = {
 		"stats.modeResonance": "Resonance",
 		"stats.modeATip": "Labels from the inaSpeechSegmenter neural classifier.",
 		"stats.modePitchTip": "Per-phone F0 — 165 Hz is the neutral midline.",
-		"stats.modeResonanceTip": "Per-phone resonance index — 0.5 is the neutral midline.",
+		"stats.modeResonanceTip": "Per-phone resonance — 0.5 is the female-reference mean (NOT the male/female midline; empirical male medians sit at 0.35–0.49).",
 		"stats.lockedTip": "No Engine C phone data for this file (Engine C off or failed).",
 		"label.male": "Masc",
 		"label.female": "Fem",
@@ -613,7 +613,7 @@ const DICT = {
 		"timeline.ariaPitch": "Pitch heatmap; color per character (unvoiced consonants inherit the vowel color).",
 		"timeline.ariaPitchDesc": "Pitch heatmap for the current page",
 		"timeline.ariaResonance": "Resonance heatmap; each cell is one phone's resonance value, 0–1.",
-		"timeline.ariaResonanceDesc": "Resonance heatmap for the current page. Palette midline = 0.5.",
+		"timeline.ariaResonanceDesc": "Resonance heatmap for the current page. 0.5 = female reference mean.",
 		"timeline.announceReady": "Analysis complete, {n} characters shown",
 		"timeline.returnToCurrent": "Jump to now",
 		"timeline.barModePhone": "Phones",
@@ -647,7 +647,7 @@ const DICT = {
 		"legend.female": "Feminine-leaning",
 		"legend.infoAria": "Palette info",
 		"legend.sci1":
-			"<strong>Resonance palette</strong> centers on 0.5 by construction — the reference-corpus midline between masculine-cool and feminine-warm.",
+			"<strong>Resonance 0.5</strong> is the <strong>female reference mean</strong>, not the male/female midline. Empirical medians: male ≈ 0.35–0.49, female ≈ 0.65–0.81 (language-dependent).",
 		"legend.sci2":
 			"Calibration uses the acousticgender.space English voice-training corpus; per-phone F₂/F₃/F₄ z-scores are combined with weights brute-forced on labeled speakers.",
 		"legend.sci3":
@@ -834,7 +834,7 @@ const DICT = {
 		"help.heatmap.h": "In the heatmap",
 		"help.heatmap.resonanceDT": "Resonance",
 		"help.heatmap.resonanceDD":
-			"Resonance within each phone. Vowels only. Derived from a weighted blend of F1, F2, and F3. Baseline calibrated against a cis-voice reference corpus. Values above 50% indicate feminine-leaning.",
+			"Resonance within each phone. Vowels only. Derived from a weighted blend of F1, F2, and F3. Baseline calibrated against a cis-voice reference corpus — <strong>0.5 is the female-reference mean</strong>, not the male/female midline. calibration_v1 empirical medians: male ≈ 35–49%, female ≈ 65–81% (language-dependent; see tests/reports/calibration_v1).",
 		"help.heatmap.pitchDT": "Pitch",
 		"help.heatmap.pitchDD":
 			"F0 within each phone. Considered the primary acoustic boundary between masculine and feminine voice perception.",
@@ -992,7 +992,7 @@ const DICT = {
 		"stats.modeResonance": "Résonance",
 		"stats.modeATip": "Étiquettes du classificateur neuronal inaSpeechSegmenter.",
 		"stats.modePitchTip": "F0 par phonème — 165 Hz est la médiane neutre.",
-		"stats.modeResonanceTip": "Indice de résonance par phonème — 0,5 est la médiane neutre.",
+		"stats.modeResonanceTip": "Résonance par phonème — 0,5 est la moyenne de référence féminine (PAS la médiane masculin/féminin ; les médianes masculines empiriques sont à 0,35–0,49).",
 		"stats.lockedTip": "Aucune donnée Engine C pour ce fichier (Engine C désactivé ou en échec).",
 		"label.male": "Masc",
 		"label.female": "Fém",
@@ -1053,7 +1053,7 @@ const DICT = {
 			"Carte thermique de la hauteur ; couleur par caractère (les consonnes non voisées héritent de la couleur de la voyelle).",
 		"timeline.ariaPitchDesc": "Carte thermique de hauteur pour la page courante",
 		"timeline.ariaResonance": "Carte thermique de résonance ; chaque cellule = un phonème, valeur 0–1.",
-		"timeline.ariaResonanceDesc": "Carte thermique de résonance pour la page courante. Médiane palette = 0,5.",
+		"timeline.ariaResonanceDesc": "Carte thermique de résonance pour la page courante. 0,5 = moyenne référence féminine.",
 		"timeline.announceReady": "Analyse terminée, {n} caractères affichés",
 		"timeline.returnToCurrent": "Revenir au moment présent",
 		"timeline.barModePhone": "Phonèmes",
@@ -1088,7 +1088,7 @@ const DICT = {
 		"legend.female": "Tendance féminine",
 		"legend.infoAria": "Info palette",
 		"legend.sci1":
-			"<strong>La palette de résonance</strong> est centrée sur 0,5 par construction — la médiane du corpus de référence entre masculin-froid et féminin-chaud.",
+			"<strong>La résonance 0,5</strong> est la <strong>moyenne du référentiel féminin</strong>, pas la médiane masculin/féminin. Médianes empiriques : masculine ≈ 0,35–0,49, féminine ≈ 0,65–0,81 (selon la langue).",
 		"legend.sci2":
 			"Le calibrage utilise le corpus d'entraînement vocal acousticgender.space en anglais ; les z-scores phonème par phonème de F₂/F₃/F₄ sont combinés avec des poids déterminés par recherche exhaustive sur des locuteur·ices étiqueté·es.",
 		"legend.sci3":
@@ -1283,7 +1283,7 @@ const DICT = {
 		"help.heatmap.h": "Dans la carte thermique",
 		"help.heatmap.resonanceDT": "Résonance",
 		"help.heatmap.resonanceDD":
-			"Résonance à l'intérieur de chaque phonème. Voyelles uniquement. Issue d'une combinaison pondérée de F1, F2 et F3. Ligne de base calibrée sur un corpus de voix cis de référence. Au-dessus de 50 % indique une tendance féminine.",
+			"Résonance à l'intérieur de chaque phonème. Voyelles uniquement. Issue d'une combinaison pondérée de F1, F2 et F3. Ligne de base calibrée sur un corpus de voix cis — <strong>0,5 est la moyenne de référence féminine</strong>, pas la médiane masculin/féminin. Médianes empiriques calibration_v1 : masculine ≈ 35–49 %, féminine ≈ 65–81 % (selon la langue ; voir tests/reports/calibration_v1).",
 		"help.heatmap.pitchDT": "Hauteur",
 		"help.heatmap.pitchDD":
 			"F0 à l'intérieur de chaque phonème. Considérée comme la frontière acoustique principale entre la perception masculine et féminine de la voix.",

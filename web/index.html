@@ -700,7 +700,7 @@
 								role="radio"
 								aria-checked="false"
 								data-i18n-title="stats.modeResonanceTip"
-								title="依每个音素的共鸣值（0.5 为中性线）"
+								title="依每个音素的共鸣值（0.5 = 女性参考均值，不是男女中线；实测男声 median ≈ 0.35–0.49）"
 							>
 								<span data-i18n="stats.modeResonance">共鸣</span>
 							</button>
@@ -908,7 +908,8 @@
 					<dl>
 						<dt data-i18n="help.heatmap.resonanceDT">共鸣</dt>
 						<dd data-i18n="help.heatmap.resonanceDD">
-							音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。大于 50% 即意味着女性化。
+							音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考——0.5 是<strong>女性参考均值</strong>，不是男女中线。calibration_v1
+							实测：男声 median ≈ 35–49%，女声 median ≈ 65–81%（视语言而异，详见 tests/reports/calibration_v1）。
 						</dd>
 						<dt data-i18n="help.heatmap.pitchDT">音高</dt>
 						<dd data-i18n="help.heatmap.pitchDD">音素内的 F0。被认为是男女性化声音的主要边界。</dd>
