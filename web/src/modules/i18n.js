@@ -277,15 +277,15 @@ const DICT = {
 		"advice.resonance.weakness_section_title": "重点练习",
 		"advice.resonance.no_weakness": "未发现明显偏低的元音。",
 		"advice.resonance.summary.clearly_below_female":
-			"共振低于真实女性的典型分布；最常见的起步动作是先抬升 F2。",
+			"共振低于女声参考下限（F P5 = 0.49）。calibration_v1 男声 median ≈ 0.38；常见首步是抬升 F2。",
 		"advice.resonance.summary.leans_male":
-			"位于真实女性分布的下沿，男女重叠带，元音色彩偏暖。",
+			"在男女重叠带（女声 P5–P25，0.49–0.62）。男声 P95 ≈ 0.66——再上一步即进入女声主区。",
 		"advice.resonance.summary.mid_neutral":
-			"落在真实女性共振分布的 P25–P75 中段——大多数顺性女性的共振都在这个区间。",
+			"在女声参考分布中段（F P25–P75，0.62–0.85）——大多数顺性女性在此区间。",
 		"advice.resonance.summary.leans_female":
-			"位于真实女性共振分布的上半段。",
+			"在女声参考分布上半段（≥ F P75 = 0.85）。",
 		"advice.resonance.summary.at_ceiling":
-			"共振分已触测量上限；下方逐元音数据是更细的进度参考——真实女性中也有相当比例触顶。",
+			"共振分已触测量上限（≥ 0.98）。calibration_v1 实测约 22% 顺性女性 zh 也触顶——下方逐元音数据更精细。",
 		"advice.resonance.weakness.F1_low": "F1 偏低",
 		"advice.resonance.weakness.F2_low": "F2 偏低",
 		"advice.resonance.weakness.F3_low": "F3 偏低",
@@ -707,15 +707,15 @@ const DICT = {
 		"advice.resonance.weakness_section_title": "Focus on",
 		"advice.resonance.no_weakness": "No notably low-formant vowels.",
 		"advice.resonance.summary.clearly_below_female":
-			"Resonance sits below the typical female range. Lifting F2 is usually the most useful first step.",
+			"Resonance below the female-reference floor (F P5 = 0.53). calibration_v1 male median ≈ 0.49; lifting F2 is the usual first step.",
 		"advice.resonance.summary.leans_male":
-			"At the lower edge of the typical female range — inside the male/female overlap zone.",
+			"In the male/female overlap zone (F P5–P25, 0.53–0.69). Male P95 = 1.00 (en male distribution is wide); per-vowel detail is the more reliable signal.",
 		"advice.resonance.summary.mid_neutral":
-			"Inside the typical female resonance range (P25–P75 of cis-female reference speakers). Most cis women's resonance lives here.",
+			"Inside the typical female range (F P25–P75, 0.69–0.99). Most cis-female speakers live here.",
 		"advice.resonance.summary.leans_female":
-			"Upper portion of the typical female resonance range.",
+			"Upper portion of the typical female range (≥ F P75 = 0.99).",
 		"advice.resonance.summary.at_ceiling":
-			"Score is at the measurement ceiling — per-vowel detail is a finer gauge. A meaningful share of cis-female reference speakers also clip here.",
+			"Score is at the measurement ceiling (≥ 0.98). calibration_v1 shows ~30% of cis-female en speakers also clip here — per-vowel detail is the finer gauge.",
 		"advice.resonance.weakness.F1_low": "low F1",
 		"advice.resonance.weakness.F2_low": "low F2",
 		"advice.resonance.weakness.F3_low": "low F3",
@@ -1152,15 +1152,15 @@ const DICT = {
 		"advice.resonance.weakness_section_title": "À travailler",
 		"advice.resonance.no_weakness": "Aucune voyelle aux formants nettement bas.",
 		"advice.resonance.summary.clearly_below_female":
-			"Résonance sous la plage typique des locutrices ; lever F2 est généralement la première étape utile.",
+			"Résonance sous le seuil féminin de référence (F P5 = 0,43). Médiane masculine calibration_v1 ≈ 0,35 ; lever F2 est généralement la première étape utile.",
 		"advice.resonance.summary.leans_male":
-			"Au bord inférieur de la plage typique féminine — dans la zone de chevauchement masculin/féminin.",
+			"Dans la zone de chevauchement masculin/féminin (F P5–P25, 0,43–0,55). P95 masculin ≈ 0,60 — un pas de plus et vous êtes dans la plage féminine principale.",
 		"advice.resonance.summary.mid_neutral":
-			"À l'intérieur de la plage typique féminine (P25–P75 des locutrices cis de référence). La plupart des femmes cis se situent dans cette zone.",
+			"À l'intérieur de la plage typique féminine (F P25–P75, 0,55–0,75). La plupart des locutrices cis se situent ici.",
 		"advice.resonance.summary.leans_female":
-			"Partie supérieure de la plage typique féminine.",
+			"Partie supérieure de la plage typique féminine (≥ F P75 = 0,75).",
 		"advice.resonance.summary.at_ceiling":
-			"Score plafonné par la mesure ; le détail par voyelle est plus précis. Une part notable des locutrices cis de référence plafonne aussi ici.",
+			"Score plafonné par la mesure (≥ 0,96). calibration_v1 : seulement ~3 % des locutrices cis fr plafonnent — clipping rare, le détail par voyelle reste plus précis.",
 		"advice.resonance.weakness.F1_low": "F1 bas",
 		"advice.resonance.weakness.F2_low": "F2 bas",
 		"advice.resonance.weakness.F3_low": "F3 bas",

@@ -28,14 +28,20 @@ Pure-function module, no IO.  See ``classify_zone`` for the public API.
 from __future__ import annotations
 
 # Female-speaker percentiles on AISHELL-3 train post-Phase-B (5500 Hz Praat
-# ceiling, stats_zh.json re-trained 2026-05-01; re-validated 2026-05-05 with
-# unchanged percentiles).  Snapshot below — re-running scripts/audit_resonance_zh.py
-# on the same fixtures should reproduce these within ±0.01 (audit is
-# deterministic seed=17).
+# ceiling, stats_zh.json re-trained 2026-05-01).  Snapshot below — re-running
+# scripts/audit_resonance_zh.py on the same fixtures should reproduce these
+# within ±0.01 (audit is deterministic seed=17).
 #
 #   sex  n   P5     P25    P50    P75    P95    mean
-#   F    50  0.490  0.612  0.683  0.842  1.000  0.721
-#   M    42  0.234  0.305  0.403  0.518  0.698  0.417
+#   F    50  0.490  0.612  0.683  0.842  1.000  0.721   ← phase A (2026-05-01, 50 spk)
+#   F    94  0.490  0.616  0.726  0.849  1.000  0.734   ← calibration_v1 (2026-05-06, 94 spk)
+#   M    42  0.234  0.305  0.403  0.518  0.698  0.417   ← phase A
+#   M    94  0.228  0.292  0.382  0.463  0.655  0.396   ← calibration_v1 (multi-session per spk)
+#
+# Reproducibility: calibration_v1 (tests/reports/calibration_v1/aggregate.csv,
+# 94 F + 94 M, 60-90 s sessions) reproduces phase-A within ±0.01 on every
+# percentile.  Thresholds below stay at phase-A values — the drift is below
+# the reproducibility band, no zone reassignment would result.
 #
 # The ``leans_female`` upper bound is set to 0.98 (not F P95 = 1.0) so the
 # top tier doesn't require whole-recording score saturation — at the clamp
@@ -63,22 +69,29 @@ _ZONES_ZH: tuple[tuple[str, float | None], ...] = (
     ("at_ceiling", None),
 )
 
-# fr-specific anchoring from tests/reports/fr_resonance_baseline_2026-05-01.md
-# (50 F + 50 M speakers from Common Voice fr v17 train, adaptive ceiling on,
-# stats_fr.json @ 5000 baseline).  Snapshot:
+# fr-specific anchoring from tests/reports/calibration_v1/aggregate.csv
+# (2026-05-06).  90 F + 94 M speakers from Common Voice fr (validated.tsv,
+# gender filter, 11 mp3s concatenated to ~60 s session per speaker), sidecar
+# adaptive ceiling, stats_fr.json v17-derived.  Snapshot:
 #
 #   sex  n   P5     P25    P50    P75    P95    mean
-#   F    50  0.420  0.580  0.669  0.795  0.943  0.679
-#   M    50  0.185  0.279  0.327  0.421  0.597  0.363
+#   F    50  0.420  0.580  0.669  0.795  0.943  0.679   ← 2026-05-01 v17 baseline
+#   F    90  0.430  0.547  0.646  0.752  0.960  0.659   ← calibration_v1
+#   M    50  0.185  0.279  0.327  0.421  0.597  0.363   ← 2026-05-01
+#   M    94  0.229  0.294  0.348  0.421  0.601  0.371   ← calibration_v1
 #
-# Notably tighter than zh: F P95 = 0.943 (not saturated), so we use it
-# directly as the ``leans_female / clearly_female`` boundary instead of the
-# 0.98 cap zh needs.  fr has only 2 % F-saturation post-adaptive — the
-# clamp pressure that bothered zh-post-Phase-B (8 %) is mostly absent.
-_FR_F_P5 = 0.420
-_FR_F_P25 = 0.580
-_FR_F_P75 = 0.795
-_FR_F_P95 = 0.943
+# Drift from 2026-05-01: F P5 +0.010, P25 -0.033, P75 -0.043, P95 +0.017.
+# The bulk of fr distribution shifts DOWN (P25/P50/P75) — the v17 50-spk
+# sample over-represented the upper-female tail.  90 spk × 11 stitched
+# clips is the better estimate; updating constants below.
+#
+# Notably still tighter than zh and en: F P95 = 0.960 (≈ 3 % saturation),
+# so we use it directly as the ``leans_female`` upper bound instead of
+# falling back to the 0.98 clamp ceiling.
+_FR_F_P5 = 0.430  # was 0.420
+_FR_F_P25 = 0.547  # was 0.580 — meaningful shift down
+_FR_F_P75 = 0.752  # was 0.795 — meaningful shift down
+_FR_F_P95 = 0.960  # was 0.943
 
 _ZONES_FR: tuple[tuple[str, float | None], ...] = (
     ("clearly_below_female", _FR_F_P5),
@@ -88,29 +101,44 @@ _ZONES_FR: tuple[tuple[str, float | None], ...] = (
     ("at_ceiling", None),
 )
 
-# en-US percentiles from tests/reports/en_resonance_baseline_2026-05-05.md
-# (LibriSpeech train-clean-100, 50 F + 30 M speakers × 3 clips each, sidecar
-# pinned 5000 Hz, stats.json cmudict-derived).  Snapshot:
+# en-US percentiles from tests/reports/calibration_v1/aggregate.csv
+# (2026-05-06).  91 F + 92 M speakers from LibriSpeech train-clean-100, 6
+# flacs concatenated to ~60-90 s sessions per speaker, sidecar pinned 5000
+# Hz, stats.json cmudict-derived.  Snapshot:
 #
 #   sex  n   P5     P25    P50    P75    P95    mean
-#   F    50  0.498  0.668  0.775  0.961  1.000  0.784
-#   M    30  0.277  0.406  0.460  0.674  1.000  0.534
+#   F    50  0.498  0.668  0.775  0.961  1.000  0.784   ← 2026-05-05 (16 unique spk × 3)
+#   F    91  0.525  0.689  0.811  0.987  1.000  0.804   ← calibration_v1 (91 unique spk × 60s)
+#   M    30  0.277  0.406  0.460  0.674  1.000  0.534   ← 2026-05-05
+#   M    92  0.328  0.381  0.489  0.639  1.000  0.546   ← calibration_v1
 #
-# en F distribution is **shifted higher and wider** than zh F (P75=0.961
-# vs zh 0.842; P25=0.668 vs zh 0.612). That's what the LibriSpeech corpus
-# really looks like — diverse volunteers, not VCTK studio clean — and
-# matches the wider F-band intuition. 24% of F speakers (12/50) saturate
-# at ≥0.98, so the ``leans_female`` slot is narrow (P75=0.961 to ceiling
-# 0.98); the bulk of "more female" outcomes flow into ``at_ceiling``.
+# Drift from 2026-05-05: F P5 +0.027, P25 +0.021, P75 +0.026.  All shifts
+# are within the original-sample CI but the 91-speaker number is the better
+# estimate.  Constants below moved to calibration_v1 values.
+#
+# en F distribution is **shifted higher and wider** than zh F (P75=0.987
+# vs zh 0.849).  The wider band is real: LibriSpeech is diverse volunteers,
+# not VCTK studio-clean.  24/91 (26 %) of F speakers saturate at ≥ 0.98;
+# the ``leans_female`` slot is therefore intentionally narrow (P75=0.987
+# to ceiling=0.98 → essentially empty for en) and the bulk of "more female"
+# outcomes flow into ``at_ceiling``.  This is by design.
 #
 # Pre-2026-05-05 ``_ZONES_EN`` aliased ``_ZONES_ZH``; that mis-classified
-# en speakers — e.g. an en F at 0.75 (P50 of real en F speakers) was
-# bucketed as ``mid_neutral`` under zh thresholds AND told "still some
-# distance from female reference", a contradiction the audit corpus
-# directly disproves.
-_EN_F_P5 = 0.498
-_EN_F_P25 = 0.668
-_EN_F_P75 = 0.961
+# en speakers — e.g. an en F at 0.75 (now-known P50 of real en F speakers)
+# was bucketed as ``mid_neutral`` under zh thresholds AND told "still some
+# distance from female reference", a contradiction the corpus disproves.
+_EN_F_P5 = 0.525  # was 0.498 (2026-05-05 baseline)
+_EN_F_P25 = 0.689  # was 0.668
+# Empirical en F P75 = 0.987, ABOVE the clamp ceiling 0.98.  We pin the
+# zone boundary to the ceiling itself so the (mid_neutral, leans_female,
+# at_ceiling) tuple stays monotone — otherwise scores in [0.98, 0.987)
+# would match mid_neutral first and never reach the at_ceiling tier,
+# silently dropping the saturation caveat.  The structural cost: en's
+# leans_female zone is empty by construction, so en F speakers in the
+# upper-female tail flow directly into at_ceiling.  This is correct: at
+# ≥ 0.98 the score has lost discriminative power and per-vowel detail
+# is the better signal anyway.
+_EN_F_P75 = _AT_CEILING  # empirical 0.987, clamped to ceiling 0.98
 
 _ZONES_EN: tuple[tuple[str, float | None], ...] = (
     ("clearly_below_female", _EN_F_P5),

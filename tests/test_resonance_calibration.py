@@ -52,18 +52,21 @@ def test_classify_zone_lang_aliases():
 
 
 def test_classify_zone_en_specific_boundaries():
-    # en boundaries from tests/reports/en_resonance_baseline_2026-05-05.md
-    # (LibriSpeech train-clean-100): F P5=0.498, P25=0.668, P75=0.961.
-    # These differ from zh enough to produce visible misclassification at
-    # the corners — pin the diff so en never silently re-aliases zh.
-    assert resonance_calibration.classify_zone(0.497, "en") == "clearly_below_female"
-    assert resonance_calibration.classify_zone(0.498, "en") == "leans_male"
-    assert resonance_calibration.classify_zone(0.667, "en") == "leans_male"
-    assert resonance_calibration.classify_zone(0.668, "en") == "mid_neutral"
-    assert resonance_calibration.classify_zone(0.960, "en") == "mid_neutral"
-    assert resonance_calibration.classify_zone(0.961, "en") == "leans_female"
-    assert resonance_calibration.classify_zone(0.979, "en") == "leans_female"
+    # en boundaries from tests/reports/calibration_v1/aggregate.csv (2026-05-06):
+    # F P5=0.525, P25=0.689, P75=0.987 (clamped to AT_CEILING=0.98).  These
+    # differ from zh enough to produce visible misclassification at the
+    # corners — pin the diff so en never silently re-aliases zh.  Note:
+    # en's leans_female zone is empty by construction (mid_neutral upper =
+    # AT_CEILING = leans_female upper) since 26% of cis-female en speakers
+    # already saturate at the meter ceiling.
+    assert resonance_calibration.classify_zone(0.524, "en") == "clearly_below_female"
+    assert resonance_calibration.classify_zone(0.525, "en") == "leans_male"
+    assert resonance_calibration.classify_zone(0.688, "en") == "leans_male"
+    assert resonance_calibration.classify_zone(0.689, "en") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.92, "en") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.979, "en") == "mid_neutral"
     assert resonance_calibration.classify_zone(0.98, "en") == "at_ceiling"
+    assert resonance_calibration.classify_zone(0.99, "en") == "at_ceiling"
     # Cross-check: a value that's "leans_female" in zh is still "mid_neutral"
     # in en — proves the tables aren't aliased.
     assert resonance_calibration.classify_zone(0.85, "zh") == "leans_female"
@@ -80,30 +83,31 @@ def test_mid_neutral_falls_inside_typical_female_range():
     # zh: P25-P75 = 0.612-0.842
     assert resonance_calibration.classify_zone(0.65, "zh-CN") == "mid_neutral"
     assert resonance_calibration.classify_zone(0.83, "zh-CN") == "mid_neutral"
-    # en: P25-P75 = 0.668-0.961
+    # en (calibration_v1): P25-P75 = 0.689-0.98 (P75 clamped to ceiling)
     assert resonance_calibration.classify_zone(0.70, "en-US") == "mid_neutral"
     assert resonance_calibration.classify_zone(0.92, "en-US") == "mid_neutral"
-    # fr: P25-P75 = 0.580-0.795
-    assert resonance_calibration.classify_zone(0.65, "fr-FR") == "mid_neutral"
-    assert resonance_calibration.classify_zone(0.78, "fr-FR") == "mid_neutral"
+    # fr (calibration_v1): P25-P75 = 0.547-0.752
+    assert resonance_calibration.classify_zone(0.60, "fr-FR") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.74, "fr-FR") == "mid_neutral"
 
 
 def test_classify_zone_fr_specific_boundaries():
-    # fr boundaries from tests/reports/fr_resonance_baseline_2026-05-01.md:
-    # < 0.420 / 0.580 / 0.795 / 0.943.  These differ from zh enough to
-    # produce visible misclassification at the corners — pin the diff.
-    assert resonance_calibration.classify_zone(0.419, "fr") == "clearly_below_female"
-    assert resonance_calibration.classify_zone(0.420, "fr") == "leans_male"
-    assert resonance_calibration.classify_zone(0.579, "fr") == "leans_male"
-    assert resonance_calibration.classify_zone(0.580, "fr") == "mid_neutral"
-    assert resonance_calibration.classify_zone(0.794, "fr") == "mid_neutral"
-    assert resonance_calibration.classify_zone(0.795, "fr") == "leans_female"
-    assert resonance_calibration.classify_zone(0.942, "fr") == "leans_female"
-    assert resonance_calibration.classify_zone(0.943, "fr") == "at_ceiling"
+    # fr boundaries from tests/reports/calibration_v1/aggregate.csv (2026-05-06):
+    # < 0.430 / 0.547 / 0.752 / 0.960.  Drift from 2026-05-01 v17 baseline:
+    # P25 -0.033 and P75 -0.043 (90 spk × 11 stitched clips) — meaningful
+    # shifts toward male side.
+    assert resonance_calibration.classify_zone(0.429, "fr") == "clearly_below_female"
+    assert resonance_calibration.classify_zone(0.430, "fr") == "leans_male"
+    assert resonance_calibration.classify_zone(0.546, "fr") == "leans_male"
+    assert resonance_calibration.classify_zone(0.547, "fr") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.751, "fr") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.752, "fr") == "leans_female"
+    assert resonance_calibration.classify_zone(0.959, "fr") == "leans_female"
+    assert resonance_calibration.classify_zone(0.960, "fr") == "at_ceiling"
     # Cross-check: a value that's "mid_neutral" in zh but "at_ceiling" in fr
     # — proves the tables aren't aliased.
-    assert resonance_calibration.classify_zone(0.95, "zh") == "leans_female"
-    assert resonance_calibration.classify_zone(0.95, "fr") == "at_ceiling"
+    assert resonance_calibration.classify_zone(0.97, "zh") == "leans_female"
+    assert resonance_calibration.classify_zone(0.97, "fr") == "at_ceiling"
 
 
 def test_classify_zone_none_inputs():
