@@ -10,6 +10,7 @@ import { applyStaticDom, getLang, onLangChange, setLang, t } from "./modules/i18
 import { clearMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
+import { buildScriptIdentity } from "./modules/resonance-history.js";
 import { renderFromSummary } from "./modules/results-render.js";
 import { highlightActiveSegment, renderStats, resetResults } from "./modules/results.js";
 import { getScatterMode, onScatterModeChange, setScatterMode } from "./modules/scatter-mode.js";
@@ -125,6 +126,8 @@ function _getRecordOptions() {
 	if (_recordMode !== "script") return { mode: "free", script: null };
 	return { mode: "script", script: _resolveScriptText() };
 }
+
+const _buildScriptIdentity = (summary) => buildScriptIdentity(summary, getLang());
 
 function _applyRecordMode() {
 	const switcher = $("record-mode-switcher");
@@ -643,6 +646,7 @@ async function _silentAnalyzeAndSave(file) {
 	try {
 		const data = await analyzeAudio(file, _getRecordOptions());
 		if (data.summary?.overall_f0_median_hz != null) {
+			const identity = await _buildScriptIdentity(data.summary);
 			const session = {
 				id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
 				filename: data.filename,
@@ -654,6 +658,7 @@ async function _silentAnalyzeAndSave(file) {
 				color: nextSessionColor(),
 				summary: data.summary,
 				analysis: data.analysis,
+				...identity,
 			};
 			saveSession(session);
 			audioCache.set(session.id, file);
@@ -868,6 +873,7 @@ $("analyze-btn")?.addEventListener("click", async () => {
 
 		// ── Save session & update scatter plot ─────────────────
 		if (data.summary.overall_f0_median_hz != null) {
+			const identity = await _buildScriptIdentity(data.summary);
 			const session = {
 				id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
 				filename: data.filename,
@@ -879,6 +885,7 @@ $("analyze-btn")?.addEventListener("click", async () => {
 				color: nextSessionColor(),
 				summary: data.summary,
 				analysis: data.analysis,
+				...identity,
 			};
 			saveSession(session);
 			audioCache.set(session.id, currentFile);
@@ -1137,6 +1144,7 @@ function onScatterDeselect() {
 async function _appendImportedToHistory({ summary, analysis, filename, audioFile, createdAt }) {
 	if (summary?.overall_f0_median_hz == null) return null;
 	const sessionId = Date.now().toString() + Math.random().toString(36).slice(2, 8);
+	const identity = await _buildScriptIdentity(summary);
 	const session = {
 		id: sessionId,
 		filename: filename || "imported",
@@ -1148,6 +1156,7 @@ async function _appendImportedToHistory({ summary, analysis, filename, audioFile
 		color: nextSessionColor(),
 		summary,
 		analysis,
+		...identity,
 	};
 	saveSession(session);
 	addSession(session);
@@ -1162,6 +1171,7 @@ async function _loadImportedSession({ summary, analysis, filename, audioFile, cr
 	if (phase === "analyzing") cancelAnalysis();
 
 	const sessionId = Date.now().toString() + Math.random().toString(36).slice(2, 8);
+	const identity = await _buildScriptIdentity(summary);
 	const session = {
 		id: sessionId,
 		filename: filename || "imported",
@@ -1173,6 +1183,7 @@ async function _loadImportedSession({ summary, analysis, filename, audioFile, cr
 		color: nextSessionColor(),
 		summary,
 		analysis,
+		...identity,
 	};
 
 	analysisData = session;

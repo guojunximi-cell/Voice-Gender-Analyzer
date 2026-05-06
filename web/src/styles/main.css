@@ -1303,145 +1303,15 @@ body {
 	padding: 24px;
 }
 
-/* ── Advice v2 panel ──────────────────────────────────────────
-   Summary one-liner + zone/tendency tags + caveat + warnings.
-   Behind VITE_ADVICE_PANEL_V2 (default on). */
-.advice-panel {
-	padding: 14px 14px 8px;
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-	border-bottom: 1px solid var(--border-strong);
-}
-
-.advice-summary {
-	font-size: 0.86rem;
-	line-height: 1.5;
-	color: var(--text-primary);
-	font-weight: 500;
-}
-
-.advice-tags {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.advice-tag {
-	display: inline-flex;
-	align-items: center;
-	padding: 3px 9px;
-	border-radius: 999px;
-	font-size: 0.72rem;
-	line-height: 1.4;
-	font-weight: 500;
-	background: color-mix(in srgb, var(--text-secondary) 8%, transparent);
-	border: 1px solid color-mix(in srgb, var(--text-secondary) 18%, transparent);
-	color: var(--text-secondary);
-}
-
-.advice-tag-zone {
-	background: color-mix(in srgb, var(--accent) 8%, transparent);
-	border-color: color-mix(in srgb, var(--accent) 25%, transparent);
-	color: var(--accent);
-}
-
-.advice-tag-tone-leans_feminine,
-.advice-tag-tone-weakly_feminine {
-	background: color-mix(in srgb, var(--female) 12%, transparent);
-	border-color: color-mix(in srgb, var(--female) 35%, transparent);
-	color: var(--female);
-}
-
-.advice-tag-tone-leans_masculine,
-.advice-tag-tone-weakly_masculine {
-	background: color-mix(in srgb, var(--male) 12%, transparent);
-	border-color: color-mix(in srgb, var(--male) 35%, transparent);
-	color: var(--male);
-}
-
-.advice-caveat {
-	font-size: 0.72rem;
-	line-height: 1.45;
-	color: var(--text-secondary);
-	opacity: 0.85;
-	padding-left: 2px;
-}
-
-.advice-warnings {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
-.advice-warning {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 8px 10px;
-	background: color-mix(in srgb, var(--accent) 10%, transparent);
-	border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
-	border-radius: var(--radius-sm);
-	color: var(--text-secondary);
-	font-size: 0.76rem;
-	line-height: 1.4;
-}
-
-.advice-warning svg {
-	flex-shrink: 0;
-	color: var(--accent);
-}
-
-.advice-warning-text,
-#advice-warning-text {
-	flex: 1;
-}
-
-.advice-warning-close {
-	flex-shrink: 0;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 20px;
-	height: 20px;
-	margin-left: 4px;
-	padding: 0;
-	background: transparent;
-	border: none;
-	border-radius: 4px;
-	color: var(--text-secondary);
-	cursor: pointer;
-	opacity: 0.7;
-	transition:
-		background-color 120ms ease,
-		opacity 120ms ease,
-		color 120ms ease;
-}
-
-.advice-warning-close:hover,
-.advice-warning-close:focus-visible {
-	background: color-mix(in srgb, var(--accent) 18%, transparent);
-	color: var(--accent);
-	opacity: 1;
-	outline: none;
-}
-
 /* ── Resonance panel ──────────────────────────────────────────
-   Phoneme-aligned breakdown: zone tag, summary line, weakness
-   vowel cards. Sits between #advice-panel and #metrics-content. */
+   Phoneme-aligned breakdown: title, summary line, weakness vowel
+   cards. Top-most panel in the right column. */
 .resonance-panel {
 	padding: 12px 14px 10px;
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 	border-bottom: 1px solid var(--border-strong);
-}
-
-.resonance-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
 }
 
 .resonance-title {
@@ -1493,6 +1363,100 @@ body {
 	font-size: 0.76rem;
 	line-height: 1.45;
 	color: var(--text-primary);
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.resonance-weakness-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.resonance-weakness-label {
+	font-size: 0.78rem;
+	color: var(--text-primary);
+}
+
+.resonance-weakness-z {
+	font-size: 0.74rem;
+	font-weight: 600;
+	color: var(--accent);
+	font-variant-numeric: tabular-nums;
+}
+
+/* z-score rail: 中性标尺，刻度落在整数 σ（-3 / -2 / -1 / 0 / +1）。基线 +
+   竖直 tick + 下标数字，无渐变也无 gendered 配色——指示器位置是唯一信号。
+   高度 = 基线区 (12px) + tick 标签 (12px)，刚好放下"−3"这种两字符标签。 */
+.resonance-weakness-rail {
+	position: relative;
+	height: 24px;
+	margin-top: 4px;
+}
+
+/* 基线：贯穿 rail 的细横线，落在 12px 处（rail 顶向下）。 */
+.resonance-weakness-rail::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 12px;
+	height: 1px;
+	background: var(--border-strong);
+}
+
+.rail-tick {
+	position: absolute;
+	top: 8px; /* 让 tick 上端略高于基线，下端正好压在基线上 */
+	transform: translateX(-50%);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	pointer-events: none;
+}
+
+/* tick 短竖线：基线之上 1px 之下 4px，骑在基线上 */
+.rail-tick::before {
+	content: "";
+	display: block;
+	width: 1px;
+	height: 8px;
+	background: var(--border-strong);
+}
+
+.rail-tick-label {
+	font-size: 0.65rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	margin-top: 3px;
+	white-space: nowrap;
+}
+
+/* 指示器：朝下的小三角，尖端正好对准基线上的 z 值位置。中性 accent 色，
+   没有 gender 含义——只是为了让眼睛能找到位置。 */
+.weakness-indicator {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform: translateX(-50%);
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 8px solid var(--accent);
+	transition: left 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* z 落在 [-3σ, +1σ] 之外时（极端男性侧 / 越过参考分布上沿），指示器钳到
+   边缘但用灰色信号"出量程"——避免和正常的极值指示混淆。z 数字同步褪色。 */
+.weakness-indicator.is-out-of-range {
+	border-top-color: var(--text-muted);
+}
+.resonance-weakness-z.is-out-of-range {
+	color: var(--text-muted);
 }
 
 .resonance-weakness-empty {
@@ -1500,6 +1464,181 @@ body {
 	color: var(--text-secondary);
 	opacity: 0.85;
 	font-style: italic;
+}
+
+/* ── All-vowels list + history compare ────────────────────────
+   One row per vowel with n≥5: vowel label + level pill + delta
+   slot (filled async after history compare resolves) + z value
+   + inline mini rail. Same neutral z-rail metaphor as the
+   weakness card but slimmer; deltas are typographic ▲/▼ in the
+   secondary text colour — no green/red, since the project's
+   palette has no good/bad axis. */
+.resonance-history-header {
+	font-size: 0.72rem;
+	color: var(--text-secondary);
+	font-style: italic;
+	opacity: 0.9;
+	margin-top: 2px;
+}
+
+/* Pitch-compensation advisory: appears between history-header and the
+   per-vowel list when NN gender_score climbed but most vowels regressed.
+   Reuses the weakness card's soft accent recipe — neutral, no red. */
+.resonance-divergence-advisory {
+	margin-top: 6px;
+	padding: 8px 10px;
+	background: color-mix(in srgb, var(--accent) 6%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+	border-radius: var(--radius-sm);
+	font-size: 0.78rem;
+	line-height: 1.55;
+	color: var(--text-primary);
+}
+
+.resonance-all-vowels-section {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 2px;
+}
+
+.resonance-section-title {
+	font-size: 0.72rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.resonance-all-vowels-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.resonance-vowel-row {
+	display: grid;
+	grid-template-columns: auto auto auto auto 1fr;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 8px;
+	font-size: 0.74rem;
+	line-height: 1.4;
+	color: var(--text-primary);
+	border-radius: var(--radius-sm);
+	transition: background 180ms ease;
+}
+
+.resonance-vowel-row:hover {
+	background: color-mix(in srgb, var(--text-secondary) 4%, transparent);
+}
+
+.resonance-vowel-label {
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+	min-width: 38px;
+}
+
+.resonance-level-pill {
+	font-size: 0.68rem;
+	padding: 2px 8px;
+	border-radius: 999px;
+	white-space: nowrap;
+	font-weight: 500;
+	letter-spacing: 0.01em;
+}
+
+.resonance-level-pill[data-level="good"] {
+	background: color-mix(in srgb, var(--accent) 7%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+	color: var(--accent);
+}
+
+.resonance-level-pill[data-level="low"] {
+	background: color-mix(in srgb, var(--text-secondary) 8%, transparent);
+	border: 1px solid color-mix(in srgb, var(--text-secondary) 18%, transparent);
+	color: var(--text-secondary);
+}
+
+.resonance-level-pill[data-level="weak"] {
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+	color: var(--accent);
+}
+
+.resonance-delta {
+	font-size: 0.7rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-secondary);
+	white-space: nowrap;
+	font-weight: 500;
+}
+
+.resonance-delta[data-change="improved"],
+.resonance-delta[data-change="regressed"] {
+	color: var(--text-primary);
+}
+
+.resonance-vowel-z {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+/* Slim mini rail — same z-scale [-3, +1] as the weakness rail but
+   compact enough to live on a single grid row. Indicator is a tiny
+   downward triangle; ticks are minimal vertical strokes. */
+.resonance-vowel-rail {
+	position: relative;
+	height: 14px;
+	min-width: 80px;
+}
+
+.resonance-vowel-rail::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 7px;
+	height: 1px;
+	background: var(--border-strong);
+}
+
+.resonance-vowel-rail .rail-tick {
+	top: 4px;
+}
+
+.resonance-vowel-rail .rail-tick::before {
+	height: 5px;
+}
+
+.resonance-vowel-rail .rail-tick-label {
+	display: none; /* tick numbers would overcrowd at this size */
+}
+
+.vowel-indicator {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform: translateX(-50%);
+	width: 0;
+	height: 0;
+	border-left: 4px solid transparent;
+	border-right: 4px solid transparent;
+	border-top: 6px solid var(--accent);
+	transition: left 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.vowel-indicator.is-out-of-range {
+	border-top-color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.vowel-indicator,
+	.resonance-vowel-row {
+		transition: none;
+	}
 }
 
 /* ── Disclosure modal (Stage 0) ───────────────────────────────

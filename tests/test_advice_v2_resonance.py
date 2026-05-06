@@ -1,31 +1,41 @@
 """Unit tests for advice_v2._resonance_panel + _pick_weakness_vowels.
 
-Pure-logic tests (no Engine A, no Engine C, no audio IO) that lock the
-weakness picker thresholds, the caveat priority, and the gating-tier
-gate on the resonance panel.
+DISABLED 2026-05-04: per-vowel level classification migrated from worst-formant
+z-score to per-vowel resonance score. New tests live in
+tests/test_per_vowel_resonance_levels.py. The body below is preserved so a
+future revert can restore the F-axis logic without rewriting test fixtures.
 
-Run: .venv/bin/python tests/test_advice_v2_resonance.py
+Run: uv run python tests/test_advice_v2_resonance.py
 """
 
 from __future__ import annotations
 
-import os
 import sys
-import traceback
+
+print(
+    "[skip] test_advice_v2_resonance.py — F-axis tests retired; see tests/test_per_vowel_resonance_levels.py"
+)
+sys.exit(0)
+
+# ─── ORIGINAL TESTS BELOW (kept for revival) ─────────────────────────────────
+import os  # noqa: E402, F401
+import traceback  # noqa: E402, F401
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import numpy as np  # noqa: E402
+import numpy as np  # noqa: E402, F401
 
-from voiceya.services.audio_analyser.advice_v2 import (  # noqa: E402
+from voiceya.services.audio_analyser.advice_v2 import (  # noqa: E402, F401
     _WEAKNESS_MIN_TOKENS,
     _WEAKNESS_TOP_K,
     _WEAKNESS_Z_THRESHOLD,
+    _build_per_vowel_levels,
+    _level_key,
     _pick_weakness_vowels,
     _resonance_panel,
     compute_advice,
 )
-from voiceya.services.audio_analyser.seg_analyser import AnalyseResultItem  # noqa: E402
+from voiceya.services.audio_analyser.seg_analyser import AnalyseResultItem  # noqa: E402, F401
 
 
 def _vowel(
@@ -118,9 +128,7 @@ def test_picker_picks_most_negative_formant_per_vowel():
 
 
 def test_picker_skips_vowel_with_all_none_z():
-    out = _pick_weakness_vowels(
-        [_vowel("a", n=10, z_F1=None, z_F2=None, z_F3=None)]
-    )
+    out = _pick_weakness_vowels([_vowel("a", n=10, z_F1=None, z_F2=None, z_F3=None)])
     assert out == []
 
 
@@ -254,6 +262,99 @@ def test_panel_zone_at_ceiling_caveat_only():
     assert out["zone_key"] == "at_ceiling"
     assert out["caveat_key"] == "advice.resonance.caveat.score_clamp"
     assert out["weakness_vowels"] == []
+
+
+# ─── _level_key + _build_per_vowel_levels ─────────────────────────
+
+
+def test_level_key_boundaries():
+    """good ≥ 0.0; low ∈ [-0.8, 0.0); weak < -0.8. Both edges check inclusivity."""
+    assert _level_key(0.5) == "good"
+    assert _level_key(0.0) == "good"  # exactly 0 is good (at reference)
+    assert _level_key(-0.01) == "low"
+    assert _level_key(-0.5) == "low"
+    assert _level_key(-0.8) == "low"  # exactly -0.8 is low (matches strict weakness threshold)
+    assert _level_key(-0.81) == "weak"
+    assert _level_key(-2.0) == "weak"
+
+
+def test_per_vowel_levels_drops_n_below_five():
+    """Same n>=5 floor as the weakness picker — single-outlier vowels stay out."""
+    out = _build_per_vowel_levels([_vowel("a", n=4, z_F2=-1.5)])
+    assert out == []
+    assert len(_build_per_vowel_levels([_vowel("a", n=5, z_F2=-1.5)])) == 1
+
+
+def test_per_vowel_levels_drops_all_none_z():
+    out = _build_per_vowel_levels([_vowel("a", n=10, z_F1=None, z_F2=None, z_F3=None)])
+    assert out == []
+
+
+def test_per_vowel_levels_assigns_correct_buckets():
+    """One vowel per bucket: pick by worst formant."""
+    out = _build_per_vowel_levels(
+        [
+            _vowel("a", n=10, z_F1=0.3, z_F2=0.5, z_F3=0.4),  # good
+            _vowel("e", n=10, z_F1=-0.2, z_F2=0.5, z_F3=0.4),  # low (worst is F1=-0.2)
+            _vowel("i", n=10, z_F1=0.5, z_F2=-1.5, z_F3=0.0),  # weak (worst is F2=-1.5)
+        ]
+    )
+    by_vowel = {r["vowel"]: r for r in out}
+    assert by_vowel["a"]["level_key"] == "good"
+    assert by_vowel["e"]["level_key"] == "low"
+    assert by_vowel["e"]["weakest_formant"] == "F1"
+    assert by_vowel["i"]["level_key"] == "weak"
+    assert by_vowel["i"]["weakest_formant"] == "F2"
+
+
+def test_per_vowel_levels_sort_order():
+    """weak → low → good, then by z ascending within each bucket.
+
+    z_F1 / z_F3 pinned to +1.0 so F2 is unambiguously the worst formant for
+    every vowel — otherwise the default z=0 on F1/F3 would tie for "good".
+    """
+    out = _build_per_vowel_levels(
+        [
+            _vowel("a", n=10, z_F1=1.0, z_F2=0.4, z_F3=1.0),  # good (z=0.4)
+            _vowel("e", n=10, z_F1=1.0, z_F2=-0.3, z_F3=1.0),  # low
+            _vowel("i", n=10, z_F1=1.0, z_F2=-1.2, z_F3=1.0),  # weak
+            _vowel("o", n=10, z_F1=1.0, z_F2=0.1, z_F3=1.0),  # good (less good than /a/)
+            _vowel("u", n=10, z_F1=1.0, z_F2=-2.0, z_F3=1.0),  # weak (most negative)
+            _vowel("y", n=10, z_F1=1.0, z_F2=-0.6, z_F3=1.0),  # low (more neg than /e/)
+        ]
+    )
+    # weak (u, i) → low (y, e) → good (o, a). Within each bucket: z ascending.
+    assert [r["vowel"] for r in out] == ["u", "i", "y", "e", "o", "a"]
+
+
+def test_per_vowel_levels_superset_of_weakness():
+    """Every weakness vowel must appear in per_vowel with level_key == 'weak'."""
+    per_vowel_input = [
+        _vowel("a", n=10, z_F2=-0.3),  # low
+        _vowel("e", n=10, z_F2=-1.5),  # weak
+        _vowel("i", n=10, z_F2=-1.0),  # weak
+    ]
+    weakness = _pick_weakness_vowels(per_vowel_input)
+    levels = _build_per_vowel_levels(per_vowel_input)
+    weak_in_levels = {r["vowel"] for r in levels if r["level_key"] == "weak"}
+    assert {w["vowel"] for w in weakness} <= weak_in_levels
+
+
+def test_panel_emits_per_vowel_field():
+    """_resonance_panel returns a per_vowel list alongside weakness_vowels."""
+    ec = _ec_with_per_vowel(
+        "mid_neutral",
+        [
+            _vowel("a", n=10, z_F2=0.4),  # good
+            _vowel("e", n=10, z_F2=-1.2),  # weak
+            _vowel("i", n=10, z_F2=-0.5),  # low
+            _vowel("o", n=4, z_F2=-2.0),  # filtered (n<5)
+        ],
+    )
+    out = _resonance_panel(ec, "full")
+    assert "per_vowel" in out
+    assert len(out["per_vowel"]) == 3  # /o/ filtered
+    assert {r["vowel"] for r in out["per_vowel"]} == {"a", "e", "i"}
 
 
 # ─── median_resonance rounding ─────────────────────────────────────

@@ -276,21 +276,32 @@ const DICT = {
 		"advice.resonance.median_label": "共振中位数",
 		"advice.resonance.weakness_section_title": "重点练习",
 		"advice.resonance.no_weakness": "未发现明显偏低的元音。",
-		"advice.resonance.zone.clearly_below_female": "明显低于典型女声",
-		"advice.resonance.zone.leans_male": "偏男声共振区间",
-		"advice.resonance.zone.mid_neutral": "中性共振区间",
-		"advice.resonance.zone.leans_female": "偏女声共振区间",
-		"advice.resonance.zone.at_ceiling": "已达共振分上限",
-		"advice.resonance.summary.clearly_below_female": "共振峰整体明显低于女声基准。先专注 F2 抬升。",
-		"advice.resonance.summary.leans_male": "共振偏男声区间，元音色彩偏低沉。",
-		"advice.resonance.summary.mid_neutral": "共振处于中性区间，离女声基准还有距离。",
-		"advice.resonance.summary.leans_female": "共振已偏向女声区间，可继续加强稳定性。",
-		"advice.resonance.summary.at_ceiling": "共振分已达上限；用 per-vowel z 看进步更准。",
-		"advice.resonance.weakness.F1_low": "/{vowel}/ 的 F1 偏低（{z}σ，实测 {hz} Hz）。可以把嘴张开些。",
-		"advice.resonance.weakness.F2_low": "/{vowel}/ 的 F2 偏低（{z}σ，实测 {hz} Hz）。试试舌位前移、嘴角后拉。",
-		"advice.resonance.weakness.F3_low": "/{vowel}/ 的 F3 偏低（{z}σ，实测 {hz} Hz）。试试嘴唇微撑、口腔前拉。",
+		"advice.resonance.summary.clearly_below_female":
+			"共振低于真实女性的典型分布；最常见的起步动作是先抬升 F2。",
+		"advice.resonance.summary.leans_male":
+			"位于真实女性分布的下沿，男女重叠带，元音色彩偏暖。",
+		"advice.resonance.summary.mid_neutral":
+			"落在真实女性共振分布的 P25–P75 中段——大多数顺性女性的共振都在这个区间。",
+		"advice.resonance.summary.leans_female":
+			"位于真实女性共振分布的上半段。",
+		"advice.resonance.summary.at_ceiling":
+			"共振分已触测量上限；下方逐元音数据是更细的进度参考——真实女性中也有相当比例触顶。",
+		"advice.resonance.weakness.F1_low": "F1 偏低",
+		"advice.resonance.weakness.F2_low": "F2 偏低",
+		"advice.resonance.weakness.F3_low": "F3 偏低",
+		"advice.resonance.weakness.resonance_low": "这个元音共振偏低",
 		"advice.resonance.caveat.score_clamp": "共振评分上限 1.0，部分元音可能已封顶；看具体元音的 z 值更准。",
 		"advice.resonance.caveat.low_alignment": "对齐质量较低，本次结果仅供参考。",
+		"advice.resonance.section_title_all": "全部音素",
+		"advice.resonance.level.good": "保持良好",
+		"advice.resonance.level.low": "偏低",
+		"advice.resonance.level.weak": "重点练习",
+		"advice.resonance.history.compare_with": "对比 {when} 的同稿录音",
+		"advice.resonance.history.improved": "进步了",
+		"advice.resonance.history.regressed": "退步了",
+		"advice.resonance.history.no_prior": "暂无同稿历史可对比",
+		"advice.resonance.history.pitch_compensation":
+			"⚠ NN 评分上升，但多数元音的共振细节在退步——可能是用提高音调代替了真正的共振调整。建议：保持下颌放松、软腭抬起，重点练 /a/ /o/。",
 
 		"disclosure.title": "使用前请先了解",
 		"disclosure.intro": "这个工具帮你测量声音的几个声学指标，作为练习参考。它不是诊断、不是评分、不是替代专业老师。",
@@ -698,26 +709,33 @@ const DICT = {
 		"advice.resonance.median_label": "Median resonance",
 		"advice.resonance.weakness_section_title": "Focus on",
 		"advice.resonance.no_weakness": "No notably low-formant vowels.",
-		"advice.resonance.zone.clearly_below_female": "Clearly below typical female",
-		"advice.resonance.zone.leans_male": "Leans male resonance",
-		"advice.resonance.zone.mid_neutral": "Mid-neutral resonance",
-		"advice.resonance.zone.leans_female": "Leans female resonance",
-		"advice.resonance.zone.at_ceiling": "At resonance score ceiling",
 		"advice.resonance.summary.clearly_below_female":
-			"Formants sit clearly below the female reference. Start by lifting F2.",
-		"advice.resonance.summary.leans_male": "Resonance leans male; vowel colour is on the darker side.",
-		"advice.resonance.summary.mid_neutral": "Resonance is mid-neutral — still some distance from the female reference.",
-		"advice.resonance.summary.leans_female": "Resonance already leans female; keep working on consistency.",
-		"advice.resonance.summary.at_ceiling": "Score is at ceiling; per-vowel z is a finer gauge of progress.",
-		"advice.resonance.weakness.F1_low":
-			"/{vowel}/ has low F1 ({z}σ, measured {hz} Hz). Try opening your mouth a touch more.",
-		"advice.resonance.weakness.F2_low":
-			"/{vowel}/ has low F2 ({z}σ, measured {hz} Hz). Try fronting the tongue and pulling the lip corners back.",
-		"advice.resonance.weakness.F3_low":
-			"/{vowel}/ has low F3 ({z}σ, measured {hz} Hz). Try slight lip spreading and pulling the cavity forward.",
+			"Resonance sits below the typical female range. Lifting F2 is usually the most useful first step.",
+		"advice.resonance.summary.leans_male":
+			"At the lower edge of the typical female range — inside the male/female overlap zone.",
+		"advice.resonance.summary.mid_neutral":
+			"Inside the typical female resonance range (P25–P75 of cis-female reference speakers). Most cis women's resonance lives here.",
+		"advice.resonance.summary.leans_female":
+			"Upper portion of the typical female resonance range.",
+		"advice.resonance.summary.at_ceiling":
+			"Score is at the measurement ceiling — per-vowel detail is a finer gauge. A meaningful share of cis-female reference speakers also clip here.",
+		"advice.resonance.weakness.F1_low": "low F1",
+		"advice.resonance.weakness.F2_low": "low F2",
+		"advice.resonance.weakness.F3_low": "low F3",
+		"advice.resonance.weakness.resonance_low": "Resonance below reference",
 		"advice.resonance.caveat.score_clamp":
 			"Resonance score caps at 1.0; some vowels may already be saturated. Per-vowel z is more diagnostic.",
 		"advice.resonance.caveat.low_alignment": "Alignment quality is low — treat results as approximate.",
+		"advice.resonance.section_title_all": "All vowels",
+		"advice.resonance.level.good": "On target",
+		"advice.resonance.level.low": "Below",
+		"advice.resonance.level.weak": "Focus on",
+		"advice.resonance.history.compare_with": "Compared with same-script recording {when}",
+		"advice.resonance.history.improved": "Improved",
+		"advice.resonance.history.regressed": "Slipped",
+		"advice.resonance.history.no_prior": "No same-script prior recording yet",
+		"advice.resonance.history.pitch_compensation":
+			"⚠ Your NN score went up, but most vowels' resonance details slipped — you likely raised pitch (jaw/larynx tightening) instead of reshaping resonance. Try keeping the jaw relaxed, lift the soft palate, and focus on /a/ and /o/.",
 
 		"disclosure.title": "Before you start",
 		"disclosure.intro":
@@ -1139,27 +1157,33 @@ const DICT = {
 		"advice.resonance.median_label": "Résonance médiane",
 		"advice.resonance.weakness_section_title": "À travailler",
 		"advice.resonance.no_weakness": "Aucune voyelle aux formants nettement bas.",
-		"advice.resonance.zone.clearly_below_female": "Nettement sous la référence féminine",
-		"advice.resonance.zone.leans_male": "Tendance masculine en résonance",
-		"advice.resonance.zone.mid_neutral": "Résonance médio-neutre",
-		"advice.resonance.zone.leans_female": "Tendance féminine en résonance",
-		"advice.resonance.zone.at_ceiling": "Plafond du score atteint",
 		"advice.resonance.summary.clearly_below_female":
-			"Les formants sont nettement sous la référence féminine. Commencez par lever F2.",
-		"advice.resonance.summary.leans_male": "Résonance plutôt masculine ; couleur vocalique sombre.",
-		"advice.resonance.summary.mid_neutral": "Résonance médio-neutre — encore loin de la référence féminine.",
-		"advice.resonance.summary.leans_female": "Résonance déjà féminine ; travaillez la régularité.",
+			"Résonance sous la plage typique des locutrices ; lever F2 est généralement la première étape utile.",
+		"advice.resonance.summary.leans_male":
+			"Au bord inférieur de la plage typique féminine — dans la zone de chevauchement masculin/féminin.",
+		"advice.resonance.summary.mid_neutral":
+			"À l'intérieur de la plage typique féminine (P25–P75 des locutrices cis de référence). La plupart des femmes cis se situent dans cette zone.",
+		"advice.resonance.summary.leans_female":
+			"Partie supérieure de la plage typique féminine.",
 		"advice.resonance.summary.at_ceiling":
-			"Score plafonné ; le z par voyelle est plus précis pour mesurer les progrès.",
-		"advice.resonance.weakness.F1_low":
-			"/{vowel}/ a un F1 bas ({z}σ, mesuré {hz} Hz). Essayez d'ouvrir un peu plus la bouche.",
-		"advice.resonance.weakness.F2_low":
-			"/{vowel}/ a un F2 bas ({z}σ, mesuré {hz} Hz). Avancez la langue et tirez les coins des lèvres.",
-		"advice.resonance.weakness.F3_low":
-			"/{vowel}/ a un F3 bas ({z}σ, mesuré {hz} Hz). Étirez légèrement les lèvres et avancez la cavité.",
+			"Score plafonné par la mesure ; le détail par voyelle est plus précis. Une part notable des locutrices cis de référence plafonne aussi ici.",
+		"advice.resonance.weakness.F1_low": "F1 bas",
+		"advice.resonance.weakness.F2_low": "F2 bas",
+		"advice.resonance.weakness.F3_low": "F3 bas",
+		"advice.resonance.weakness.resonance_low": "Résonance sous la référence",
 		"advice.resonance.caveat.score_clamp":
 			"Le score de résonance plafonne à 1,0 ; certaines voyelles peuvent être saturées. Le z par voyelle est plus diagnostique.",
 		"advice.resonance.caveat.low_alignment": "Qualité d'alignement faible — résultats à titre indicatif.",
+		"advice.resonance.section_title_all": "Toutes les voyelles",
+		"advice.resonance.level.good": "Sur la cible",
+		"advice.resonance.level.low": "En-dessous",
+		"advice.resonance.level.weak": "À travailler",
+		"advice.resonance.history.compare_with": "Comparé à l'enregistrement du même texte {when}",
+		"advice.resonance.history.improved": "Progression",
+		"advice.resonance.history.regressed": "Régression",
+		"advice.resonance.history.no_prior": "Aucun enregistrement antérieur du même texte",
+		"advice.resonance.history.pitch_compensation":
+			"⚠ Votre score NN a augmenté, mais le détail des résonances voyelle par voyelle a régressé — vous avez sans doute monté le ton (mâchoire/larynx serrés) au lieu de remodeler la résonance. Détendez la mâchoire, soulevez le voile du palais, travaillez /a/ et /o/.",
 
 		// TODO(fr): native review of disclosure copy
 		"disclosure.title": "À lire avant de commencer",

@@ -39,7 +39,8 @@ def test_classify_zone_boundary_zh():
 def test_classify_zone_lang_aliases():
     # BCP-47 ↔ short codes both routed.  zh has its own anchored table
     # (Phase B / 2026-05-01 baseline); fr has its own anchored table
-    # (audit_resonance_fr.py / 2026-05-01 baseline); en still inherits zh.
+    # (audit_resonance_fr.py / 2026-05-01 baseline); en got its own table
+    # 2026-05-05 (LibriSpeech audit) — no longer aliases zh.
     for lang in ("zh-CN", "zh", "Zh-CN", "ZH"):
         assert resonance_calibration.classify_zone(0.7, lang) == "mid_neutral"
     for lang in ("fr-FR", "fr"):
@@ -48,6 +49,43 @@ def test_classify_zone_lang_aliases():
         assert resonance_calibration.classify_zone(0.7, lang) == "mid_neutral"
     # Unknown lang falls back to zh defaults — fail-safe for new locales.
     assert resonance_calibration.classify_zone(0.7, "xx-XX") == "mid_neutral"
+
+
+def test_classify_zone_en_specific_boundaries():
+    # en boundaries from tests/reports/en_resonance_baseline_2026-05-05.md
+    # (LibriSpeech train-clean-100): F P5=0.498, P25=0.668, P75=0.961.
+    # These differ from zh enough to produce visible misclassification at
+    # the corners — pin the diff so en never silently re-aliases zh.
+    assert resonance_calibration.classify_zone(0.497, "en") == "clearly_below_female"
+    assert resonance_calibration.classify_zone(0.498, "en") == "leans_male"
+    assert resonance_calibration.classify_zone(0.667, "en") == "leans_male"
+    assert resonance_calibration.classify_zone(0.668, "en") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.960, "en") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.961, "en") == "leans_female"
+    assert resonance_calibration.classify_zone(0.979, "en") == "leans_female"
+    assert resonance_calibration.classify_zone(0.98, "en") == "at_ceiling"
+    # Cross-check: a value that's "leans_female" in zh is still "mid_neutral"
+    # in en — proves the tables aren't aliased.
+    assert resonance_calibration.classify_zone(0.85, "zh") == "leans_female"
+    assert resonance_calibration.classify_zone(0.85, "en") == "mid_neutral"
+
+
+def test_mid_neutral_falls_inside_typical_female_range():
+    """``mid_neutral`` is the F P25..P75 band — i.e. half of real cis-female
+    speakers sit here.  This regression test exists because the pre-2026-05-05
+    summary copy ("still some distance from the female reference") directly
+    contradicted that fact.  If anyone repurposes ``mid_neutral`` as a
+    non-female zone, they MUST also update web/src/modules/i18n.js so we
+    don't reintroduce the contradiction."""
+    # zh: P25-P75 = 0.612-0.842
+    assert resonance_calibration.classify_zone(0.65, "zh-CN") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.83, "zh-CN") == "mid_neutral"
+    # en: P25-P75 = 0.668-0.961
+    assert resonance_calibration.classify_zone(0.70, "en-US") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.92, "en-US") == "mid_neutral"
+    # fr: P25-P75 = 0.580-0.795
+    assert resonance_calibration.classify_zone(0.65, "fr-FR") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.78, "fr-FR") == "mid_neutral"
 
 
 def test_classify_zone_fr_specific_boundaries():

@@ -29,6 +29,7 @@ import csv  # noqa: F401 — symmetry with fr audit; tsv writers may want it lat
 import json
 import logging
 import os
+import random
 import re
 import statistics
 import sys
@@ -43,9 +44,12 @@ log = logging.getLogger("audit_en")
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SIDECAR_DEFAULT = "http://localhost:8001"
 DEFAULT_CORPUS = Path("/mnt/d/project_vocieduck/ablation/audio/en")
+DEFAULT_LIBRISPEECH = Path("/mnt/d/project_vocieduck/ablation/audio/en/LibriSpeech")
 DEFAULT_RAW = Path.home() / "scratch" / "en_phase_a" / "raw"
 DEFAULT_REPORT = REPO_ROOT / "tests" / "reports" / f"en_resonance_baseline_{date.today()}.md"
 STATS_EN_PATH = REPO_ROOT / "voiceya" / "sidecars" / "visualizer-backend" / "stats.json"
+LIBRISPEECH_SUBSET = "train-clean-100"
+LIBRISPEECH_SEED = 17
 
 # ARPABET vowel base classes — stress digits (0/1/2) stripped before lookup.
 EN_VOWELS = {
@@ -147,6 +151,141 @@ def enumerate_clips(corpus_root: Path) -> list[dict]:
     return rows
 
 
+# ── LibriSpeech enumeration (large-N alternative to curated corpus) ─────
+
+
+def _parse_librispeech_speakers(speakers_txt: Path, subset: str) -> dict[str, str]:
+    """Parse SPEAKERS.TXT → {reader_id: 'F'|'M'} restricted to ``subset``.
+
+    Format (pipe-separated, lines starting with ``;`` are comments):
+        <id> | <sex> | <subset> | <minutes> | <name>
+    """
+    out: dict[str, str] = {}
+    for line in speakers_txt.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line or line.lstrip().startswith(";"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 3:
+            continue
+        spk_id, sex, sub = parts[0], parts[1], parts[2]
+        if sub != subset:
+            continue
+        if sex not in ("F", "M"):
+            continue
+        out[spk_id] = sex
+    return out
+
+
+def _resolve_librispeech_transcript(flac_path: Path) -> str | None:
+    """LibriSpeech ships transcripts at ``<spk>-<chap>.trans.txt``; one line
+    per utterance keyed by ``<spk>-<chap>-<utt>``. Return the transcript or
+    None if missing.
+    """
+    parent = flac_path.parent
+    stem = flac_path.stem  # e.g. "103-1240-0000"
+    try:
+        spk, chap, _utt = stem.split("-", 2)
+    except ValueError:
+        return None
+    trans_file = parent / f"{spk}-{chap}.trans.txt"
+    if not trans_file.is_file():
+        return None
+    for line in trans_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line:
+            continue
+        head, _, body = line.partition(" ")
+        if head == stem:
+            return body.strip()
+    return None
+
+
+def enumerate_clips_librispeech(
+    librispeech_root: Path,
+    *,
+    target_f: int,
+    target_m: int,
+    clips_per_spk: int,
+    seed: int = LIBRISPEECH_SEED,
+) -> list[dict]:
+    """Sample ``target_f`` F + ``target_m`` M speakers from train-clean-100,
+    take ``clips_per_spk`` clips each. Transcripts pulled from the .trans.txt
+    files so the analyze phase can skip ASR. Returns the same dict shape as
+    ``enumerate_clips`` plus a ``transcript`` key.
+    """
+    speakers_txt = librispeech_root / "SPEAKERS.TXT"
+    if not speakers_txt.is_file():
+        log.error("LibriSpeech SPEAKERS.TXT missing at %s", speakers_txt)
+        return []
+    spk_sex = _parse_librispeech_speakers(speakers_txt, LIBRISPEECH_SUBSET)
+    subset_root = librispeech_root / LIBRISPEECH_SUBSET
+    if not subset_root.is_dir():
+        log.error("LibriSpeech subset missing: %s", subset_root)
+        return []
+
+    rng = random.Random(seed)
+    f_speakers = sorted(s for s, x in spk_sex.items() if x == "F")
+    m_speakers = sorted(s for s, x in spk_sex.items() if x == "M")
+    rng.shuffle(f_speakers)
+    rng.shuffle(m_speakers)
+
+    rows: list[dict] = []
+    for sex_pool, target, sex_label in (
+        (f_speakers, target_f, "F"),
+        (m_speakers, target_m, "M"),
+    ):
+        picked = 0
+        for spk_id in sex_pool:
+            if picked >= target:
+                break
+            spk_dir = subset_root / spk_id
+            if not spk_dir.is_dir():
+                continue
+            flacs = sorted(spk_dir.rglob("*.flac"))
+            if not flacs:
+                continue
+            rng.shuffle(flacs)
+            took = 0
+            for flac in flacs:
+                if took >= clips_per_spk:
+                    break
+                transcript = _resolve_librispeech_transcript(flac)
+                if not transcript:
+                    continue
+                stem = f"librispeech_{spk_id}_{flac.stem}"
+                rows.append(
+                    {
+                        "wav": str(flac),
+                        "sex": sex_label,
+                        "spk_id": f"librispeech_{spk_id}",
+                        "stem": stem,
+                        "transcript": transcript,
+                    }
+                )
+                took += 1
+            if took:
+                picked += 1
+    log.info(
+        "librispeech enumerated %d clips (%dF / %dM) across %d speakers",
+        len(rows),
+        sum(1 for r in rows if r["sex"] == "F"),
+        sum(1 for r in rows if r["sex"] == "M"),
+        len({r["spk_id"] for r in rows}),
+    )
+    return rows
+
+
+def enumerate_for_args(args: argparse.Namespace) -> list[dict]:
+    """Dispatcher: pick curated or librispeech enumerator from CLI flags."""
+    if args.corpus_mode == "librispeech":
+        return enumerate_clips_librispeech(
+            Path(args.librispeech),
+            target_f=args.target_spk_f,
+            target_m=args.target_spk_m,
+            clips_per_spk=args.clips_per_spk,
+        )
+    return enumerate_clips(Path(args.corpus))
+
+
 # ── ASR + sidecar ──────────────────────────────────────────────────
 
 
@@ -180,11 +319,10 @@ def _post_one(sidecar_url: str, token: str, wav: Path, transcript: str) -> dict:
 
 
 def analyze_phase(args: argparse.Namespace) -> int:
-    corpus_root = Path(args.corpus)
-    if not corpus_root.is_dir():
-        log.error("corpus root not found: %s", corpus_root)
+    clips = enumerate_for_args(args)
+    if not clips:
+        log.error("no clips enumerated for corpus_mode=%s", args.corpus_mode)
         sys.exit(2)
-    clips = enumerate_clips(corpus_root)
     log.info(
         "enumerated %d clips (%dF / %dM) across %d speakers",
         len(clips),
@@ -221,17 +359,21 @@ def analyze_phase(args: argparse.Namespace) -> int:
             continue
         wav_path = Path(row["wav"])
 
-        if asr_model is None:
-            log.info("loading faster-whisper base.en …")
-            from faster_whisper import WhisperModel  # noqa: PLC0415
-
-            asr_model = WhisperModel("base.en", device="cpu", compute_type="int8")
-            log.info("ASR model ready")
-
-        transcript = _transcribe_one(wav_path, asr_model)
+        # If the enumerator already resolved a transcript (LibriSpeech mode),
+        # use it verbatim — skips the faster-whisper load entirely on big runs.
+        transcript = row.get("transcript")
         if not transcript:
-            failed += 1
-            continue
+            if asr_model is None:
+                log.info("loading faster-whisper base.en …")
+                from faster_whisper import WhisperModel  # noqa: PLC0415
+
+                asr_model = WhisperModel("base.en", device="cpu", compute_type="int8")
+                log.info("ASR model ready")
+
+            transcript = _transcribe_one(wav_path, asr_model)
+            if not transcript:
+                failed += 1
+                continue
         try:
             data = _post_one(args.sidecar, token, wav_path, transcript)
         except Exception as exc:
@@ -286,8 +428,7 @@ def report_phase(args: argparse.Namespace) -> Path:
     if not raw_dir.is_dir():
         log.error("missing %s — run --analyze first", raw_dir)
         sys.exit(2)
-    corpus_root = Path(args.corpus)
-    clips = enumerate_clips(corpus_root)
+    clips = enumerate_for_args(args)
 
     stats = json.loads(STATS_EN_PATH.read_text(encoding="utf-8"))
 
@@ -407,11 +548,22 @@ def report_phase(args: argparse.Namespace) -> Path:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
     lines.append(f"# en-US resonance baseline ({date.today()})\n")
+    if args.corpus_mode == "librispeech":
+        source_desc = (
+            f"LibriSpeech {LIBRISPEECH_SUBSET} subset at `{args.librispeech}` "
+            f"(seed={LIBRISPEECH_SEED}, target_f={args.target_spk_f}, "
+            f"target_m={args.target_spk_m}, clips_per_spk={args.clips_per_spk}). "
+            "Transcripts pulled from .trans.txt files (no ASR)."
+        )
+    else:
+        source_desc = (
+            f"hand-curated VCTK + CMU-Arctic + test fixtures at `{args.corpus}` "
+            "(cis_female_en + cis_male_en)."
+        )
     lines.append(
-        f"**Source**: hand-curated VCTK + CMU-Arctic + test fixtures at "
-        f"`{corpus_root}` (cis_female_en + cis_male_en).  Total clips: "
-        f"{len(clip_data)}; speakers: {len(by_spk)}.  Per-spk median is "
-        "the median of that speaker's clip-medians.\n"
+        f"**Source**: {source_desc}  Total clips: {len(clip_data)}; "
+        f"speakers: {len(by_spk)}.  Per-spk median is the median of that "
+        "speaker's clip-medians.\n"
     )
     lines.append(
         "Sidecar formant ceiling: pinned 5000 Hz (en NOT in `_ADAPTIVE_LANGS`).  "
@@ -537,12 +689,26 @@ def main() -> int:
     )
     ap.add_argument("--analyze", action="store_true")
     ap.add_argument("--report", action="store_true")
+    ap.add_argument(
+        "--corpus-mode",
+        choices=("curated", "librispeech"),
+        default="curated",
+        help="curated = cis_female_en/cis_male_en (~16 spk); librispeech = train-clean-100 sample",
+    )
     ap.add_argument("--corpus", default=str(DEFAULT_CORPUS))
+    ap.add_argument("--librispeech", default=str(DEFAULT_LIBRISPEECH))
+    ap.add_argument("--target-spk-f", type=int, default=50)
+    ap.add_argument("--target-spk-m", type=int, default=30)
+    ap.add_argument("--clips-per-spk", type=int, default=3)
     ap.add_argument("--raw", default=str(DEFAULT_RAW))
     ap.add_argument("--report-out", default=str(DEFAULT_REPORT))
     ap.add_argument("--sidecar", default=SIDECAR_DEFAULT)
     ap.add_argument("--token-env", default="ENGINE_C_SIDECAR_TOKEN")
     args = ap.parse_args()
+    # LibriSpeech raws live in their own scratch tree so curated + librispeech
+    # caches don't collide — same wav stems would shadow each other otherwise.
+    if args.corpus_mode == "librispeech" and args.raw == str(DEFAULT_RAW):
+        args.raw = str(Path.home() / "scratch" / "en_phase_a" / "raw_librispeech")
 
     _drift_guard()
 

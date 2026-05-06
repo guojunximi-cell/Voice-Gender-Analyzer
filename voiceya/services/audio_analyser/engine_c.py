@@ -492,9 +492,9 @@ def _aggregate_per_vowel(
             continue
         bucket = buckets.setdefault(
             label,
-            {"z_F1": [], "z_F2": [], "z_F3": [], "F1": [], "F2": [], "F3": []},
+            {"z_F1": [], "z_F2": [], "z_F3": [], "F1": [], "F2": [], "F3": [], "resonance": []},
         )
-        for key in ("z_F1", "z_F2", "z_F3", "F1", "F2", "F3"):
+        for key in ("z_F1", "z_F2", "z_F3", "F1", "F2", "F3", "resonance"):
             v = p.get(key)
             if v is not None:
                 bucket[key].append(float(v))
@@ -514,6 +514,10 @@ def _aggregate_per_vowel(
                 "F1_med_hz": _round_or_none(_median(b["F1"]), 0),
                 "F2_med_hz": _round_or_none(_median(b["F2"]), 0),
                 "F3_med_hz": _round_or_none(_median(b["F3"]), 0),
+                # Per-vowel resonance score (0-1, same scale as the panel-level
+                # median_resonance). advice_v2 uses this to drive the simple
+                # good/low/weak classification that replaced the F-axis logic.
+                "resonance_med": _round_or_none(_median(b["resonance"]), 3),
             }
         )
     out.sort(key=lambda r: -r["n"])

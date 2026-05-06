@@ -8,20 +8,24 @@
 
 import { getMode } from "./classify-mode.js";
 import { classifyForMode } from "./classify.js";
-import { renderAdvicePanel, renderMetricsPanel } from "./metrics-panel.js";
+import { renderMetricsPanel } from "./metrics-panel.js";
 import { renderResonancePanel } from "./resonance-panel.js";
 import { renderSegments, renderStats } from "./results.js";
 
 /**
- * @param {{summary: object, analysis: object[]}} session
+ * @param {{summary: object, analysis: object[], createdAt?: number}} session
  * @returns {object[]} classified segments for the current classify mode
+ *
+ * `createdAt` is forwarded to renderResonancePanel so the same-script history
+ * compare can pick a strictly-earlier prior attempt. Restored sessions carry
+ * their saved timestamp; fresh analysis results don't, and the panel falls
+ * back to Date.now() (safe — the new session isn't saved yet at render time).
  */
-export function renderFromSummary({ summary, analysis }) {
+export function renderFromSummary({ summary, analysis, createdAt }) {
 	const segs = classifyForMode({ summary, analysis }, getMode());
 	renderStats(segs);
 	renderSegments(analysis);
 	renderMetricsPanel(summary, analysis);
-	renderAdvicePanel(summary?.advice);
-	renderResonancePanel(summary?.advice?.resonance_panel);
+	renderResonancePanel(summary?.advice?.resonance_panel, { summary, createdAt });
 	return segs;
 }
