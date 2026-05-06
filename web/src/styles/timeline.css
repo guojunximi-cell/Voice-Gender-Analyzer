@@ -48,9 +48,18 @@
 }
 
 /* When the analyzer unhides the root, reserve the same vertical box so the
-   container itself doesn't grow underneath siblings as content streams in. */
+   container itself doesn't grow underneath siblings as content streams in.
+   ``flex-shrink: 0`` is critical: panel-center is ``display:flex; column``
+   with overflow-y:auto. At narrow three-panel widths (≤ 1000 px) the panel
+   would otherwise shrink phone-timeline below its natural content height
+   (transcript + bands + nav + footer), and the footer (carrying the
+   gender-legend) would overflow down into the next sibling — visually
+   landing under the Distribution card. flex-shrink:0 keeps the timeline at
+   content size; panel-center already scrolls when total content exceeds
+   the viewport. */
 #phone-timeline-root:not([hidden]) {
 	min-height: 220px;
+	flex-shrink: 0;
 }
 
 .vga-timeline[data-state="skeleton"] .vga-skel {
@@ -470,39 +479,52 @@
 }
 
 .vga-gender-legend__labels {
-	/* Three labels (left/mid/right) anchored to the bar's left/center/right edges
-	   via absolute positioning, plus a flex-flow info button pushed to the
-	   row's right end via margin-left:auto.
-	   Earlier version used `justify-content: space-between` over the four
-	   children, but `--mid` is absolute (out of flow), leaving three flex items
-	   distributed at start/center/end — which made "女声方向" land in the dead
-	   center, overlapping with the absolute "中性" label and looking like the
-	   middle label was missing. */
-	display: flex;
+	/* Grid layout: [ left | mid | right | info ].
+	   Pre-2026-05-06 we used flex + ``position: absolute`` on --mid /
+	   --right; on narrow widths the absolute right label could collide
+	   with the absolute mid label and "swallow" 女声方向. The two ``1fr``
+	   columns now reserve exclusive horizontal space for left/right
+	   labels, the ``auto`` middle column sizes to 中性 and stays
+	   centered between them, and the 20px tail column houses the info
+	   button — no more overlap regardless of width. */
+	display: grid;
+	grid-template-columns: 1fr auto 1fr 20px;
 	align-items: center;
+	column-gap: 8px;
 	padding-top: 4px;
+	/* 6px breathing room below the glyph bottom: panel-center already gives
+	   a 14px gap to the next sibling, but at certain DPR / zoom levels the
+	   labels still read as "swallowed" by the Distribution card. 6px lifts
+	   the visual gap to ~20px, comfortably past the perception threshold. */
+	padding-bottom: 6px;
 	font-size: 0.78rem;
 	color: var(--text-secondary);
 	position: relative;
 }
 
+.vga-gender-legend__label--left {
+	grid-column: 1;
+	justify-self: start;
+	min-width: 0;
+}
+
 .vga-gender-legend__label--mid {
-	position: absolute;
-	left: 50%;
-	transform: translateX(-50%);
+	grid-column: 2;
+	justify-self: center;
 	color: var(--text-muted);
 }
 
 .vga-gender-legend__label--right {
-	/* Anchor to the bar's right edge.  28px = info-button width (20px) + 8px gap. */
-	position: absolute;
-	right: 28px;
+	grid-column: 3;
+	justify-self: end;
+	min-width: 0;
 }
 
 .vga-gender-legend__info {
 	all: unset;
 	box-sizing: border-box;
-	margin-left: auto;
+	grid-column: 4;
+	justify-self: end;
 	width: 20px;
 	height: 20px;
 	border: 1px solid var(--border);
