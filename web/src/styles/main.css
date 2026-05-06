@@ -1518,7 +1518,7 @@ body {
 
 .resonance-vowel-row {
 	display: grid;
-	grid-template-columns: auto auto auto auto 1fr;
+	grid-template-columns: auto auto auto 1fr;
 	align-items: center;
 	gap: 8px;
 	padding: 4px 8px;
@@ -1537,33 +1537,6 @@ body {
 	font-variant-numeric: tabular-nums;
 	color: var(--text-primary);
 	min-width: 38px;
-}
-
-.resonance-level-pill {
-	font-size: 0.68rem;
-	padding: 2px 8px;
-	border-radius: 999px;
-	white-space: nowrap;
-	font-weight: 500;
-	letter-spacing: 0.01em;
-}
-
-.resonance-level-pill[data-level="good"] {
-	background: color-mix(in srgb, var(--accent) 7%, transparent);
-	border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-	color: var(--accent);
-}
-
-.resonance-level-pill[data-level="low"] {
-	background: color-mix(in srgb, var(--text-secondary) 8%, transparent);
-	border: 1px solid color-mix(in srgb, var(--text-secondary) 18%, transparent);
-	color: var(--text-secondary);
-}
-
-.resonance-level-pill[data-level="weak"] {
-	background: color-mix(in srgb, var(--accent) 12%, transparent);
-	border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
-	color: var(--accent);
 }
 
 .resonance-delta {

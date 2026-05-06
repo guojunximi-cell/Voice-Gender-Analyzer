@@ -113,11 +113,6 @@ function _buildVowelRow(row) {
 	vowelEl.className = "resonance-vowel-label";
 	vowelEl.textContent = `/${_vowelDisplay(row.vowel)}/`;
 
-	const pill = document.createElement("span");
-	pill.className = "resonance-level-pill";
-	pill.dataset.level = row.level_key;
-	pill.textContent = t(`advice.resonance.level.${row.level_key}`);
-
 	const delta = document.createElement("span");
 	delta.className = "resonance-delta";
 	delta.dataset.role = "delta";
@@ -133,7 +128,7 @@ function _buildVowelRow(row) {
 	_appendRailTicks(rail);
 	_appendIndicator(rail, pct, "vowel-indicator");
 
-	el.append(vowelEl, pill, delta, valueEl, rail);
+	el.append(vowelEl, delta, valueEl, rail);
 	return el;
 }
 

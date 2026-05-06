@@ -13,27 +13,6 @@ import { certaintTag, fmt } from "../utils.js";
 import { t } from "./i18n.js";
 import { clearResonancePanel } from "./resonance-panel.js";
 
-function animNum(el, target, suffix = "", duration = 600) {
-	if (!el) return;
-	const start = performance.now();
-	const from = parseFloat(el.dataset.current || 0) || 0;
-	el.dataset.current = target;
-	function tick(now) {
-		const p = Math.min((now - start) / duration, 1);
-		const ease = 1 - Math.pow(1 - p, 3);
-		el.textContent = Math.round(from + (target - from) * ease) + suffix;
-		if (p < 1) requestAnimationFrame(tick);
-	}
-	requestAnimationFrame(tick);
-}
-
-function animBar(el, pct, delay = 0) {
-	if (!el) return;
-	setTimeout(() => {
-		el.style.width = `${Math.max(0, Math.min(100, pct))}%`;
-	}, delay);
-}
-
 // ─── Aggregators ─────────────────────────────────────────────
 function _meanFormants(phones) {
 	const pick = (k) => {
@@ -111,27 +90,18 @@ export function renderMetricsPanel(summary, analysis) {
 		}
 	}
 
-	// ── F0 card ─────────────────────────────────────────────
-	// 卡片上的数字与下方"音高范围"指示器必须同源，否则 164 Hz 的文字会配
-	// 落在 200 Hz 附近的滑块，看起来自相矛盾。统一走 median（更鲁棒，也
-	// 与后端 overall_f0_median_hz 命名一致），mean 仅作 fallback。
+	// ── F0 + Formants (frontend-computed phone mean) ────────
+	// F0 与下方"音高范围"指示器同源（median，与后端 overall_f0_median_hz
+	// 命名一致；mean 仅作 fallback），避免 164 Hz 的文字配在 200 Hz 附近
+	// 的滑块上自相矛盾。
 	const pitch = ec.median_pitch_hz ?? ec.mean_pitch_hz;
 	const pitchStd = ec.stdev_pitch_hz;
-	animNum(document.getElementById("mc-f0-median"), Math.round(pitch ?? 0), " Hz");
-	const stdEl = document.getElementById("mc-f0-std");
-	if (stdEl) stdEl.textContent = `±${pitchStd != null ? Math.round(pitchStd) : "—"} Hz`;
-
-	// ── Resonance card (0..1 → percent) ─────────────────────
-	const resPct = ec.mean_resonance != null ? Math.round(ec.mean_resonance * 100) : 0;
-	animNum(document.getElementById("mc-res-val"), resPct, "%");
-	animBar(document.getElementById("mc-res-bar"), resPct, 80);
-
-	// ── Formants (frontend-computed phone mean) ─────────────
 	const { f1, f2, f3 } = _meanFormants(ec.phones);
 	const setFormant = (id, val) => {
 		const el = document.getElementById(id);
 		if (el) el.textContent = val != null ? `${Math.round(val)} Hz` : "—";
 	};
+	setFormant("mc-f0", pitch);
 	setFormant("mc-f1", f1);
 	setFormant("mc-f2", f2);
 	setFormant("mc-f3", f3);
