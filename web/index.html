@@ -28,6 +28,11 @@
 		<title data-i18n="app.title">声音分析鸭 — 声音性别分析</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="preload"
+			as="style"
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+		/>
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 		<link rel="stylesheet" href="/src/styles/main.css" />
 		<link rel="stylesheet" href="/src/styles/timeline.css" />
@@ -182,7 +187,11 @@
 		<!-- ══════════════════════════ THREE-PANEL LAYOUT ════════════════════════ -->
 		<div class="app-layout">
 			<!-- ══ LEFT PANEL: Scatter plot ════════════════════════════════════════ -->
-			<aside class="panel panel-left">
+			<!-- panel-expanded baked into HTML so mobile first paint matches the JS-default
+			     state — avoids a 0→260px max-height shift on initMobilePanel().  Desktop
+			     ignores the class (the collapse rules are inside @media (max-width:780px))
+			     and JS removes it on resize ≥781px to keep the toggle semantics. -->
+			<aside class="panel panel-left panel-expanded">
 				<div class="panel-header">
 					<span class="panel-title" data-i18n="panel.history">历史分析</span>
 					<span class="panel-collapse-chevron" aria-hidden="true"></span>

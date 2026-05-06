@@ -848,6 +848,13 @@ body {
    STATS
    ============================================================ */
 .stats-section {
+	contain: layout style;
+}
+
+/* Reserve space once the analyzer unhides the section so it doesn't pop into
+   existence and shove segments-list down (CLS=0.37 on Cloudflare RUM). */
+.stats-section:not([hidden]) {
+	min-height: 140px;
 }
 
 /* Caption above the male/female bars, calls out that the % denominator is

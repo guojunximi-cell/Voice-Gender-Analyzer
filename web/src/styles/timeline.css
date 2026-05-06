@@ -41,6 +41,16 @@
 .vga-timeline {
 	margin-top: 0;
 	contain: layout style;
+	/* Reserves enough room for both the ~116px skeleton and the populated
+	   timeline (~150–300px) so the skeleton→data swap doesn't push siblings.
+	   Paired with #phone-timeline-root:not([hidden]) below. */
+	min-height: 220px;
+}
+
+/* When the analyzer unhides the root, reserve the same vertical box so the
+   container itself doesn't grow underneath siblings as content streams in. */
+#phone-timeline-root:not([hidden]) {
+	min-height: 220px;
 }
 
 .vga-timeline[data-state="skeleton"] .vga-skel {

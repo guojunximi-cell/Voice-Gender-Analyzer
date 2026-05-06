@@ -1275,8 +1275,9 @@ async function initScatterFromStorage() {
 	const leftHeader = leftPanel?.querySelector(".panel-header");
 	if (!leftPanel || !leftHeader) return;
 
-	// Start expanded on mobile so the chart is visible by default
-	if (mq.matches) leftPanel.classList.add("panel-expanded");
+	// HTML defaults to panel-expanded so mobile first paint = expanded (no CLS).
+	// On desktop we strip the class so the toggle semantics still match resize handlers.
+	if (!mq.matches) leftPanel.classList.remove("panel-expanded");
 
 	leftHeader.addEventListener("click", () => {
 		if (!mq.matches) return;
