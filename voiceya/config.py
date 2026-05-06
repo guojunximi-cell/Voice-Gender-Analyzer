@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     max_concurrent: PositiveInt = 2
     max_queue_depth: NonNegativeInt = 30
 
+    # ─── 本地调试 ──────────────────────────────────────────────────
+    # True 时跳过文件大小 / 音频时长上限。仅本地调试用，线上保持 False。
+    debug_no_limits: bool = False
+
     # ─── Engine C / 进阶分析 ──────────────────────────────────────
     # feature-flagged，默认关；开启时需要 visualizer-backend sidecar 可达。
     engine_c_enabled: bool = False

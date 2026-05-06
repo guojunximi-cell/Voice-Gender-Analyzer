@@ -29,6 +29,7 @@ API_CONFIGS = {
     "max_file_size_mb": CFG.max_file_size_mb,
     "max_audio_duration_sec": CFG.max_audio_duration_sec,
     "engine_c_enabled": CFG.engine_c_enabled,
+    "debug_no_limits": CFG.debug_no_limits,
     "tone_threshold": TONE_THRESHOLD,
     "weak_tone_threshold": WEAK_TONE_THRESHOLD,
 }
@@ -75,7 +76,7 @@ async def new_analyse(
     max_bytes = CFG.max_file_size_mb * 1024 * 1024
     while chunk := await audio.read(64 * 1024):
         buf.write(chunk)
-        if buf.tell() > max_bytes:
+        if not CFG.debug_no_limits and buf.tell() > max_bytes:
             raise FILE_EXCEED_SIZE_LIMIT_EXCEPTION
 
     if buf.tell() < 12:
@@ -92,7 +93,7 @@ async def new_analyse(
     # ── 时长限制 ───────────────────────────────────────────
     with av.open(buf, "r") as s:
         duration = await asyncio.to_thread(get_duraton_sec, s)
-        if duration > CFG.max_audio_duration_sec:
+        if not CFG.debug_no_limits and duration > CFG.max_audio_duration_sec:
             raise HTTPException(
                 status_code=413,
                 detail=f"音频时长 {duration} 秒，超过 {CFG.max_audio_duration_sec} 秒限制",

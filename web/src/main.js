@@ -711,19 +711,34 @@ async function initUploaders() {
 	let maxFileSizeMb = 5;
 	let maxDurationSec = 180;
 	let engineCEnabled = false;
+	let debugNoLimits = false;
 	try {
 		const cfg = await fetch("/api/config").then((r) => r.json());
 		allowConcurrent = cfg.allow_concurrent ?? cfg.max_concurrent > 1;
 		maxFileSizeMb = cfg.max_file_size_mb ?? 5;
 		maxDurationSec = cfg.max_audio_duration_sec ?? 180;
 		engineCEnabled = !!cfg.engine_c_enabled;
+		debugNoLimits = !!cfg.debug_no_limits;
 		if (cfg.tone_threshold != null) setToneThreshold(cfg.tone_threshold);
 		if (cfg.weak_tone_threshold != null) setWeakToneThreshold(cfg.weak_tone_threshold);
 	} catch (_) {}
 
+	if (debugNoLimits && !document.getElementById("debug-no-limits-badge")) {
+		const badge = document.createElement("div");
+		badge.id = "debug-no-limits-badge";
+		badge.textContent = "DEBUG: limits off";
+		badge.style.cssText =
+			"position:fixed;right:12px;bottom:12px;z-index:9999;" +
+			"padding:4px 8px;border-radius:6px;" +
+			"background:rgba(220,53,69,.9);color:#fff;" +
+			"font:600 11px/1.2 ui-monospace,monospace;" +
+			"pointer-events:none;user-select:none;";
+		document.body.appendChild(badge);
+	}
+
 	_initRecordMode(engineCEnabled);
 
-	const maxBytes = maxFileSizeMb * 1024 * 1024;
+	const maxBytes = debugNoLimits ? Number.POSITIVE_INFINITY : maxFileSizeMb * 1024 * 1024;
 
 	// 更新上传区提示文字（绑定到 data-i18n 参数，便于语言切换时自动刷新）
 	const hint = document.querySelector(".upload-hint");
