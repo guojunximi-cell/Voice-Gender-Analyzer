@@ -140,13 +140,6 @@ const DICT = {
 		"label.noise": "噪音",
 		"label.silence": "静音",
 
-		"segments.title": "分段详情",
-		"segments.countSuffix": "段",
-		"segments.confTitle": "置信度 {pct}%",
-
-		"mobile.tabSegments": "分段详情",
-		"mobile.tabMetrics": "声学特征",
-
 		"metrics.emptyClick": "点击音段<br/>查看声学特征",
 		"metrics.emptyUpload": "上传并分析音频<br/>查看整段声学平均",
 		"metrics.noEngineC": "Engine C 未启用<br/>无法展示整段声学平均",
@@ -220,7 +213,8 @@ const DICT = {
 		"legend.neutral": "中性",
 		"legend.female": "女声方向",
 		"legend.infoAria": "色系说明",
-		"legend.sci1": "<strong>共鸣色条</strong>的 0.5 是<strong>女性参考均值</strong>（不是男女中线——实测男声 median ≈ 0.35–0.49，女声 median ≈ 0.65–0.81，因语言而异），女声阈值 = <strong>{res}</strong>。",
+		"legend.sci1":
+			"<strong>共鸣色条</strong>的 0.5 是<strong>女性参考均值</strong>（不是男女中线——实测男声 median ≈ 0.35–0.49，女声 median ≈ 0.65–0.81，因语言而异），女声阈值 = <strong>{res}</strong>。",
 		"legend.sci2": "该阈值基于 AISHELL-3 语料库（134 男 + 134 女）的 10-fold 交叉验证，精度 <strong>0.900</strong>。",
 		"legend.sci3":
 			"<strong>音高参考</strong>：{neutral} Hz 为男声上限 / 女声下限交界，{fem} Hz 为声音训练常用的女声感知阈值。",
@@ -366,7 +360,12 @@ const DICT = {
 		"help.title": "🦆 声音分析鸭 · 使用说明",
 		"help.what.h": "这是什么？",
 		"help.what.p":
-			"这是一个双引擎互相参考的，对声音刻板影响性别的评估网站。它分为音素级分析和整段分析。主要由上游项目 gender-voice-visualization 和 inaSpeechSegmenter（K-3 fork）驱动。它处于 beta 版本，在迭代中。作者希望它能辅助练声过程。",
+			"上传或录制中文 / 英文 / 法文音频，分析声音的性别声学特征。中央时间轴展示逐音素的音高与共鸣，右侧给出整段中位数。仅作练声参考，不是判定。",
+		"help.what.engineA.h": "Engine A · 音色参考",
+		"help.what.engineA.desc": "inaSpeechSegmenter K-3 fork · CNN 分类器，输出整段女性化分数",
+		"help.what.engineC.h": "Engine C · 主线 · 音素级",
+		"help.what.engineC.desc": "ASR + Montreal Forced Aligner + Praat 共振峰，按音素出 pitch / resonance",
+		"help.what.beta": "beta · 迭代中",
 		"help.flow.h": "分析流程",
 		"help.flow.s1.h": "上传 / 录音",
 		"help.flow.s1.note":
@@ -377,7 +376,7 @@ const DICT = {
 		"help.flow.s3.note":
 			"Engine C · 自由模式跑 ASR（FunASR / faster-whisper），跟稿模式直接用您的稿子；Montreal Forced Aligner 对齐到音素",
 		"help.flow.s4.h": "共振峰 + z-score",
-		"help.flow.s4.note": "Praat 提 F1 / F2 / F3 → z-score 合成共鸣值",
+		"help.flow.s4.note": "Praat 提 F1 / F2 / F3 → z-score 归一为共鸣值；整段聚合用「每元音 median 再取中位数」",
 		"help.flow.s5.h": "三面板渲染",
 		"help.flow.s5.note": "波形 · 中央三明治时间轴 · 右侧整段均值",
 		"help.how.h": "如何使用？",
@@ -387,21 +386,32 @@ const DICT = {
 		"help.heatmap.h": "术语",
 		"help.heatmap.resonanceDT": "共鸣",
 		"help.heatmap.resonanceDD":
-			"音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。calibration_v1 实测 median（p25–p75）：zh-CN 男 38%（29–46）／女 73%（62–85）。详见 tests/reports/calibration_v1。",
+			"音素内的共鸣，仅在元音上计算，由 F1 / F2 / F3 加权 + z-score 归一。Baseline 来自 cis 录音的分布参考（详见下表）。",
+		"help.heatmap.resonance.credit": "算法来自",
 		"help.heatmap.pitchDT": "音高",
-		"help.heatmap.pitchDD": "音素内的 F0。被认为是男女性化声音的主要边界。",
+		"help.heatmap.pitchDD":
+			"音素内的 F0（pyin，60–250 Hz）。听感上最容易识别，但不是唯一线索——F0 抬上去而 resonance 没跟上，听起来通常是「捏着嗓子」，把两条热力图对照看比单看 F0 更有用。",
+		"help.baseline.h": "参考分布",
+		"help.baseline.note": "男女分布严重重叠 — 数字偏哪一侧不构成判定。calibration_v1，每语种 ~90 段 cis 录音。",
+		"help.baseline.col.lang": "语种",
+		"help.baseline.col.male": "男声 中位数 (p25–p75)",
+		"help.baseline.col.female": "女声 中位数 (p25–p75)",
 		"help.overall.h": "整段分析",
-		"help.overall.note": "基频，共鸣和共振峰采用有效数据的平均值。",
-		"help.overall.nnDT": "NN / Engine A",
-		"help.overall.nnDD":
-			"来自 inaSpeechSegmenter 的 CNN 分类器，数据源以法语为主。输出性别标签，设计目的是区分 cis 人群在语音中的分布。仅作为 tone 参考。",
+		"help.overall.note": "时间轴是音素级测量，右侧是整段聚合。聚合方式见下：",
+		"help.aggregate.h": "聚合方式",
+		"help.aggregate.f0.h": "F0",
+		"help.aggregate.f0.body": "pyin 中位数 + p25 / p75",
+		"help.aggregate.resonance.h": "共鸣",
+		"help.aggregate.resonance.body": "每元音 median 再取中位数（每元音等权，避免高频元音压全局）",
+		"help.aggregate.formant.h": "F1 / F2 / F3",
+		"help.aggregate.formant.body": "有效帧均值",
 		"help.qa.h": "常见问题",
 		"help.qa.q1": "先看哪里？",
 		"help.qa.a1":
-			"看 resonance 和 pitch 的热力图，不要看 Neural Net 那个百分比。Neural Net 不准。我正在把它降级成「音色参考」。Resonance 和 pitch 是直接测量出来的，时间分辨率细到每个音素，这才是能指导练习的东西。",
-		"help.qa.q2": "三个引擎分歧？",
+			"看中央时间轴上 resonance 和 pitch 的热力图。右侧 NN 那个百分比已经降级成音色参考——不准，别盯着它练。Resonance / pitch 是音素级直接测量，这才是能指导练习的东西。",
+		"help.qa.q2": "两个引擎分歧？",
 		"help.qa.a2":
-			"信 resonance 和 pitch。它们对不上 NN 是正常的。它们测的不是同一个东西。更有用的问法是「resonance 和 pitch 自己之间对得上吗」。如果 pitch 已经上去了但 resonance 还偏低，说明抬了音高但共鸣腔还没改，这就是下一步的方向。",
+			"信 resonance 和 pitch（Engine C）。它们对不上 NN（Engine A）是正常的——测的不是同一个东西。更有用的问法是「resonance 和 pitch 自己之间对得上吗」。如果 pitch 已经上去但 resonance 还偏低，说明抬了音高但共鸣腔还没改，这就是下一步的方向。",
 		"help.qa.q3": '"Other" 是什么？',
 		"help.qa.a3": "停顿、呼吸、或者引擎没法判断的片段。",
 		"help.qa.q4": "我现实里 pass，但工具说我是 masc，怎么回事？",
@@ -542,7 +552,8 @@ const DICT = {
 		"stats.modeResonance": "Resonance",
 		"stats.modeATip": "Labels from the inaSpeechSegmenter neural classifier.",
 		"stats.modePitchTip": "Per-phone F0 — 165 Hz is the neutral midline.",
-		"stats.modeResonanceTip": "Per-phone resonance — 0.5 is the female-reference mean (NOT the male/female midline; empirical male medians sit at 0.35–0.49).",
+		"stats.modeResonanceTip":
+			"Per-phone resonance — 0.5 is the female-reference mean (NOT the male/female midline; empirical male medians sit at 0.35–0.49).",
 		"stats.lockedTip": "No Engine C phone data for this file (Engine C off or failed).",
 		"label.male": "Masc",
 		"label.female": "Fem",
@@ -550,13 +561,6 @@ const DICT = {
 		"label.music": "Music",
 		"label.noise": "Noise",
 		"label.silence": "Silent",
-
-		"segments.title": "Segments",
-		"segments.countSuffix": "segs",
-		"segments.confTitle": "Classifier confidence {pct}%",
-
-		"mobile.tabSegments": "Segments",
-		"mobile.tabMetrics": "Acoustics",
 
 		"metrics.emptyClick": "Click a segment<br/>to see its acoustic detail",
 		"metrics.emptyUpload": "Upload and analyze audio<br/>to see the whole-file averages",
@@ -794,7 +798,12 @@ const DICT = {
 		"help.title": "🦆 Voiceduck · How to use",
 		"help.what.h": "What is this?",
 		"help.what.p":
-			"A dual-engine cross-referencing site for evaluating how acoustic stereotypes shape perceived gender. It covers phone-level analysis and whole-file analysis. Powered primarily by upstream projects gender-voice-visualization and inaSpeechSegmenter (K-3 fork). It's in beta and iterating. The author hopes it can assist with voice training.",
+			"Upload or record a Chinese / English / French clip and we analyze its gendered acoustic features. The center timeline shows per-phone pitch and resonance; the right side gives whole-file medians. Reference for voice training, not a verdict.",
+		"help.what.engineA.h": "Engine A · Tonal reference",
+		"help.what.engineA.desc": "inaSpeechSegmenter K-3 fork · CNN classifier; outputs the whole-file femininity score.",
+		"help.what.engineC.h": "Engine C · Primary · phone-level",
+		"help.what.engineC.desc": "ASR + Montreal Forced Aligner + Praat formants — pitch / resonance per phone.",
+		"help.what.beta": "beta · iterating",
 		"help.flow.h": "Pipeline",
 		"help.flow.s1.h": "Upload / record",
 		"help.flow.s1.note": "Drop a file, pick one, or use the mic (≤ {mb} MB, < {min} min; zh-CN / en-US / fr-FR).",
@@ -804,7 +813,8 @@ const DICT = {
 		"help.flow.s3.note":
 			"Engine C · free mode runs ASR (FunASR / faster-whisper); script mode uses your pasted text. Montreal Forced Aligner aligns to phones.",
 		"help.flow.s4.h": "Formants + z-score",
-		"help.flow.s4.note": "Praat extracts F1 / F2 / F3 → z-score blends into the resonance value.",
+		"help.flow.s4.note":
+			"Praat extracts F1 / F2 / F3 → z-score normalizes into the resonance value; whole-file aggregation uses median-of-per-vowel-medians.",
 		"help.flow.s5.h": "Three-panel render",
 		"help.flow.s5.note": "Waveform · center sandwich timeline · right-side whole-file averages.",
 		"help.how.h": "How to use",
@@ -814,22 +824,35 @@ const DICT = {
 		"help.heatmap.h": "Terminology",
 		"help.heatmap.resonanceDT": "Resonance",
 		"help.heatmap.resonanceDD":
-			"Resonance within each phone. Vowels only. Derived from a weighted blend of F1, F2, and F3. Baseline calibrated against a cis-voice reference corpus. calibration_v1 medians (p25–p75): en-US M 49% (38–64) / F 81% (69–99). See tests/reports/calibration_v1.",
+			"Resonance within each phone, computed only on vowels, as a z-score-normalized weighted blend of F1 / F2 / F3. Baseline is a cis-voice reference distribution (table below).",
+		"help.heatmap.resonance.credit": "Algorithm from",
 		"help.heatmap.pitchDT": "Pitch",
 		"help.heatmap.pitchDD":
-			"F0 within each phone. Considered the primary acoustic boundary between masculine and feminine voice perception.",
+			"F0 within each phone (pyin, 60–250 Hz). The most audible cue, but not the only one — F0 going up while resonance stays low usually sounds strained. Reading the two heatmaps side-by-side beats reading F0 alone.",
+		"help.baseline.h": "Reference distributions",
+		"help.baseline.note":
+			"Distributions overlap heavily — which side a number leans on is not a verdict. calibration_v1, ~90 cis recordings per language.",
+		"help.baseline.col.lang": "Language",
+		"help.baseline.col.male": "Male median (p25–p75)",
+		"help.baseline.col.female": "Female median (p25–p75)",
 		"help.overall.h": "Whole-file analysis",
-		"help.overall.note": "F0, resonance, and formants are averages over voiced segments.",
-		"help.overall.nnDT": "NN / Engine A",
-		"help.overall.nnDD":
-			"A CNN classifier from inaSpeechSegmenter, trained primarily on French broadcast audio. Outputs a gender label designed to distinguish cis-voice distributions in speech segments. Treat as a rough tonal reference only.",
+		"help.overall.note":
+			"The timeline is phone-level measurement; the right side is whole-file aggregation. Aggregation methods below:",
+		"help.aggregate.h": "Aggregation",
+		"help.aggregate.f0.h": "F0",
+		"help.aggregate.f0.body": "pyin median + p25 / p75",
+		"help.aggregate.resonance.h": "Resonance",
+		"help.aggregate.resonance.body":
+			"Median of per-vowel medians (each vowel weighted equally, so high-frequency phones don't drag the global value).",
+		"help.aggregate.formant.h": "F1 / F2 / F3",
+		"help.aggregate.formant.body": "Mean across voiced frames",
 		"help.qa.h": "FAQ",
 		"help.qa.q1": "Where should I look first?",
 		"help.qa.a1":
-			"Look at the resonance and pitch heatmaps, not the Neural Net percentage. Neural Net isn't accurate. I'm downgrading it to a \"tonal reference\". Resonance and pitch are direct measurements with phone-level time resolution, and that's what can actually guide practice.",
-		"help.qa.q2": "Three engines disagree?",
+			"Look at the resonance and pitch heatmaps in the center timeline. The Neural Net percentage on the right has been downgraded to a tonal reference — it isn't accurate, don't train against it. Resonance / pitch are direct phone-level measurements; that's what can actually guide practice.",
+		"help.qa.q2": "Two engines disagree?",
 		"help.qa.a2":
-			"Trust resonance and pitch. It's normal for them to disagree with the NN. They aren't measuring the same thing. A more useful question is: do resonance and pitch agree with each other? If pitch has gone up but resonance is still low, that means vocal pitch went up but the resonant cavity hasn't changed yet, and that's your next direction.",
+			"Trust resonance and pitch (Engine C). It's normal for them to disagree with the NN (Engine A) — they aren't measuring the same thing. A more useful question is: do resonance and pitch agree with each other? If pitch has gone up but resonance is still low, that means vocal pitch went up but the resonant cavity hasn't changed yet — that's your next direction.",
 		"help.qa.q3": 'What is "Other"?',
 		"help.qa.a3": "Pauses, breath sounds, or segments the engine couldn't classify.",
 		"help.qa.q4": "I get read as a woman in everyday life, but the tool says I'm masc — what's going on?",
@@ -972,7 +995,8 @@ const DICT = {
 		"stats.modeResonance": "Résonance",
 		"stats.modeATip": "Étiquettes du classificateur neuronal inaSpeechSegmenter.",
 		"stats.modePitchTip": "F0 par phonème — 165 Hz est la médiane neutre.",
-		"stats.modeResonanceTip": "Résonance par phonème — 0,5 est la moyenne de référence féminine (PAS la médiane masculin/féminin ; les médianes masculines empiriques sont à 0,35–0,49).",
+		"stats.modeResonanceTip":
+			"Résonance par phonème — 0,5 est la moyenne de référence féminine (PAS la médiane masculin/féminin ; les médianes masculines empiriques sont à 0,35–0,49).",
 		"stats.lockedTip": "Aucune donnée Engine C pour ce fichier (Engine C désactivé ou en échec).",
 		"label.male": "Masc",
 		"label.female": "Fém",
@@ -980,13 +1004,6 @@ const DICT = {
 		"label.music": "Musique",
 		"label.noise": "Bruit",
 		"label.silence": "Silence",
-
-		"segments.title": "Segments",
-		"segments.countSuffix": "segs",
-		"segments.confTitle": "Confiance du classificateur {pct} %",
-
-		"mobile.tabSegments": "Segments",
-		"mobile.tabMetrics": "Acoustique",
 
 		"metrics.emptyClick": "Cliquez un segment<br/>pour voir son détail acoustique",
 		"metrics.emptyUpload": "Téléversez et analysez un audio<br/>pour voir les moyennes globales",
@@ -1033,7 +1050,8 @@ const DICT = {
 			"Carte thermique de la hauteur ; couleur par caractère (les consonnes non voisées héritent de la couleur de la voyelle).",
 		"timeline.ariaPitchDesc": "Carte thermique de hauteur pour la page courante",
 		"timeline.ariaResonance": "Carte thermique de résonance ; chaque cellule = un phonème, valeur 0–1.",
-		"timeline.ariaResonanceDesc": "Carte thermique de résonance pour la page courante. 0,5 = moyenne référence féminine.",
+		"timeline.ariaResonanceDesc":
+			"Carte thermique de résonance pour la page courante. 0,5 = moyenne référence féminine.",
 		"timeline.announceReady": "Analyse terminée, {n} caractères affichés",
 		"timeline.returnToCurrent": "Revenir au moment présent",
 		"timeline.barModePhone": "Phonèmes",
@@ -1232,7 +1250,12 @@ const DICT = {
 		"help.title": "🦆 Voiceduck · Mode d'emploi",
 		"help.what.h": "C'est quoi ?",
 		"help.what.p":
-			"Un site à double moteur croisé pour évaluer comment les stéréotypes acoustiques influencent la perception du genre. Couvre l'analyse phonème par phonème et l'analyse globale du fichier. Principalement propulsé par les projets en amont gender-voice-visualization et inaSpeechSegmenter (fork K-3). En version bêta, en itération. L'auteur espère que ce sera utile au travail de la voix.",
+			"Téléversez ou enregistrez un audio chinois / anglais / français pour analyser ses caractéristiques acoustiques liées au genre. La timeline centrale montre la hauteur et la résonance par phonème ; le panneau de droite donne les médianes globales. Référence pour le travail de voix, pas un verdict.",
+		"help.what.engineA.h": "Moteur A · Référence tonale",
+		"help.what.engineA.desc": "inaSpeechSegmenter K-3 fork · classificateur CNN ; produit le score global de féminité.",
+		"help.what.engineC.h": "Moteur C · Principal · niveau phonème",
+		"help.what.engineC.desc": "ASR + Montreal Forced Aligner + formants Praat — pitch / résonance par phonème.",
+		"help.what.beta": "bêta · en cours",
 		"help.flow.h": "Pipeline",
 		"help.flow.s1.h": "Téléverser / enregistrer",
 		"help.flow.s1.note":
@@ -1243,7 +1266,8 @@ const DICT = {
 		"help.flow.s3.note":
 			"Engine C · le mode libre lance une ASR (FunASR / faster-whisper) ; le mode lecture utilise votre texte tel quel. Montreal Forced Aligner aligne au phonème.",
 		"help.flow.s4.h": "Formants + z-score",
-		"help.flow.s4.note": "Praat extrait F1 / F2 / F3 → z-score combiné en valeur de résonance.",
+		"help.flow.s4.note":
+			"Praat extrait F1 / F2 / F3 → z-score normalisé en valeur de résonance ; agrégation globale par médiane des médianes par voyelle.",
 		"help.flow.s5.h": "Rendu trois panneaux",
 		"help.flow.s5.note": "Forme d'onde · timeline sandwich centrale · moyennes globales à droite.",
 		"help.how.h": "Comment l'utiliser",
@@ -1253,22 +1277,35 @@ const DICT = {
 		"help.heatmap.h": "Terminologie",
 		"help.heatmap.resonanceDT": "Résonance",
 		"help.heatmap.resonanceDD":
-			"Résonance à l'intérieur de chaque phonème. Voyelles uniquement. Issue d'une combinaison pondérée de F1, F2 et F3. Ligne de base calibrée sur un corpus de voix cis. Médianes calibration_v1 (p25–p75) : fr-FR H 35 % (29–42) / F 65 % (55–75). Voir tests/reports/calibration_v1.",
+			"Résonance par phonème, calculée sur les voyelles uniquement, à partir d'une combinaison pondérée et z-scorée de F1 / F2 / F3. La ligne de base provient d'un corpus de voix cis (cf. tableau ci-dessous).",
+		"help.heatmap.resonance.credit": "Algorithme issu de",
 		"help.heatmap.pitchDT": "Hauteur",
 		"help.heatmap.pitchDD":
-			"F0 à l'intérieur de chaque phonème. Considérée comme la frontière acoustique principale entre la perception masculine et féminine de la voix.",
+			"F0 par phonème (pyin, 60–250 Hz). C'est l'indice le plus audible, mais pas le seul — F0 qui monte sans que la résonance suive sonne souvent forcé. Mieux vaut lire les deux cartes thermiques côte à côte que la hauteur seule.",
+		"help.baseline.h": "Distributions de référence",
+		"help.baseline.note":
+			"Les distributions se chevauchent fortement — un chiffre qui penche d'un côté n'est pas un verdict. calibration_v1, ~90 enregistrements cis par langue.",
+		"help.baseline.col.lang": "Langue",
+		"help.baseline.col.male": "Médiane masc. (p25–p75)",
+		"help.baseline.col.female": "Médiane fém. (p25–p75)",
 		"help.overall.h": "Analyse globale",
-		"help.overall.note": "F0, résonance et formants sont des moyennes sur les segments voisés.",
-		"help.overall.nnDT": "NN / Engine A",
-		"help.overall.nnDD":
-			"Un classificateur CNN d'inaSpeechSegmenter, entraîné principalement sur de l'audio de radiodiffusion français. Émet une étiquette de genre conçue pour distinguer les distributions de voix cis dans les segments parlés. À traiter comme une référence tonale approximative seulement.",
+		"help.overall.note":
+			"La timeline est une mesure au phonème ; le panneau de droite est une agrégation globale. Méthodes ci-dessous :",
+		"help.aggregate.h": "Agrégation",
+		"help.aggregate.f0.h": "F0",
+		"help.aggregate.f0.body": "médiane pyin + p25 / p75",
+		"help.aggregate.resonance.h": "Résonance",
+		"help.aggregate.resonance.body":
+			"Médiane des médianes par voyelle (chaque voyelle équipondérée, pour qu'une voyelle fréquente ne tire pas la valeur globale).",
+		"help.aggregate.formant.h": "F1 / F2 / F3",
+		"help.aggregate.formant.body": "Moyenne sur trames voisées",
 		"help.qa.h": "FAQ",
 		"help.qa.q1": "Où regarder en premier ?",
 		"help.qa.a1":
-			"Regardez les cartes thermiques de résonance et de hauteur, pas le pourcentage du réseau de neurones. Le NN n'est pas précis. Je suis en train de le rétrograder en « référence tonale ». Résonance et hauteur sont des mesures directes avec une résolution temporelle au phonème — c'est ça qui peut guider la pratique.",
-		"help.qa.q2": "Les trois moteurs ne sont pas d'accord ?",
+			"Regardez les cartes thermiques de résonance et de hauteur sur la timeline centrale. Le pourcentage NN à droite a été rétrogradé en référence tonale — il n'est pas précis, ne vous entraînez pas dessus. Résonance / hauteur sont des mesures directes au phonème ; c'est ça qui peut guider la pratique.",
+		"help.qa.q2": "Les deux moteurs ne sont pas d'accord ?",
 		"help.qa.a2":
-			"Faites confiance à la résonance et à la hauteur. C'est normal qu'elles divergent du NN — elles ne mesurent pas la même chose. Question plus utile : la résonance et la hauteur sont-elles d'accord entre elles ? Si la hauteur est montée mais la résonance reste basse, c'est que la hauteur vocale est montée mais la cavité résonante n'a pas encore changé — voilà la prochaine direction.",
+			"Faites confiance à la résonance et à la hauteur (Moteur C). C'est normal qu'elles divergent du NN (Moteur A) — elles ne mesurent pas la même chose. Question plus utile : la résonance et la hauteur sont-elles d'accord entre elles ? Si la hauteur est montée mais la résonance reste basse, c'est que la hauteur vocale est montée mais la cavité résonante n'a pas encore changé — voilà la prochaine direction.",
 		"help.qa.q3": "C'est quoi « Other » ?",
 		"help.qa.a3": "Pauses, sons de respiration, ou segments que le moteur n'a pas pu classer.",
 		"help.qa.q4":

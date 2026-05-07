@@ -852,7 +852,7 @@ body {
 }
 
 /* Reserve space once the analyzer unhides the section so it doesn't pop into
-   existence and shove segments-list down (CLS=0.37 on Cloudflare RUM). */
+   existence and shove neighboring content (CLS=0.37 on Cloudflare RUM). */
 .stats-section:not([hidden]) {
 	min-height: 140px;
 }
@@ -866,11 +866,9 @@ body {
 	color: var(--text-muted);
 }
 
-/* Stats list mirrors .segments-list visual language: a column of transparent
-   grid rows inside a single .card wrapper (no per-row borders / shadows / left
-   accent stripes).  Per-type dominance is conveyed by a subtle tinted
-   background — kept here because it carries information that the segment list's
-   uniform .active state doesn't need. */
+/* Stats list: a column of transparent grid rows inside a single .card wrapper
+   (no per-row borders / shadows / left accent stripes).  Per-type dominance is
+   conveyed by a subtle tinted background. */
 .stats-grid {
 	padding: 0 12px 12px;
 	display: flex;
@@ -973,23 +971,6 @@ body {
 	margin-bottom: 12px;
 }
 
-#segments-details > summary {
-	list-style: none;
-	cursor: pointer;
-}
-#segments-details > summary::-webkit-details-marker {
-	display: none;
-}
-#segments-details > summary .section-title::after {
-	content: " ▸";
-	font-size: 0.7em;
-	color: var(--text-muted);
-	margin-left: 4px;
-}
-#segments-details[open] > summary .section-title::after {
-	content: " ▾";
-}
-
 .section-title {
 	font-size: 0.9rem;
 	font-weight: 600;
@@ -1067,77 +1048,6 @@ body {
 	text-align: center;
 }
 
-.segments-list {
-	padding: 0 12px 12px;
-	display: flex;
-	flex-direction: column;
-	gap: 3px;
-	max-height: min(360px, 45vh);
-	overflow-y: auto;
-	scrollbar-width: thin;
-	scrollbar-color: var(--border-strong) transparent;
-}
-.segments-list::-webkit-scrollbar {
-	width: 4px;
-}
-.segments-list::-webkit-scrollbar-track {
-	background: transparent;
-}
-.segments-list::-webkit-scrollbar-thumb {
-	background: var(--border-strong);
-	border-radius: 2px;
-}
-
-.segment-item {
-	display: grid;
-	grid-template-columns: 10px minmax(60px, auto) 96px 1fr 6px 28px;
-	align-items: center;
-	gap: 10px;
-	padding: 8px 8px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	transition: background var(--transition);
-	font-size: 0.85rem;
-	border: 1px solid transparent;
-}
-
-.segment-item:hover {
-	background: var(--surface-hover);
-	border-color: var(--border);
-}
-
-.segment-item.active {
-	background: var(--accent-subtle);
-	border-color: var(--accent-border);
-}
-
-.segment-swatch {
-	width: 10px;
-	height: 10px;
-	border-radius: 3px;
-	flex-shrink: 0;
-}
-
-.segment-label {
-	font-weight: 500;
-	min-width: 60px;
-	color: var(--text-primary);
-	white-space: nowrap;
-}
-
-.segment-time {
-	color: var(--text-muted);
-	font-variant-numeric: tabular-nums;
-	font-size: 0.78rem;
-}
-
-.segment-duration {
-	color: var(--text-muted);
-	font-size: 0.75rem;
-	font-variant-numeric: tabular-nums;
-	text-align: right;
-}
-
 /* ============================================================
    TOAST
    ============================================================ */
@@ -1188,8 +1098,7 @@ body {
 	}
 }
 
-.stats-section,
-#segments-section {
+.stats-section {
 	animation: fadeUp 320ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
@@ -1344,12 +1253,11 @@ body {
 .resonance-zone {
 	height: 100%;
 }
-/* Tints intentionally softer than .pitch-zone-* (which sit at α≈0.45):
-   the cis-male band covers 0..F_P25 ≈ 0–61% in zh-CN, and a saturated
-   blue across that span reads as "you're far from the goal" even when
-   the indicator is at the cis-male population median. The reduced
-   alpha keeps the zone information legible while letting the indicator
-   + range span dominate the eye. */
+/* Soft tints (α≈0.2) so the indicator + range span dominate the eye
+   instead of the zone fill — a saturated blue across cis-male p0..p25
+   would read as "far from the goal" even when the indicator sits on
+   the cis-male population median. .pitch-zone-* uses the same alpha
+   for visual parity. */
 .resonance-zone-male {
 	background: rgba(91, 141, 239, 0.2);
 }
@@ -1370,14 +1278,14 @@ body {
 	height: 16px;
 	left: 0;
 	width: 0;
-	background: rgba(255, 255, 255, 0.32);
-	backdrop-filter: blur(6px) saturate(1.25);
-	-webkit-backdrop-filter: blur(6px) saturate(1.25);
-	border: 1px solid rgba(255, 255, 255, 0.55);
+	background: rgba(255, 255, 255, 0.16);
+	backdrop-filter: blur(4px) saturate(1.15);
+	-webkit-backdrop-filter: blur(4px) saturate(1.15);
+	border: 1px solid rgba(255, 255, 255, 0.32);
 	border-radius: 999px;
 	box-shadow:
-		0 1px 4px rgba(0, 0, 0, 0.12),
-		inset 0 1px 0 rgba(255, 255, 255, 0.55);
+		0 1px 3px rgba(0, 0, 0, 0.08),
+		inset 0 1px 0 rgba(255, 255, 255, 0.3);
 	box-sizing: border-box;
 	pointer-events: none;
 	transition:
@@ -1386,11 +1294,11 @@ body {
 }
 
 [data-theme="dark"] .resonance-range-span {
-	background: rgba(255, 255, 255, 0.12);
-	border-color: rgba(255, 255, 255, 0.28);
+	background: rgba(255, 255, 255, 0.06);
+	border-color: rgba(255, 255, 255, 0.16);
 	box-shadow:
-		0 1px 4px rgba(0, 0, 0, 0.35),
-		inset 0 1px 0 rgba(255, 255, 255, 0.18);
+		0 1px 3px rgba(0, 0, 0, 0.25),
+		inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .resonance-scale-labels {
@@ -1731,15 +1639,15 @@ body {
 
 .pitch-zone-male {
 	width: 31%;
-	background: rgba(91, 141, 239, 0.45);
+	background: rgba(91, 141, 239, 0.2);
 }
 .pitch-zone-overlap {
 	width: 17%;
-	background: rgba(160, 120, 210, 0.4);
+	background: rgba(160, 120, 210, 0.18);
 }
 .pitch-zone-female {
 	width: 33%;
-	background: rgba(224, 122, 170, 0.45);
+	background: rgba(224, 122, 170, 0.2);
 }
 
 .pitch-indicator {
@@ -1773,14 +1681,14 @@ body {
 	height: 16px;
 	left: 50%;
 	width: 0;
-	background: rgba(255, 255, 255, 0.32);
-	backdrop-filter: blur(6px) saturate(1.25);
-	-webkit-backdrop-filter: blur(6px) saturate(1.25);
-	border: 1px solid rgba(255, 255, 255, 0.55);
+	background: rgba(255, 255, 255, 0.16);
+	backdrop-filter: blur(4px) saturate(1.15);
+	-webkit-backdrop-filter: blur(4px) saturate(1.15);
+	border: 1px solid rgba(255, 255, 255, 0.32);
 	border-radius: 999px;
 	box-shadow:
-		0 1px 4px rgba(0, 0, 0, 0.12),
-		inset 0 1px 0 rgba(255, 255, 255, 0.55);
+		0 1px 3px rgba(0, 0, 0, 0.08),
+		inset 0 1px 0 rgba(255, 255, 255, 0.3);
 	box-sizing: border-box;
 	pointer-events: none;
 	transition:
@@ -1789,11 +1697,11 @@ body {
 }
 
 [data-theme="dark"] .pitch-range-span {
-	background: rgba(255, 255, 255, 0.12);
-	border-color: rgba(255, 255, 255, 0.28);
+	background: rgba(255, 255, 255, 0.06);
+	border-color: rgba(255, 255, 255, 0.16);
 	box-shadow:
-		0 1px 4px rgba(0, 0, 0, 0.35),
-		inset 0 1px 0 rgba(255, 255, 255, 0.18);
+		0 1px 3px rgba(0, 0, 0, 0.25),
+		inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .pitch-range-labels {
@@ -1868,29 +1776,6 @@ body {
 	color: var(--text-muted);
 	text-align: center;
 	margin-top: 4px;
-}
-
-/* Confidence micro-bar in segment list */
-.segment-conf-bar {
-	width: 28px;
-	height: 3px;
-	background: var(--border);
-	border-radius: 99px;
-	position: relative;
-	overflow: hidden;
-	flex-shrink: 0;
-	justify-self: end;
-}
-.segment-conf-bar::after {
-	content: "";
-	position: absolute;
-	left: 0;
-	top: 0;
-	height: 100%;
-	width: calc(var(--conf, 0.5) * 100%);
-	background: var(--accent);
-	border-radius: 99px;
-	transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Certainty tag — primary signal of the NN section, no spectrum bar */
@@ -2194,10 +2079,6 @@ body {
 		min-height: 44px;
 		justify-content: center;
 	}
-	.segment-item {
-		min-height: 44px;
-		padding: 10px;
-	}
 	.play-btn {
 		width: 44px;
 		height: 44px;
@@ -2221,50 +2102,6 @@ body {
 	}
 	.recorder-mic-btn {
 		padding: 10px 16px;
-	}
-
-	/* Mobile tabs */
-	.mobile-tabs {
-		display: flex;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		overflow: hidden;
-		flex-shrink: 0;
-	}
-	.mobile-tab {
-		flex: 1;
-		padding: 10px 8px;
-		background: var(--bg-secondary);
-		border: none;
-		font: inherit;
-		font-size: 0.8rem;
-		font-weight: 500;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition:
-			background var(--transition),
-			color var(--transition);
-		min-height: 44px;
-	}
-	.mobile-tab + .mobile-tab {
-		border-left: 1px solid var(--border);
-	}
-	.mobile-tab.active {
-		background: var(--surface);
-		color: var(--text-primary);
-		font-weight: 600;
-	}
-	.mobile-tab:hover:not(.active) {
-		background: var(--surface-hover);
-		color: var(--text-secondary);
-	}
-
-	/* When metrics tab is active, hide segments; when segments tab active, hide right panel */
-	.panel-right.mobile-hidden {
-		display: none;
-	}
-	#segments-section.mobile-hidden {
-		display: none !important;
 	}
 }
 
@@ -2562,9 +2399,6 @@ body {
    MOBILE: hide elements on desktop
    ============================================================ */
 .panel-collapse-chevron {
-	display: none;
-}
-.mobile-tabs {
 	display: none;
 }
 

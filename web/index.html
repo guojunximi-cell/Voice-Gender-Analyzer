@@ -658,15 +658,7 @@
 				<!-- Phone-level timeline (Engine C, feature-flagged) — drill-down detail -->
 				<div id="phone-timeline-root" hidden></div>
 
-				<!-- Mobile tabs (visible only on narrow screens) -->
-				<div class="mobile-tabs" id="mobile-tabs" hidden>
-					<button class="mobile-tab" data-tab="segments" data-i18n="mobile.tabSegments">分段详情</button>
-					<button class="mobile-tab active" data-tab="metrics" data-i18n="mobile.tabMetrics">声学特征</button>
-				</div>
-
-				<!-- Stats cards — macro conclusion, sits directly above segment list so
-				     the two summary panels (overall composition + per-segment detail)
-				     are visually grouped at the bottom of the center column. -->
+				<!-- Stats cards — macro conclusion at the bottom of the center column. -->
 				<section id="stats-section" class="card stats-section" hidden>
 					<div class="section-header">
 						<h2 class="section-title" data-i18n="stats.title">声音占比</h2>
@@ -727,17 +719,6 @@
 						</div>
 					</div>
 				</section>
-
-				<!-- Segment list -->
-				<section id="segments-section" class="card" hidden>
-					<details id="segments-details">
-						<summary class="section-header">
-							<h2 class="section-title" data-i18n="segments.title">分段详情</h2>
-							<span id="segment-count" class="badge">—</span>
-						</summary>
-						<div id="segments-list" class="segments-list"></div>
-					</details>
-				</section>
 			</main>
 
 			<!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
@@ -750,9 +731,9 @@
 				<!-- Resonance panel: per-vowel level (Engine C only). -->
 				<details id="resonance-panel" class="mc-collapsible resonance-panel" open hidden>
 					<summary class="mc-collapsible-header">
-							<span data-i18n="advice.resonance.title">共鸣表现</span>
-							<span id="resonance-median-tag" class="mc-collapsible-value" hidden></span>
-						</summary>
+						<span data-i18n="advice.resonance.title">共鸣表现</span>
+						<span id="resonance-median-tag" class="mc-collapsible-value" hidden></span>
+					</summary>
 					<div class="mc-collapsible-body">
 						<div id="resonance-summary" class="resonance-summary" hidden></div>
 						<div id="resonance-median-block" class="resonance-median-block" hidden>
@@ -771,7 +752,9 @@
 									<span class="resonance-whisker-label" data-i18n="advice.resonance.typical.male">典型顺性别男声</span>
 								</div>
 								<div class="resonance-whisker resonance-whisker-female" id="resonance-whisker-female">
-									<span class="resonance-whisker-label" data-i18n="advice.resonance.typical.female">典型顺性别女声</span>
+									<span class="resonance-whisker-label" data-i18n="advice.resonance.typical.female"
+										>典型顺性别女声</span
+									>
 								</div>
 							</div>
 						</div>
@@ -822,9 +805,9 @@
 					<!-- Collapsible: Pitch range -->
 					<details class="mc-collapsible" open>
 						<summary class="mc-collapsible-header">
-								<span data-i18n="metrics.pitchRangeTitle">音高范围</span>
-								<span id="mc-pitch-median-tag" class="mc-collapsible-value" hidden></span>
-							</summary>
+							<span data-i18n="metrics.pitchRangeTitle">音高范围</span>
+							<span id="mc-pitch-median-tag" class="mc-collapsible-value" hidden></span>
+						</summary>
 						<div class="mc-collapsible-body">
 							<div class="pitch-range-bar">
 								<div class="pitch-zone pitch-zone-male" data-i18n-title="metrics.zoneMale" title="男性 85~155 Hz"></div>
@@ -918,34 +901,108 @@
 				<section class="vga-help-section">
 					<h4 data-i18n="help.what.h">这是什么？</h4>
 					<p data-i18n="help.what.p">
-						上传或录制一段普通话或英文音频，分析声音的性别声学特征。输出整段均值 +
-						逐字音高/共鸣色彩，作声音训练的参考工具——并非判定。
+						上传或录制中文 / 英文 /
+						法文音频，分析声音的性别声学特征。中央时间轴展示逐音素的音高与共鸣，右侧给出整段中位数。仅作练声参考，不是判定。
 					</p>
+					<div class="vga-help-engine-grid">
+						<div class="vga-help-engine-card">
+							<div class="vga-help-engine-card-h" data-i18n="help.what.engineA.h">Engine A · 音色参考</div>
+							<div class="vga-help-engine-card-body" data-i18n="help.what.engineA.desc">
+								inaSpeechSegmenter K-3 fork · CNN 分类器，输出整段女性化分数
+							</div>
+						</div>
+						<div class="vga-help-engine-card vga-help-engine-card--primary">
+							<div class="vga-help-engine-card-h" data-i18n="help.what.engineC.h">Engine C · 主线 · 音素级</div>
+							<div class="vga-help-engine-card-body" data-i18n="help.what.engineC.desc">
+								ASR + Montreal Forced Aligner + Praat 共振峰，按音素出 pitch / resonance
+							</div>
+						</div>
+					</div>
+					<span class="vga-help-pill" data-i18n="help.what.beta">beta · 迭代中</span>
 				</section>
 
 				<section class="vga-help-section">
 					<h4 data-i18n="help.heatmap.h">术语</h4>
-					<dl>
-						<dt data-i18n="help.heatmap.resonanceDT">共鸣</dt>
-						<dd data-i18n="help.heatmap.resonanceDD">
-							音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。calibration_v1
-							实测 median（p25–p75）：zh-CN 男 38%（29–46）／女 73%（62–85）。详见 tests/reports/calibration_v1。
-						</dd>
-						<dt data-i18n="help.heatmap.pitchDT">音高</dt>
-						<dd data-i18n="help.heatmap.pitchDD">音素内的 F0。被认为是男女性化声音的主要边界。</dd>
-					</dl>
+					<div class="vga-help-term-grid">
+						<div class="vga-help-term-card">
+							<div class="vga-help-term-card-h" data-i18n="help.heatmap.resonanceDT">共鸣</div>
+							<div class="vga-help-term-card-body" data-i18n="help.heatmap.resonanceDD">
+								音素内的共鸣，仅在元音上计算，由 F1 / F2 / F3 加权 + z-score 归一。Baseline 来自 cis
+								录音的分布参考（详见下表）。
+							</div>
+							<div class="vga-help-credit">
+								<span data-i18n="help.heatmap.resonance.credit">算法来自</span>
+								<a
+									href="https://github.com/lmcnulty/gender-voice-visualization"
+									target="_blank"
+									rel="noopener noreferrer"
+									>lmcnulty/gender-voice-visualization</a
+								>
+							</div>
+						</div>
+						<div class="vga-help-term-card">
+							<div class="vga-help-term-card-h" data-i18n="help.heatmap.pitchDT">音高</div>
+							<div class="vga-help-term-card-body" data-i18n="help.heatmap.pitchDD">
+								音素内的 F0（pyin，60–250 Hz）。听感上最容易识别，但不是唯一线索。
+							</div>
+						</div>
+					</div>
+
+					<h5 class="vga-help-subhead" data-i18n="help.baseline.h">参考分布</h5>
+					<div class="vga-help-callout vga-help-callout--info">
+						<span class="vga-help-callout-icon" aria-hidden="true">ⓘ</span>
+						<span data-i18n="help.baseline.note">
+							男女分布严重重叠 — 数字偏哪一侧不构成判定。calibration_v1，每语种 ~90 段 cis 录音。
+						</span>
+					</div>
+					<table class="vga-help-baseline">
+						<thead>
+							<tr>
+								<th data-i18n="help.baseline.col.lang">语种</th>
+								<th data-i18n="help.baseline.col.male">男声 中位数 (p25–p75)</th>
+								<th data-i18n="help.baseline.col.female">女声 中位数 (p25–p75)</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><code>zh-CN</code></td>
+								<td>38% (29–46)</td>
+								<td>73% (62–85)</td>
+							</tr>
+							<tr>
+								<td><code>en-US</code></td>
+								<td>29% (24–38)</td>
+								<td>55% (46–68)</td>
+							</tr>
+							<tr>
+								<td><code>fr-FR</code></td>
+								<td>35% (29–42)</td>
+								<td>65% (55–75)</td>
+							</tr>
+						</tbody>
+					</table>
 				</section>
 
 				<section class="vga-help-section">
 					<h4 data-i18n="help.overall.h">整段分析</h4>
-					<p data-i18n="help.overall.note">基频，共鸣和共振峰采用有效数据的平均值。</p>
-					<dl>
-						<dt data-i18n="help.overall.nnDT">NN / Engine A</dt>
-						<dd data-i18n="help.overall.nnDD">
-							来自 inaSpeechSegmenter 的 CNN 分类器，数据源以法语为主。输出性别标签，设计目的是区分 cis
-							人群在语音中的分布。仅作为 tone 参考。
-						</dd>
-					</dl>
+					<p data-i18n="help.overall.note">时间轴是音素级测量，右侧是整段聚合。聚合方式见下：</p>
+					<h5 class="vga-help-subhead" data-i18n="help.aggregate.h">聚合方式</h5>
+					<div class="vga-help-aggregate-grid">
+						<div class="vga-help-aggregate-cell">
+							<div class="vga-help-aggregate-h" data-i18n="help.aggregate.f0.h">F0</div>
+							<div class="vga-help-aggregate-body" data-i18n="help.aggregate.f0.body">pyin 中位数 + p25 / p75</div>
+						</div>
+						<div class="vga-help-aggregate-cell">
+							<div class="vga-help-aggregate-h" data-i18n="help.aggregate.resonance.h">共鸣</div>
+							<div class="vga-help-aggregate-body" data-i18n="help.aggregate.resonance.body">
+								每元音 median 再取中位数（每元音等权）
+							</div>
+						</div>
+						<div class="vga-help-aggregate-cell">
+							<div class="vga-help-aggregate-h" data-i18n="help.aggregate.formant.h">F1 / F2 / F3</div>
+							<div class="vga-help-aggregate-body" data-i18n="help.aggregate.formant.body">有效帧均值</div>
+						</div>
+					</div>
 				</section>
 
 				<section class="vga-help-section">
@@ -954,17 +1011,17 @@
 						<details>
 							<summary data-i18n="help.qa.q1">先看哪里？</summary>
 							<p data-i18n="help.qa.a1">
-								看 resonance 和 pitch 的热力图，不要看 Neural Net 那个百分比。Neural Net
-								不准。我正在把它降级成「音色参考」。Resonance 和 pitch
-								是直接测量出来的，时间分辨率细到每个音素，这才是能指导练习的东西。
+								看中央时间轴上 resonance 和 pitch 的热力图。右侧 NN
+								那个百分比已经降级成音色参考——不准，别盯着它练。Resonance / pitch
+								是音素级直接测量，这才是能指导练习的东西。
 							</p>
 						</details>
 						<details>
-							<summary data-i18n="help.qa.q2">三个引擎分歧？</summary>
+							<summary data-i18n="help.qa.q2">两个引擎分歧？</summary>
 							<p data-i18n="help.qa.a2">
-								信 resonance 和 pitch。它们对不上 NN 是正常的。它们测的不是同一个东西。更有用的问法是「resonance 和
-								pitch 自己之间对得上吗」。如果 pitch 已经上去了但 resonance
-								还偏低，说明抬了音高但共鸣腔还没改，这就是下一步的方向。
+								信 resonance 和 pitch（Engine C）。它们对不上 NN（Engine
+								A）是正常的——测的不是同一个东西。更有用的问法是「resonance 和 pitch 自己之间对得上吗」。如果 pitch
+								已经上去但 resonance 还偏低，说明抬了音高但共鸣腔还没改，这就是下一步的方向。
 							</p>
 						</details>
 						<details>
@@ -988,7 +1045,7 @@
 						</details>
 						<details>
 							<summary data-i18n="help.qa.q7">语言切换？</summary>
-							<p data-i18n="help.qa.a7">右上角切 zh-CN / en-US。</p>
+							<p data-i18n="help.qa.a7">右上角依次切换 zh-CN / en-US / fr-FR。</p>
 						</details>
 						<details>
 							<summary data-i18n="help.qa.q8">数据会留吗？</summary>
@@ -1043,7 +1100,7 @@
 							</li>
 							<li>
 								<a
-									href="https://github.com/guojunximi-cell/gender-voice-visualization"
+									href="https://github.com/lmcnulty/gender-voice-visualization"
 									target="_blank"
 									rel="noopener noreferrer"
 									data-i18n="help.links.gvv"
@@ -1101,7 +1158,7 @@
 							<div class="vga-help-flow-step">
 								<div class="vga-help-flow-step-h" data-i18n="help.flow.s1.h">上传 / 录音</div>
 								<div class="vga-help-flow-step-note" data-i18n="help.flow.s1.note" data-i18n-params='{"mb":5,"min":3}'>
-									拖拽音频、选择文件，或调用麦克风（≤ 5 MB，&lt; 3 分钟，中文 zh-CN 或英文 en-US）
+									拖拽音频、选择文件，或调用麦克风（≤ 5 MB，&lt; 3 分钟，中文 zh-CN / 英文 en-US / 法文 fr-FR）
 								</div>
 							</div>
 							<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
@@ -1211,7 +1268,6 @@
 			</div>
 		</div>
 		-->
-
 
 		<style>
 			/* ── Overlay container ───────────────────────────── */
@@ -1404,6 +1460,180 @@
 				line-height: 1.6;
 			}
 
+			/* ── Engine cards (what is this?) ─────────────────── */
+			.vga-help-engine-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 8px;
+				margin-top: 10px;
+			}
+			.vga-help-engine-card {
+				border: 1px solid var(--border);
+				background: var(--surface-hover);
+				border-radius: 10px;
+				padding: 10px 12px;
+			}
+			.vga-help-engine-card--primary {
+				border-color: color-mix(in srgb, var(--female, var(--accent)) 40%, var(--border));
+				background: color-mix(in srgb, var(--female, var(--accent)) 8%, var(--surface-hover));
+			}
+			.vga-help-engine-card-h {
+				font-size: 0.82rem;
+				font-weight: 600;
+				color: var(--text-primary);
+				margin-bottom: 4px;
+			}
+			.vga-help-engine-card-body {
+				font-size: 0.78rem;
+				color: var(--text-secondary);
+				line-height: 1.5;
+			}
+			.vga-help-pill {
+				display: inline-block;
+				margin-top: 10px;
+				padding: 2px 8px;
+				font-size: 0.72rem;
+				font-weight: 600;
+				color: var(--text-muted);
+				background: var(--surface-hover);
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				letter-spacing: 0.02em;
+			}
+
+			/* ── Term cards (resonance / pitch) ───────────────── */
+			.vga-help-term-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 8px;
+			}
+			.vga-help-term-card {
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 10px 12px;
+				background: var(--surface);
+			}
+			.vga-help-term-card-h {
+				font-size: 0.86rem;
+				font-weight: 700;
+				color: var(--text-primary);
+				margin-bottom: 4px;
+			}
+			.vga-help-term-card-body {
+				font-size: 0.8rem;
+				color: var(--text-secondary);
+				line-height: 1.55;
+			}
+			.vga-help-credit {
+				margin-top: 6px;
+				font-size: 0.72rem;
+				color: var(--text-muted);
+				line-height: 1.4;
+			}
+			.vga-help-credit a {
+				color: var(--text-secondary);
+				text-decoration: none;
+				border-bottom: 1px dashed var(--border);
+				padding-bottom: 1px;
+				transition:
+					color var(--transition),
+					border-color var(--transition);
+			}
+			.vga-help-credit a:hover,
+			.vga-help-credit a:focus-visible {
+				color: var(--female);
+				border-bottom-color: var(--female);
+			}
+
+			/* ── Subhead between sections ─────────────────────── */
+			.vga-help-subhead {
+				font-size: 0.78rem;
+				font-weight: 600;
+				color: var(--text-muted);
+				margin: 16px 0 8px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+
+			/* ── Callouts (info / warn) ───────────────────────── */
+			.vga-help-callout {
+				display: block;
+				border-radius: 10px;
+				padding: 10px 12px;
+				font-size: 0.8rem;
+				line-height: 1.55;
+				margin-bottom: 10px;
+			}
+			.vga-help-callout--info {
+				border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+				background: color-mix(in srgb, var(--accent) 8%, transparent);
+				color: var(--text-secondary);
+			}
+			.vga-help-callout--info .vga-help-callout-icon {
+				color: var(--accent);
+				margin-right: 6px;
+				font-weight: 700;
+			}
+			/* ── Baseline table ───────────────────────────────── */
+			.vga-help-baseline {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 0.8rem;
+				font-variant-numeric: tabular-nums;
+			}
+			.vga-help-baseline thead th {
+				text-align: left;
+				font-weight: 600;
+				font-size: 0.74rem;
+				color: var(--text-muted);
+				padding: 6px 8px;
+				border-bottom: 1px solid var(--border);
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+			}
+			.vga-help-baseline tbody td {
+				padding: 7px 8px;
+				border-bottom: 1px solid var(--border);
+				color: var(--text-primary);
+			}
+			.vga-help-baseline tbody tr:last-child td {
+				border-bottom: none;
+			}
+			.vga-help-baseline tbody td:first-child code {
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				font-size: 0.78rem;
+				color: var(--text-muted);
+				background: var(--surface-hover);
+				padding: 1px 6px;
+				border-radius: 4px;
+			}
+
+			/* ── Aggregation grid ─────────────────────────────── */
+			.vga-help-aggregate-grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 6px;
+				margin-bottom: 12px;
+			}
+			.vga-help-aggregate-cell {
+				border: 1px solid var(--border);
+				background: var(--surface-hover);
+				border-radius: 8px;
+				padding: 8px 10px;
+			}
+			.vga-help-aggregate-h {
+				font-size: 0.78rem;
+				font-weight: 700;
+				color: var(--text-primary);
+				margin-bottom: 3px;
+				font-variant-numeric: tabular-nums;
+			}
+			.vga-help-aggregate-body {
+				font-size: 0.74rem;
+				color: var(--text-muted);
+				line-height: 1.45;
+			}
+
 			/* ── Friendly links ─────────────────────────────── */
 			.vga-help-links-group {
 				margin-bottom: 14px;
@@ -1454,6 +1684,20 @@
 				.vga-help-header {
 					font-size: 0.9rem;
 					padding: 14px 0 10px;
+				}
+				.vga-help-engine-grid,
+				.vga-help-term-grid {
+					grid-template-columns: 1fr;
+				}
+				.vga-help-aggregate-grid {
+					grid-template-columns: 1fr;
+				}
+				.vga-help-baseline {
+					font-size: 0.74rem;
+				}
+				.vga-help-baseline thead th,
+				.vga-help-baseline tbody td {
+					padding: 5px 6px;
 				}
 			}
 		</style>
