@@ -20,7 +20,7 @@ import { getLang, t } from "./i18n.js";
 // Values from calibration_v1 (commit 482d374, 2026-05-06).
 const _ZONE_THRESHOLDS = {
 	"zh-CN": { p25: 0.612, p75: 0.842 },
-	"en-US": { p25: 0.689, p75: 0.98 },
+	"en-US": { p25: 0.458, p75: 0.682 },
 	"fr-FR": { p25: 0.547, p75: 0.752 },
 };
 
@@ -37,9 +37,9 @@ const _ZONE_TIERS = {
 		["at_ceiling", null],
 	],
 	"en-US": [
-		["clearly_below_female", 0.525],
-		["leans_male", 0.689],
-		["mid_neutral", 0.98],
+		["clearly_below_female", 0.351],
+		["leans_male", 0.458],
+		["mid_neutral", 0.682],
 		["leans_female", 0.98],
 		["at_ceiling", null],
 	],

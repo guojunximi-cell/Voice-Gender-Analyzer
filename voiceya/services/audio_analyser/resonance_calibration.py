@@ -112,51 +112,54 @@ _ZONES_FR: tuple[tuple[str, float | None], ...] = (
     ("at_ceiling", None),
 )
 
-# en-US percentiles from tests/reports/calibration_v1/aggregate.csv
-# (2026-05-06).  91 F + 92 M speakers from LibriSpeech train-clean-100, 6
-# flacs concatenated to ~60-90 s sessions per speaker, sidecar pinned 5000
-# Hz, stats.json cmudict-derived.  Snapshot:
+# en-US percentiles from tests/reports/calibration_v1/aggregate.csv after
+# the 2026-05-06 stats.json retrain.  91 F + 92 M speakers from LibriSpeech
+# train-clean-100, 6 flacs concatenated to ~60-90 s sessions per speaker,
+# sidecar adaptive ceiling 4500–6500 Hz, stats.json re-baked at fixed 5500
+# Hz on 5000 LibriSpeech train segments (59 phones).  Snapshot evolution:
 #
-#   sex  n   P5     P25    P50    P75    P95    mean
-#   F    50  0.498  0.668  0.775  0.961  1.000  0.784   ← 2026-05-05 (16 unique spk × 3)
-#   F    91  0.525  0.689  0.811  0.987  1.000  0.804   ← calibration_v1 (91 unique spk × 60s)
-#   M    30  0.277  0.406  0.460  0.674  1.000  0.534   ← 2026-05-05
-#   M    92  0.328  0.381  0.489  0.639  1.000  0.546   ← calibration_v1
+#   sex  n   P5     P25    P50    P75    P95    mean   src
+#   F    50  0.498  0.668  0.775  0.961  1.000  0.784  2026-05-05 (16 spk × 3, upstream stats)
+#   F    91  0.525  0.689  0.811  0.987  1.000  0.804  calibration_v1 v0 (upstream stats @ 5000 Hz)
+#   F    91  0.351  0.458  0.553  0.682  0.833  0.568  calibration_v1 v1 (re-trained @ 5500 Hz)  ← current
+#   M    30  0.277  0.406  0.460  0.674  1.000  0.534  2026-05-05
+#   M    92  0.328  0.381  0.489  0.639  1.000  0.546  calibration_v1 v0
+#   M    92  0.195  0.237  0.286  0.385  0.673  0.339  calibration_v1 v1  ← current
 #
-# Drift from 2026-05-05: F P5 +0.027, P25 +0.021, P75 +0.026.  All shifts
-# are within the original-sample CI but the 91-speaker number is the better
-# estimate.  Constants below moved to calibration_v1 values.
+# Why the distribution shifted DOWN despite "fixing" the ceiling: the old
+# upstream stats.json had an artificially-depressed /IY1/ F2 mean of
+# 2112 Hz (vs literature ~2960) because Praat's 5-pole LPC at 5000 Hz
+# intermittently fused F1+F2 into a spurious low-frequency peak when
+# female F2 sat near 5000 Hz.  Real F speakers measuring their TRUE F2
+# (~2700-2900 Hz) thus scored z = +1.6 to +2.7 above this depressed
+# reference and saturated at the clamp ceiling (26 % of F samples hit
+# resonance ≥ 0.98).  Re-training at 5500 Hz lifts /IY1/ F2 mean to
+# 2353 Hz and tightens stdev (474 → 336), so the same TRUE-F2-2800
+# speaker now scores z = +1.0 — high, but no longer saturating.
 #
-# en F distribution is **shifted higher and wider** than zh F (P75=0.987
-# vs zh 0.849).  The wider band is real: LibriSpeech is diverse volunteers,
-# not VCTK studio-clean.  24/91 (26 %) of F speakers saturate at ≥ 0.98;
-# the ``leans_female`` slot is therefore intentionally narrow (P75=0.987
-# to ceiling=0.98 → essentially empty for en) and the bulk of "more female"
-# outcomes flow into ``at_ceiling``.  This is by design.
+# The cost: the old "F P50 = 0.811" was largely an artifact of the
+# downward-biased reference.  Honest reference makes F speakers cluster
+# around their own population mean at z ≈ 0 → resonance ≈ 0.5–0.55.
+# This is the algorithmic intent (``0.5 = female reference mean``) finally
+# being expressed accurately.  See voiceya/sidecars/visualizer-backend/
+# CHANGELOG_EN.md (2026-05-06) for the full diagnosis.
 #
-# Pre-2026-05-05 ``_ZONES_EN`` aliased ``_ZONES_ZH``; that mis-classified
-# en speakers — e.g. an en F at 0.75 (now-known P50 of real en F speakers)
-# was bucketed as ``mid_neutral`` under zh thresholds AND told "still some
-# distance from female reference", a contradiction the corpus disproves.
-_EN_F_P5 = 0.525  # was 0.498 (2026-05-05 baseline)
-_EN_F_P25 = 0.689  # was 0.668
+# Saturation eliminated: ``leans_female`` zone (P75 → at_ceiling) now has
+# 0.682–0.98 = ~30 % of bar width — wider than zh's 14 % (P75=0.849).
+# This is structurally correct: en F P75 = 0.682 sits comfortably below
+# the clamp ceiling, so the boundary doesn't need to be pinned to 0.98
+# (the way the old empirical 0.987 P75 forced it to be).
+_EN_F_P5 = 0.351  # was 0.525 (calibration_v1 v0); shift from 5500 Hz retrain
+_EN_F_P25 = 0.458  # was 0.689
+_EN_F_P75 = 0.682  # was _AT_CEILING (0.98) — now sub-ceiling, leans_female has real width
 
-# en-US M (92 spk, calibration_v1): 0.328 / 0.381 / 0.489 / 0.639 / 1.000.
-# P95 saturates so we use IQR (P25..P75) as the typical-range whisker —
-# wider than zh/fr (~26 % vs 17 % / 12 %) reflecting LibriSpeech volunteer
-# diversity vs studio-clean corpora.
-_EN_M_P25 = 0.381
-_EN_M_P75 = 0.639
-# Empirical en F P75 = 0.987, ABOVE the clamp ceiling 0.98.  We pin the
-# zone boundary to the ceiling itself so the (mid_neutral, leans_female,
-# at_ceiling) tuple stays monotone — otherwise scores in [0.98, 0.987)
-# would match mid_neutral first and never reach the at_ceiling tier,
-# silently dropping the saturation caveat.  The structural cost: en's
-# leans_female zone is empty by construction, so en F speakers in the
-# upper-female tail flow directly into at_ceiling.  This is correct: at
-# ≥ 0.98 the score has lost discriminative power and per-vowel detail
-# is the better signal anyway.
-_EN_F_P75 = _AT_CEILING  # empirical 0.987, clamped to ceiling 0.98
+# en-US M (92 spk, calibration_v1 v1): 0.195 / 0.237 / 0.286 / 0.385 / 0.673.
+# IQR (P25..P75) used as the typical-range whisker.  Notably narrower than
+# v0 (0.381..0.639 = 0.258 wide vs 0.237..0.385 = 0.148 wide), reflecting
+# the same reference-shift effect as F: with an accurate reference the M
+# population's z-distribution clusters tighter around its true centroid.
+_EN_M_P25 = 0.237  # was 0.381
+_EN_M_P75 = 0.385  # was 0.639
 
 _ZONES_EN: tuple[tuple[str, float | None], ...] = (
     ("clearly_below_female", _EN_F_P5),

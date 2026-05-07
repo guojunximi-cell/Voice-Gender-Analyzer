@@ -283,6 +283,20 @@ async def run_engine_c(
     alignment_confidence = _alignment_confidence(phones, transcript, total_audio_sec, lang_short)
 
     median_resonance = _safe_float(data.get("medianResonance"))
+
+    # Zone classification uses median-of-per-vowel-medians (each vowel weighs
+    # equally, regardless of how many times it appeared) so a frequent
+    # low-resonance vowel can't drag the speaker out of an otherwise-feminine
+    # zone. Falls back to the sidecar's flat-list median when no vowel meets
+    # the n ≥ 5 threshold (very short / vowel-imbalanced recordings).
+    per_vowel_data = _aggregate_per_vowel(phones, lang_short)
+    qualifying_meds = [
+        float(v["resonance_med"])
+        for v in per_vowel_data
+        if (v.get("n") or 0) >= 5 and isinstance(v.get("resonance_med"), (int, float))
+    ]
+    zone_median = _median(qualifying_meds) if qualifying_meds else median_resonance
+
     summary = {
         "mean_pitch_hz": _safe_float(data.get("meanPitch")),
         "median_pitch_hz": _safe_float(data.get("medianPitch")),
@@ -313,9 +327,9 @@ async def run_engine_c(
         # are advisory; the raw `median_resonance` and per-phone `phones`
         # array remain authoritative for any consumer that wants to ignore
         # the binning.
-        "resonance_zone_key": resonance_calibration.classify_zone(median_resonance, language),
+        "resonance_zone_key": resonance_calibration.classify_zone(zone_median, language),
         "resonance_empirical_bands": resonance_calibration.empirical_bands(language),
-        "resonance_per_vowel": _aggregate_per_vowel(phones, lang_short),
+        "resonance_per_vowel": per_vowel_data,
     }
 
     # INFO 不带用户解析数值（pitch / resonance / 对齐分数 / phone 数量都是结果指纹），
