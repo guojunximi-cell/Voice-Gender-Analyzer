@@ -13,7 +13,7 @@ import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
 import { buildScriptIdentity } from "./modules/resonance-history.js";
 import { renderFromSummary } from "./modules/results-render.js";
-import { highlightActiveSegment, renderStats, resetResults } from "./modules/results.js";
+import { renderStats, resetResults } from "./modules/results.js";
 import { getScatterMode, onScatterModeChange, setScatterMode } from "./modules/scatter-mode.js";
 import {
 	addSession,
@@ -636,9 +636,6 @@ function onFileSelected(file) {
 		onReady: (_dur) => {
 			/* controls already enabled in waveform.js */
 		},
-		onTimeUpdate: (t) => {
-			if (analysisData) highlightActiveSegment(t, analysisData.analysis);
-		},
 	});
 }
 
@@ -1140,9 +1137,6 @@ async function onScatterDotClick(session) {
 				if ($("analyze-btn")) $("analyze-btn").disabled = true;
 				_phoneTimeline?.attachWavesurfer(getWaveSurfer());
 			},
-			onTimeUpdate: (t) => {
-				if (analysisData) highlightActiveSegment(t, analysisData.analysis);
-			},
 		});
 	} else {
 		// Cold：缓存里没有原文件（首刷被淘汰等），段落用右侧列表承担
@@ -1252,9 +1246,6 @@ async function _loadImportedSession({ summary, analysis, filename, audioFile, cr
 				if ($("analyze-btn")) $("analyze-btn").disabled = true;
 				_phoneTimeline?.attachWavesurfer(getWaveSurfer());
 			},
-			onTimeUpdate: (tm) => {
-				if (analysisData) highlightActiveSegment(tm, analysisData.analysis);
-			},
 		});
 	} else {
 		setAudioUnavailableHint(true);
@@ -1302,81 +1293,18 @@ async function initScatterFromStorage() {
 	const leftHeader = leftPanel?.querySelector(".panel-header");
 	if (!leftPanel || !leftHeader) return;
 
-	// HTML defaults to panel-expanded so mobile first paint = expanded (no CLS).
-	// On desktop we strip the class so the toggle semantics still match resize handlers.
-	if (!mq.matches) leftPanel.classList.remove("panel-expanded");
-
+	// HTML default = no panel-expanded (mobile starts collapsed so the empty
+	// scatter canvas doesn't pad first paint).  Desktop ignores the class.
 	leftHeader.addEventListener("click", () => {
 		if (!mq.matches) return;
 		leftPanel.classList.toggle("panel-expanded");
 	});
 
-	// Reset on resize to desktop; expand when entering mobile
+	// Resize-to-desktop: ensure no leftover toggle state.  Resize-to-mobile:
+	// keep whatever state was there (collapsed by default, or whatever the
+	// user toggled before resizing back).
 	mq.addEventListener("change", (e) => {
 		if (!e.matches) leftPanel.classList.remove("panel-expanded");
-		else leftPanel.classList.add("panel-expanded");
-	});
-})();
-
-// ─── Mobile: tabs for segments / metrics ─────────────────────
-(function initMobileTabs() {
-	const mq = matchMedia("(max-width: 780px)");
-	const tabBar = $("mobile-tabs");
-	const segSection = $("segments-section");
-	const rightPanel = document.querySelector(".panel-right");
-	if (!tabBar || !rightPanel) return;
-
-	const tabs = tabBar.querySelectorAll(".mobile-tab");
-	let activeTab = "metrics";
-
-	function applyTab(tab) {
-		activeTab = tab;
-		tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
-		if (!mq.matches) {
-			// Desktop: show everything
-			segSection?.classList.remove("mobile-hidden");
-			rightPanel.classList.remove("mobile-hidden");
-			return;
-		}
-		if (tab === "segments") {
-			segSection?.classList.remove("mobile-hidden");
-			rightPanel.classList.add("mobile-hidden");
-		} else {
-			segSection?.classList.add("mobile-hidden");
-			rightPanel.classList.remove("mobile-hidden");
-		}
-	}
-
-	tabBar.addEventListener("click", (e) => {
-		const btn = e.target.closest(".mobile-tab");
-		if (!btn) return;
-		applyTab(btn.dataset.tab);
-	});
-
-	// Show tab bar when stats are visible (results phase)
-	const observer = new MutationObserver(() => {
-		const statsVisible = !$("stats-section")?.hidden;
-		tabBar.hidden = !statsVisible;
-		if (statsVisible && mq.matches) applyTab(activeTab);
-	});
-	const statsEl = $("stats-section");
-	if (statsEl) observer.observe(statsEl, { attributes: true, attributeFilter: ["hidden"] });
-
-	// Auto-switch to metrics when a segment is clicked on mobile
-	document.addEventListener("segment-select", () => {
-		if (mq.matches) {
-			applyTab("metrics");
-		}
-	});
-
-	// Reset on resize to desktop
-	mq.addEventListener("change", (e) => {
-		if (!e.matches) {
-			segSection?.classList.remove("mobile-hidden");
-			rightPanel.classList.remove("mobile-hidden");
-		} else {
-			applyTab(activeTab);
-		}
 	});
 })();
 
