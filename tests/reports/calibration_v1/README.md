@@ -1,6 +1,6 @@
 # Calibration corpus v1 — resonance%% empirical distribution
 
-_Generated 2026-05-06T22:38:00.660195+00:00 from `/mnt/d/project_vocieduck/calibration_v1`._
+_Generated 2026-05-07T05:19:47.721644+00:00 from `/mnt/d/project_vocieduck/calibration_v1`._
 
 ## Provenance
 
@@ -23,8 +23,8 @@ Engine C sidecar @ `localhost:8001`, faithful re-emission of
 
 | Bucket | n | P5 | P25 | P50 | P75 | P95 | mean | std | F0 P50 (Hz) |
 | --- | ---:| ---:| ---:| ---:| ---:| ---:| ---:| ---:| ---:|
-| en-US · F | 91 | 0.525 | 0.688 | 0.811 | 0.987 | 1.000 | 0.804 | 0.164 | 197 |
-| en-US · M | 92 | 0.328 | 0.381 | 0.489 | 0.639 | 1.000 | 0.546 | 0.210 | 114 |
+| en-US · F | 91 | 0.351 | 0.458 | 0.552 | 0.682 | 0.834 | 0.568 | 0.147 | 197 |
+| en-US · M | 92 | 0.193 | 0.238 | 0.288 | 0.385 | 0.675 | 0.339 | 0.164 | 114 |
 | fr-FR · F | 90 | 0.429 | 0.547 | 0.646 | 0.752 | 0.960 | 0.659 | 0.159 | 209 |
 | fr-FR · M | 94 | 0.229 | 0.294 | 0.348 | 0.421 | 0.601 | 0.371 | 0.123 | 118 |
 | zh-CN · F | 94 | 0.490 | 0.616 | 0.726 | 0.849 | 1.000 | 0.734 | 0.160 | 230 |
