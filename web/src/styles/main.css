@@ -879,7 +879,11 @@ body {
 
 .stat-card {
 	display: grid;
-	grid-template-columns: 10px minmax(60px, auto) 56px 1fr 36px;
+	/* Bar caps at 220 px on wide panels — a 4-px-tall bar stretching to 240+ px
+	   reads as a thin lonely thread. Floor 80 px keeps it useful on narrow ones.
+	   With no 1fr column, leftover panel width sits as silent right-side
+	   whitespace instead of overinflating the bar. */
+	grid-template-columns: 10px minmax(60px, auto) 56px minmax(80px, 220px) 36px;
 	align-items: center;
 	gap: 10px;
 	padding: 8px 8px;
@@ -1314,7 +1318,7 @@ body {
    narrow bands (en-US M is ~26 % of the bar). */
 .resonance-whiskers {
 	position: relative;
-	height: 32px;
+	min-height: 32px;
 	margin-top: 4px;
 }
 
@@ -1360,21 +1364,54 @@ body {
 	background: rgba(224, 122, 170, 0.7);
 }
 
-.resonance-whisker-label {
+/* In-band labels were dropped (overflowed narrow IQR bands and stomped on
+   the neighboring band's hit area). Identification now lives in the legend
+   chip row below — see .resonance-whisker-legend. */
+
+/* Legend row sits below both M and F whiskers (top: 0, top: 18px). With
+   the whiskers occupying 0–32 px, the legend starts at 36 px. */
+.resonance-whisker-legend {
 	position: absolute;
-	left: 4px;
-	top: 50%;
-	transform: translateY(-50%);
+	top: 36px;
+	left: 0;
+	right: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
 	font-size: 0.62rem;
 	color: var(--text-muted);
-	white-space: nowrap;
-	line-height: 1;
-	pointer-events: none;
+	line-height: 1.2;
 }
 
-.resonance-whisker.is-active .resonance-whisker-label {
-	color: var(--text-secondary);
-	font-weight: 600;
+.resonance-whisker-legend-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	white-space: nowrap;
+}
+
+.resonance-whisker-legend-dash {
+	display: inline-block;
+	width: 12px;
+	height: 0;
+	border-top: 1px dashed currentColor;
+	flex-shrink: 0;
+}
+
+.resonance-whisker-legend-chip--male {
+	color: rgba(91, 141, 239, 0.85);
+}
+.resonance-whisker-legend-chip--female {
+	color: rgba(224, 122, 170, 0.85);
+}
+
+/* Account for the legend row eating ~16px below the whisker bands. */
+.resonance-whiskers:not([hidden]) {
+	padding-bottom: 18px;
+}
+
+.resonance-whisker.is-active {
+	border-style: solid;
 }
 
 /* ── All-vowels list ──────────────────────────────────────────
