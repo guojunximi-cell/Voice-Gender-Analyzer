@@ -1304,22 +1304,13 @@ body {
 }
 
 /* ── Resonance panel ──────────────────────────────────────────
-   Phoneme-aligned breakdown: title, summary line, weakness vowel
-   cards. Top-most panel in the right column. */
+   Wrapped in <details class="mc-collapsible resonance-panel">; chrome
+   (border, header, padding) comes from .mc-collapsible* rules. The
+   panel sits directly under .panel-right (which has no internal
+   padding), so we add card margins here to give the rounded border
+   breathing room — same 14px metric used by #metrics-content below. */
 .resonance-panel {
-	padding: 12px 14px 10px;
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	border-bottom: 1px solid var(--border-strong);
-}
-
-.resonance-title {
-	font-size: 0.78rem;
-	font-weight: 600;
-	color: var(--text-secondary);
-	letter-spacing: 0.02em;
-	text-transform: uppercase;
+	margin: 14px 14px 0;
 }
 
 .resonance-summary {
@@ -1328,151 +1319,164 @@ body {
 	color: var(--text-primary);
 }
 
-.resonance-median {
-	font-size: 0.72rem;
-	color: var(--text-secondary);
-	font-variant-numeric: tabular-nums;
-}
-
-.resonance-weakness-section {
+/* ── Median scale bar ─────────────────────────────────────────
+   Mirrors the Pitch Range bar recipe: a 10px-tall pill split
+   into three zone tints (cis-male / androgynous / cis-female)
+   with a frosted indicator at the median resonance %. Zone
+   widths are written inline by JS from the language's calibration
+   thresholds (see _ZONE_THRESHOLDS in resonance-panel.js). */
+.resonance-median-block {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
 	margin-top: 2px;
 }
 
-.resonance-weakness-title {
-	font-size: 0.72rem;
-	font-weight: 600;
-	color: var(--text-secondary);
-	letter-spacing: 0.02em;
-	text-transform: uppercase;
-}
-
-.resonance-weakness-list {
+.resonance-scale-bar {
+	position: relative;
+	height: 10px;
+	border-radius: 99px;
+	overflow: visible;
+	background: var(--border-strong);
 	display: flex;
-	flex-direction: column;
-	gap: 5px;
 }
 
-.resonance-weakness-card {
-	padding: 8px 10px;
-	background: color-mix(in srgb, var(--accent) 6%, transparent);
-	border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-	border-radius: var(--radius-sm);
-	font-size: 0.76rem;
-	line-height: 1.45;
-	color: var(--text-primary);
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+.resonance-zone {
+	height: 100%;
+}
+/* Tints intentionally softer than .pitch-zone-* (which sit at α≈0.45):
+   the cis-male band covers 0..F_P25 ≈ 0–61% in zh-CN, and a saturated
+   blue across that span reads as "you're far from the goal" even when
+   the indicator is at the cis-male population median. The reduced
+   alpha keeps the zone information legible while letting the indicator
+   + range span dominate the eye. */
+.resonance-zone-male {
+	background: rgba(91, 141, 239, 0.2);
+}
+.resonance-zone-overlap {
+	background: rgba(160, 120, 210, 0.18);
+}
+.resonance-zone-female {
+	background: rgba(224, 122, 170, 0.2);
 }
 
-.resonance-weakness-header {
+/* Range span — frosted-glass overlay marking min..max of per-vowel
+   resonance medians. Clone of .pitch-range-span recipe. JS sets
+   left/width inline; transition mirrors the Pitch Range easing. */
+.resonance-range-span {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	height: 16px;
+	left: 0;
+	width: 0;
+	background: rgba(255, 255, 255, 0.32);
+	backdrop-filter: blur(6px) saturate(1.25);
+	-webkit-backdrop-filter: blur(6px) saturate(1.25);
+	border: 1px solid rgba(255, 255, 255, 0.55);
+	border-radius: 999px;
+	box-shadow:
+		0 1px 4px rgba(0, 0, 0, 0.12),
+		inset 0 1px 0 rgba(255, 255, 255, 0.55);
+	box-sizing: border-box;
+	pointer-events: none;
+	transition:
+		left 500ms cubic-bezier(0.4, 0, 0.2, 1),
+		width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] .resonance-range-span {
+	background: rgba(255, 255, 255, 0.12);
+	border-color: rgba(255, 255, 255, 0.28);
+	box-shadow:
+		0 1px 4px rgba(0, 0, 0, 0.35),
+		inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.resonance-scale-labels {
 	display: flex;
 	justify-content: space-between;
-	align-items: baseline;
-	gap: 8px;
-}
-
-.resonance-weakness-label {
-	font-size: 0.78rem;
-	color: var(--text-primary);
-}
-
-.resonance-weakness-z {
-	font-size: 0.74rem;
-	font-weight: 600;
-	color: var(--accent);
+	font-size: 0.62rem;
+	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
 }
 
-/* z-score rail: 中性标尺，刻度落在整数 σ（-3 / -2 / -1 / 0 / +1）。基线 +
-   竖直 tick + 下标数字，无渐变也无 gendered 配色——指示器位置是唯一信号。
-   高度 = 基线区 (12px) + tick 标签 (12px)，刚好放下"−3"这种两字符标签。 */
-.resonance-weakness-rail {
+/* "Typical range" whiskers — two horizontal pills below the scale bar
+   showing where cis-M (P25..P75) and cis-F (P25..P75) populations cluster
+   per calibration_v1. Position is set inline by JS from
+   panelData.empirical_bands. The thin baseline + end caps mimic a boxplot
+   IQR box; the label hugs the band's left edge so it doesn't overflow on
+   narrow bands (en-US M is ~26 % of the bar). */
+.resonance-whiskers {
 	position: relative;
-	height: 24px;
+	height: 32px;
 	margin-top: 4px;
 }
 
-/* 基线：贯穿 rail 的细横线，落在 12px 处（rail 顶向下）。 */
-.resonance-weakness-rail::before {
-	content: "";
+.resonance-whisker {
 	position: absolute;
-	left: 0;
-	right: 0;
-	top: 12px;
-	height: 1px;
-	background: var(--border-strong);
+	height: 14px;
+	box-sizing: border-box;
+	border-top: 1px dashed var(--text-muted);
+	border-bottom: 1px dashed var(--text-muted);
 }
 
-.rail-tick {
+.resonance-whisker::before,
+.resonance-whisker::after {
+	content: "";
 	position: absolute;
-	top: 8px; /* 让 tick 上端略高于基线，下端正好压在基线上 */
-	transform: translateX(-50%);
-	display: flex;
-	flex-direction: column;
-	align-items: center;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: var(--text-muted);
+}
+.resonance-whisker::before {
+	left: 0;
+}
+.resonance-whisker::after {
+	right: 0;
+}
+
+.resonance-whisker-male {
+	top: 0;
+	border-color: rgba(91, 141, 239, 0.7);
+}
+.resonance-whisker-male::before,
+.resonance-whisker-male::after {
+	background: rgba(91, 141, 239, 0.7);
+}
+
+.resonance-whisker-female {
+	top: 18px;
+	border-color: rgba(224, 122, 170, 0.7);
+}
+.resonance-whisker-female::before,
+.resonance-whisker-female::after {
+	background: rgba(224, 122, 170, 0.7);
+}
+
+.resonance-whisker-label {
+	position: absolute;
+	left: 4px;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 0.62rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+	line-height: 1;
 	pointer-events: none;
 }
 
-/* tick 短竖线：基线之上 1px 之下 4px，骑在基线上 */
-.rail-tick::before {
-	content: "";
-	display: block;
-	width: 1px;
-	height: 8px;
-	background: var(--border-strong);
-}
-
-.rail-tick-label {
-	font-size: 0.65rem;
-	color: var(--text-muted);
-	font-variant-numeric: tabular-nums;
-	line-height: 1;
-	margin-top: 3px;
-	white-space: nowrap;
-}
-
-/* 指示器：朝下的小三角，尖端正好对准基线上的 z 值位置。中性 accent 色，
-   没有 gender 含义——只是为了让眼睛能找到位置。 */
-.weakness-indicator {
-	position: absolute;
-	top: 0;
-	left: 0;
-	transform: translateX(-50%);
-	width: 0;
-	height: 0;
-	border-left: 5px solid transparent;
-	border-right: 5px solid transparent;
-	border-top: 8px solid var(--accent);
-	transition: left 400ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* z 落在 [-3σ, +1σ] 之外时（极端男性侧 / 越过参考分布上沿），指示器钳到
-   边缘但用灰色信号"出量程"——避免和正常的极值指示混淆。z 数字同步褪色。 */
-.weakness-indicator.is-out-of-range {
-	border-top-color: var(--text-muted);
-}
-.resonance-weakness-z.is-out-of-range {
-	color: var(--text-muted);
-}
-
-.resonance-weakness-empty {
-	font-size: 0.74rem;
+.resonance-whisker.is-active .resonance-whisker-label {
 	color: var(--text-secondary);
-	opacity: 0.85;
-	font-style: italic;
+	font-weight: 600;
 }
 
-/* ── All-vowels list + history compare ────────────────────────
-   One row per vowel with n≥5: vowel label + level pill + delta
-   slot (filled async after history compare resolves) + z value
-   + inline mini rail. Same neutral z-rail metaphor as the
-   weakness card but slimmer; deltas are typographic ▲/▼ in the
-   secondary text colour — no green/red, since the project's
-   palette has no good/bad axis. */
+/* ── All-vowels list ──────────────────────────────────────────
+   One row per vowel with n≥5, mirroring the Distribution
+   panel's stat-card recipe: vowel label | gradient progress bar
+   | right-aligned %. Bar fill animates 700ms on render via the
+   same easing the Distribution bars use. */
 .resonance-history-header {
 	font-size: 0.72rem;
 	color: var(--text-secondary);
@@ -1483,7 +1487,7 @@ body {
 
 /* Pitch-compensation advisory: appears between history-header and the
    per-vowel list when NN gender_score climbed but most vowels regressed.
-   Reuses the weakness card's soft accent recipe — neutral, no red. */
+   Soft accent recipe — neutral, no red. */
 .resonance-divergence-advisory {
 	margin-top: 6px;
 	padding: 8px 10px;
@@ -1518,9 +1522,9 @@ body {
 
 .resonance-vowel-row {
 	display: grid;
-	grid-template-columns: auto auto auto 1fr;
+	grid-template-columns: auto 1fr auto;
 	align-items: center;
-	gap: 8px;
+	gap: 10px;
 	padding: 4px 8px;
 	font-size: 0.74rem;
 	line-height: 1.4;
@@ -1539,76 +1543,33 @@ body {
 	min-width: 38px;
 }
 
-.resonance-delta {
-	font-size: 0.7rem;
-	font-variant-numeric: tabular-nums;
-	color: var(--text-secondary);
-	white-space: nowrap;
-	font-weight: 500;
-}
-
-.resonance-delta[data-change="improved"],
-.resonance-delta[data-change="regressed"] {
-	color: var(--text-primary);
-}
-
-.resonance-vowel-z {
-	font-size: 0.7rem;
-	color: var(--text-muted);
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
-}
-
-/* Slim mini rail — same z-scale [-3, +1] as the weakness rail but
-   compact enough to live on a single grid row. Indicator is a tiny
-   downward triangle; ticks are minimal vertical strokes. */
-.resonance-vowel-rail {
-	position: relative;
-	height: 14px;
+.resonance-vowel-bar-wrap {
+	height: 4px;
+	background: var(--border-strong);
+	border-radius: 99px;
+	overflow: hidden;
 	min-width: 80px;
 }
 
-.resonance-vowel-rail::before {
-	content: "";
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 7px;
-	height: 1px;
-	background: var(--border-strong);
+.resonance-vowel-bar-fill {
+	height: 100%;
+	width: 0%;
+	border-radius: 99px;
+	background: linear-gradient(90deg, var(--accent-subtle), var(--accent));
+	transition: width 700ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.resonance-vowel-rail .rail-tick {
-	top: 4px;
-}
-
-.resonance-vowel-rail .rail-tick::before {
-	height: 5px;
-}
-
-.resonance-vowel-rail .rail-tick-label {
-	display: none; /* tick numbers would overcrowd at this size */
-}
-
-.vowel-indicator {
-	position: absolute;
-	top: 0;
-	left: 0;
-	transform: translateX(-50%);
-	width: 0;
-	height: 0;
-	border-left: 4px solid transparent;
-	border-right: 4px solid transparent;
-	border-top: 6px solid var(--accent);
-	transition: left 400ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.vowel-indicator.is-out-of-range {
-	border-top-color: var(--text-muted);
+.resonance-vowel-pct {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	min-width: 38px;
+	text-align: right;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.vowel-indicator,
+	.resonance-vowel-bar-fill,
 	.resonance-vowel-row {
 		transition: none;
 	}
@@ -2015,6 +1976,20 @@ body {
 	display: none;
 }
 
+/* Right-aligned median value tag inside the collapsible header
+   (Pitch range, Resonance). margin-left: auto pushes it past the
+   title; the ::after toggle still sits on the far right. */
+.mc-collapsible-value {
+	margin-left: auto;
+	margin-right: 8px;
+	font-weight: 500;
+	font-size: 0.7rem;
+	text-transform: none;
+	letter-spacing: 0;
+	color: var(--text-primary);
+	font-variant-numeric: tabular-nums;
+}
+
 .mc-collapsible-header::after {
 	content: "›";
 	font-size: 1rem;
@@ -2196,6 +2171,20 @@ body {
 	}
 	.panel-left.panel-expanded .panel-collapse-chevron {
 		transform: rotate(90deg);
+	}
+	/* Collapsed state: drop the header's bottom border so it merges flat
+	   into panel-right's border-top, hide the orphaned action icons, and
+	   `display: none` the scatter body — the inline-flex switcher's pill
+	   background paints through `max-height: 0` otherwise. */
+	.panel-left:not(.panel-expanded) .panel-header {
+		border-bottom: none;
+	}
+	.panel-left:not(.panel-expanded) .panel-header-actions {
+		display: none;
+	}
+	.panel-left:not(.panel-expanded) .scatter-mode-switcher,
+	.panel-left:not(.panel-expanded) .scatter-wrap {
+		display: none;
 	}
 
 	/* Touch-friendly targets */

@@ -58,6 +58,13 @@ _ZH_F_P25 = 0.612
 _ZH_F_P75 = 0.842
 _AT_CEILING = 0.98
 
+# cis-M empirical IQR (P25..P75) from the same calibration_v1 corpus.  Used
+# only by ``empirical_bands`` to draw a "typical cis-male voices" whisker
+# in the UI — it does not affect ``classify_zone`` or the scoring formula.
+# zh-CN M (94 spk): 0.228 / 0.292 / 0.382 / 0.463 / 0.655 (P5/25/50/75/95).
+_ZH_M_P25 = 0.292
+_ZH_M_P75 = 0.463
+
 # Five zones, ordered low → high.  Each entry is (key, upper_bound_exclusive).
 # A score x falls in the FIRST zone where x < upper_bound (or the last zone
 # if x ≥ all bounds).  ``upper_bound = None`` means "open-ended high tier".
@@ -92,6 +99,10 @@ _FR_F_P5 = 0.430  # was 0.420
 _FR_F_P25 = 0.547  # was 0.580 — meaningful shift down
 _FR_F_P75 = 0.752  # was 0.795 — meaningful shift down
 _FR_F_P95 = 0.960  # was 0.943
+
+# fr-FR M (94 spk, calibration_v1): 0.229 / 0.294 / 0.348 / 0.421 / 0.601.
+_FR_M_P25 = 0.294
+_FR_M_P75 = 0.421
 
 _ZONES_FR: tuple[tuple[str, float | None], ...] = (
     ("clearly_below_female", _FR_F_P5),
@@ -129,6 +140,13 @@ _ZONES_FR: tuple[tuple[str, float | None], ...] = (
 # distance from female reference", a contradiction the corpus disproves.
 _EN_F_P5 = 0.525  # was 0.498 (2026-05-05 baseline)
 _EN_F_P25 = 0.689  # was 0.668
+
+# en-US M (92 spk, calibration_v1): 0.328 / 0.381 / 0.489 / 0.639 / 1.000.
+# P95 saturates so we use IQR (P25..P75) as the typical-range whisker —
+# wider than zh/fr (~26 % vs 17 % / 12 %) reflecting LibriSpeech volunteer
+# diversity vs studio-clean corpora.
+_EN_M_P25 = 0.381
+_EN_M_P75 = 0.639
 # Empirical en F P75 = 0.987, ABOVE the clamp ceiling 0.98.  We pin the
 # zone boundary to the ceiling itself so the (mid_neutral, leans_female,
 # at_ceiling) tuple stays monotone — otherwise scores in [0.98, 0.987)
@@ -186,3 +204,39 @@ def classify_zone(median_resonance: float | None, lang: str) -> str | None:
 # Public list of zone keys in low → high order.  Useful for tests and for
 # i18n key generation in advice_v2 / web/src/modules/i18n.js.
 ZONE_KEYS_LOW_TO_HIGH: tuple[str, ...] = tuple(k for k, _ in _ZONES_ZH)
+
+
+# ─── Empirical IQR bands (UI-only) ──────────────────────────────────────────
+# ``classify_zone`` answers "which named tier does this score fall into" and
+# is what advice_v2 uses to pick copy.  ``empirical_bands`` answers a
+# different question: "where do real cis-M / cis-F speakers cluster on this
+# scale, expressed as the inner 50 % of each population".  The frontend
+# uses these to draw "typical range" whiskers under the resonance bar so a
+# reading at e.g. 0.40 (zh M median) reads as "in the typical cis-male
+# range" rather than "stuck in the bottom third of a 0–100 scale".
+_M_BANDS: dict[str, tuple[float, float]] = {
+    "zh": (_ZH_M_P25, _ZH_M_P75),
+    "en": (_EN_M_P25, _EN_M_P75),
+    "fr": (_FR_M_P25, _FR_M_P75),
+}
+_F_BANDS: dict[str, tuple[float, float]] = {
+    "zh": (_ZH_F_P25, _ZH_F_P75),
+    "en": (_EN_F_P25, _EN_F_P75),
+    "fr": (_FR_F_P25, _FR_F_P75),
+}
+
+
+def empirical_bands(lang: str) -> dict[str, dict[str, float]]:
+    """Return cis-M and cis-F IQR bands (P25..P75) for the language.
+
+    Output shape: ``{"m": {"p25": float, "p75": float},
+    "f": {"p25": float, "p75": float}}``.  Falls back to zh-CN bands for
+    unknown lang codes — same convention as ``_zones_for_lang``.
+    """
+    short = lang.split("-", 1)[0].lower()
+    m_p25, m_p75 = _M_BANDS.get(short, _M_BANDS["zh"])
+    f_p25, f_p75 = _F_BANDS.get(short, _F_BANDS["zh"])
+    return {
+        "m": {"p25": m_p25, "p75": m_p75},
+        "f": {"p25": f_p25, "p75": f_p75},
+    }

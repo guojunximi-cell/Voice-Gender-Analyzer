@@ -14,7 +14,7 @@ import { t } from "./i18n.js";
 import { clearResonancePanel } from "./resonance-panel.js";
 
 // ─── Aggregators ─────────────────────────────────────────────
-function _meanFormants(phones) {
+function _medianFormants(phones) {
 	const pick = (k) => {
 		if (!phones?.length) return null;
 		const vs = [];
@@ -22,7 +22,10 @@ function _meanFormants(phones) {
 			const v = p[k];
 			if (v != null && v > 0) vs.push(v);
 		}
-		return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null;
+		if (!vs.length) return null;
+		vs.sort((a, b) => a - b);
+		const m = vs.length >> 1;
+		return vs.length % 2 ? vs[m] : (vs[m - 1] + vs[m]) / 2;
 	};
 	return { f1: pick("F1"), f2: pick("F2"), f3: pick("F3") };
 }
@@ -94,9 +97,19 @@ export function renderMetricsPanel(summary, analysis) {
 	// F0 与下方"音高范围"指示器同源（median，与后端 overall_f0_median_hz
 	// 命名一致；mean 仅作 fallback），避免 164 Hz 的文字配在 200 Hz 附近
 	// 的滑块上自相矛盾。
-	const pitch = ec.median_pitch_hz ?? ec.mean_pitch_hz;
+	const pitch = ec.median_pitch_hz;
 	const pitchStd = ec.stdev_pitch_hz;
-	const { f1, f2, f3 } = _meanFormants(ec.phones);
+	const { f1, f2, f3 } = _medianFormants(ec.phones);
+
+	const pitchMedianTag = document.getElementById("mc-pitch-median-tag");
+	if (pitchMedianTag) {
+		if (pitch != null) {
+			pitchMedianTag.textContent = `${Math.round(pitch)} Hz`;
+			pitchMedianTag.hidden = false;
+		} else {
+			pitchMedianTag.hidden = true;
+		}
+	}
 	const setFormant = (id, val) => {
 		const el = document.getElementById(id);
 		if (el) el.textContent = val != null ? `${Math.round(val)} Hz` : "—";

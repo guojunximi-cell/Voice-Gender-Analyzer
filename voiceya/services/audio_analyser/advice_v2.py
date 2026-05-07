@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from voiceya.services.audio_analyser.f0_panel import compute_f0_panel
+from voiceya.services.audio_analyser.resonance_calibration import classify_zone
 from voiceya.services.audio_analyser.statics import weighted_confidence
 
 if TYPE_CHECKING:
@@ -205,11 +206,29 @@ def _resonance_panel(engine_c: dict | None, tier: str) -> dict | None:
     """
     if not engine_c or tier == "minimal":
         return None
-    zone_key = engine_c.get("resonance_zone_key")
-    median_resonance = engine_c.get("median_resonance")
     per_vowel = engine_c.get("resonance_per_vowel") or []
     weakness_vowels = _pick_weakness_vowels(per_vowel)
     per_vowel_levels = _build_per_vowel_levels(per_vowel)
+
+    # Median-of-per-vowel-medians: each vowel weighs equally regardless of
+    # how often it appeared. Replaces the sidecar's flat-list median, which
+    # over-weights frequent vowels (e.g. /ə/ at 30 occurrences could drag
+    # the panel value down even though no individual vowel is unusually low).
+    qualifying_meds = [
+        float(v["resonance_med"])
+        for v in per_vowel
+        if (v.get("n") or 0) >= _WEAKNESS_MIN_TOKENS
+        and isinstance(v.get("resonance_med"), int | float)
+    ]
+    if qualifying_meds:
+        median_resonance = float(np.median(qualifying_meds))
+        language = engine_c.get("language") or "zh-CN"
+        zone_key = classify_zone(median_resonance, language)
+    else:
+        # Fall back to sidecar's flat-list median when too few vowels meet
+        # the n ≥ 5 threshold (very short or vowel-imbalanced recording).
+        median_resonance = engine_c.get("median_resonance")
+        zone_key = engine_c.get("resonance_zone_key")
 
     if zone_key == "at_ceiling":
         caveat_key = "advice.resonance.caveat.score_clamp"
@@ -227,6 +246,10 @@ def _resonance_panel(engine_c: dict | None, tier: str) -> dict | None:
         "per_vowel": per_vowel_levels,
         "summary_text_key": f"advice.resonance.summary.{zone_key}" if zone_key else None,
         "caveat_key": caveat_key,
+        # Cis-M / cis-F population IQR for the active language — frontend
+        # draws "typical range" whiskers from this. Pass-through; no
+        # interpretation here since the field is purely visual reference.
+        "empirical_bands": engine_c.get("resonance_empirical_bands"),
     }
 
 

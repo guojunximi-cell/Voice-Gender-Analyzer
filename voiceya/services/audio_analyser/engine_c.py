@@ -314,6 +314,7 @@ async def run_engine_c(
         # array remain authoritative for any consumer that wants to ignore
         # the binning.
         "resonance_zone_key": resonance_calibration.classify_zone(median_resonance, language),
+        "resonance_empirical_bands": resonance_calibration.empirical_bands(language),
         "resonance_per_vowel": _aggregate_per_vowel(phones, lang_short),
     }
 

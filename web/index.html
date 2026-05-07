@@ -187,11 +187,11 @@
 		<!-- ══════════════════════════ THREE-PANEL LAYOUT ════════════════════════ -->
 		<div class="app-layout">
 			<!-- ══ LEFT PANEL: Scatter plot ════════════════════════════════════════ -->
-			<!-- panel-expanded baked into HTML so mobile first paint matches the JS-default
-			     state — avoids a 0→260px max-height shift on initMobilePanel().  Desktop
-			     ignores the class (the collapse rules are inside @media (max-width:780px))
-			     and JS removes it on resize ≥781px to keep the toggle semantics. -->
-			<aside class="panel panel-left panel-expanded">
+			<!-- No `panel-expanded` on first paint: mobile default = collapsed, so the
+			     empty scatter canvas (~180 px) doesn't take vertical real-estate before
+			     any session exists.  User taps the header to expand.  Desktop ignores
+			     the class entirely (collapse rules are inside @media (max-width:780px)). -->
+			<aside class="panel panel-left">
 				<div class="panel-header">
 					<span class="panel-title" data-i18n="panel.history">历史分析</span>
 					<span class="panel-collapse-chevron" aria-hidden="true"></span>
@@ -744,29 +744,43 @@
 					<span id="mc-segment-label" class="mc-segment-label"></span>
 				</div>
 
-				<!-- Resonance panel: per-vowel level + weakness cards (Engine C only). -->
-				<div id="resonance-panel" class="resonance-panel" hidden>
-					<span class="resonance-title" data-i18n="advice.resonance.title">共鸣表现</span>
-					<div id="resonance-summary" class="resonance-summary" hidden></div>
-					<div id="resonance-median" class="resonance-median" hidden></div>
-					<div id="resonance-history-header" class="resonance-history-header" hidden></div>
-					<div id="resonance-divergence-advisory" class="resonance-divergence-advisory" hidden></div>
-					<div id="resonance-all-vowels-section" class="resonance-all-vowels-section" hidden>
-						<div class="resonance-section-title" data-i18n="advice.resonance.section_title_all">全部音素</div>
-						<div id="resonance-all-vowels-list" class="resonance-all-vowels-list"></div>
-					</div>
-					<div id="resonance-weakness-section" class="resonance-weakness-section" hidden>
-						<div
-							id="resonance-weakness-title"
-							class="resonance-weakness-title"
-							data-i18n="advice.resonance.weakness_section_title"
-						>
-							重点练习
+				<!-- Resonance panel: per-vowel level (Engine C only). -->
+				<details id="resonance-panel" class="mc-collapsible resonance-panel" open hidden>
+					<summary class="mc-collapsible-header">
+							<span data-i18n="advice.resonance.title">共鸣表现</span>
+							<span id="resonance-median-tag" class="mc-collapsible-value" hidden></span>
+						</summary>
+					<div class="mc-collapsible-body">
+						<div id="resonance-summary" class="resonance-summary" hidden></div>
+						<div id="resonance-median-block" class="resonance-median-block" hidden>
+							<div class="resonance-scale-bar">
+								<div class="resonance-zone resonance-zone-male" id="resonance-zone-male"></div>
+								<div class="resonance-zone resonance-zone-overlap" id="resonance-zone-neutral"></div>
+								<div class="resonance-zone resonance-zone-female" id="resonance-zone-female"></div>
+								<div class="resonance-range-span" id="resonance-range-span" hidden></div>
+								<div class="pitch-indicator" id="resonance-indicator"></div>
+							</div>
+							<div class="resonance-scale-labels">
+								<span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+							</div>
+							<div id="resonance-whiskers" class="resonance-whiskers" hidden>
+								<div class="resonance-whisker resonance-whisker-male" id="resonance-whisker-male">
+									<span class="resonance-whisker-label" data-i18n="advice.resonance.typical.male">典型顺性别男声</span>
+								</div>
+								<div class="resonance-whisker resonance-whisker-female" id="resonance-whisker-female">
+									<span class="resonance-whisker-label" data-i18n="advice.resonance.typical.female">典型顺性别女声</span>
+								</div>
+							</div>
 						</div>
-						<div id="resonance-weakness-list" class="resonance-weakness-list"></div>
+						<div id="resonance-history-header" class="resonance-history-header" hidden></div>
+						<div id="resonance-divergence-advisory" class="resonance-divergence-advisory" hidden></div>
+						<div id="resonance-all-vowels-section" class="resonance-all-vowels-section" hidden>
+							<div class="resonance-section-title" data-i18n="advice.resonance.section_title_all">元音</div>
+							<div id="resonance-all-vowels-list" class="resonance-all-vowels-list"></div>
+						</div>
+						<div id="resonance-caveat" class="advice-caveat" hidden></div>
 					</div>
-					<div id="resonance-caveat" class="advice-caveat" hidden></div>
-				</div>
+				</details>
 
 				<div id="metrics-empty" class="metrics-placeholder">
 					<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true">
@@ -804,7 +818,10 @@
 					</div>
 					<!-- Collapsible: Pitch range -->
 					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header" data-i18n="metrics.pitchRangeTitle">音高范围 (80~320 Hz)</summary>
+						<summary class="mc-collapsible-header">
+								<span data-i18n="metrics.pitchRangeTitle">音高范围</span>
+								<span id="mc-pitch-median-tag" class="mc-collapsible-value" hidden></span>
+							</summary>
 						<div class="mc-collapsible-body">
 							<div class="pitch-range-bar">
 								<div class="pitch-zone pitch-zone-male" data-i18n-title="metrics.zoneMale" title="男性 85~155 Hz"></div>
