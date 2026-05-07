@@ -10,19 +10,15 @@
  */
 
 import { getLang, t } from "./i18n.js";
+import { RESONANCE_ZONES } from "./zones.js";
 
-// Language-keyed zone thresholds — mirror voiceya/services/audio_analyser/
-// resonance_calibration.py. Two breakpoints split the 0–100% bar into three
-// zones: cis-male (0..p25) covers `clearly_below_female` + `leans_male`;
-// androgynous (p25..p75) is `mid_neutral`; cis-female (p75..1) covers
-// `leans_female` + `at_ceiling`. Boundaries align with the panel's own
-// `summary_text_key` so a "Leans cis-male" reading lands in the male band.
-// Values from calibration_v1 (commit 482d374, 2026-05-06).
-const _ZONE_THRESHOLDS = {
-	"zh-CN": { p25: 0.612, p75: 0.842 },
-	"en-US": { p25: 0.458, p75: 0.682 },
-	"fr-FR": { p25: 0.547, p75: 0.752 },
-};
+// Two breakpoints split the 0–100% bar into three zones: cis-male (0..p25)
+// covers `clearly_below_female` + `leans_male`; androgynous (p25..p75) is
+// `mid_neutral`; cis-female (p75..1) covers `leans_female` + `at_ceiling`.
+// Boundaries align with the panel's own `summary_text_key` so a
+// "Leans cis-male" reading lands in the male band. Values from calibration_v1
+// (commit 482d374, 2026-05-06) live in zones.js for shared use.
+const _ZONE_THRESHOLDS = RESONANCE_ZONES;
 
 // Five-tier classifier mirroring resonance_calibration.py:classify_zone.
 // We recompute median + zone_key client-side from per_vowel so imported
@@ -154,9 +150,7 @@ function _renderMedianBar(median, perVowel, empiricalBands) {
 	// per-vowel data — minimal tier already short-circuits the panel.
 	const span = document.getElementById("resonance-range-span");
 	if (span) {
-		const vals = (perVowel || [])
-			.map((v) => v.resonance_med)
-			.filter((v) => typeof v === "number");
+		const vals = (perVowel || []).map((v) => v.resonance_med).filter((v) => typeof v === "number");
 		if (vals.length >= 2) {
 			const lo = Math.max(0, Math.min(...vals));
 			const hi = Math.min(1, Math.max(...vals));
@@ -216,9 +210,7 @@ export function renderResonancePanel(panelData, context = {}) {
 	// computed by the pre-fix flat-list algorithm) display the new robust
 	// median. New analyses already ship the correct value from advice_v2.py;
 	// this client recompute is idempotent in that case.
-	const meds = (panelData.per_vowel || [])
-		.map((v) => v.resonance_med)
-		.filter((v) => typeof v === "number");
+	const meds = (panelData.per_vowel || []).map((v) => v.resonance_med).filter((v) => typeof v === "number");
 	let median = panelData.median_resonance;
 	let zoneKey = panelData.zone_key;
 	if (meds.length) {

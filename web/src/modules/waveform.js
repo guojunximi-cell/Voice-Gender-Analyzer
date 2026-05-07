@@ -6,6 +6,7 @@ import { t } from "./i18n.js";
 // ─── Color map ────────────────────────────────────────────────
 const LABEL_VARS = {
 	male: "--male",
+	neutral: "--neutral",
 	female: "--female",
 	music: "--music",
 	noise: "--noise",
@@ -54,7 +55,7 @@ function _renderOverlay() {
 		const color = resolveCSSVar(LABEL_VARS[seg.label] || "--noise") || "#888";
 		const x = (seg.start_time / duration) * W;
 		const w = Math.max(2, ((seg.end_time - seg.start_time) / duration) * W);
-		const voiced = seg.label === "male" || seg.label === "female";
+		const voiced = seg.label === "male" || seg.label === "female" || seg.label === "neutral";
 
 		// Full-height tint — opacity encodes confidence
 		const baseOpacity = voiced ? 0.07 + Math.min(seg.confidence ?? 0.5, 1) * 0.2 : 0.1;
@@ -101,11 +102,6 @@ function _renderOverlay() {
 					_selectedTint.setAttribute("opacity", _selectedTint.dataset.baseOpacity);
 				tint.setAttribute("opacity", 0.3);
 				_selectedTint = tint;
-				document.dispatchEvent(
-					new CustomEvent("segment-select", {
-						detail: { segment: seg, index: idx },
-					}),
-				);
 			});
 
 			svg.appendChild(hit);

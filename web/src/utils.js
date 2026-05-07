@@ -28,6 +28,7 @@ export function nextSessionColor() {
 // 旧调用点直接读 `meta.zh` 也能拿到切换后的值。
 const _LABEL_KEYS = {
 	male: "label.male",
+	neutral: "label.neutral",
 	female: "label.female",
 	music: "label.music",
 	noise: "label.noise",
@@ -35,6 +36,7 @@ const _LABEL_KEYS = {
 };
 const _LABEL_VARS = {
 	male: "var(--male)",
+	neutral: "var(--neutral)",
 	female: "var(--female)",
 	music: "var(--music)",
 	noise: "var(--noise)",

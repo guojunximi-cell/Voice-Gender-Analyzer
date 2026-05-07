@@ -657,11 +657,25 @@
 
 				<!-- Phone-level timeline (Engine C, feature-flagged) — drill-down detail -->
 				<div id="phone-timeline-root" hidden></div>
+			</main>
 
-				<!-- Stats cards — macro conclusion at the bottom of the center column. -->
-				<section id="stats-section" class="card stats-section" hidden>
-					<div class="section-header">
-						<h2 class="section-title" data-i18n="stats.title">声音占比</h2>
+			<!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
+			<aside class="panel panel-right">
+				<div class="panel-header">
+					<span class="panel-title" data-i18n="panel.metrics">综合声学特征</span>
+					<span id="mc-segment-label" class="mc-segment-label"></span>
+				</div>
+
+				<!-- Distribution — overall composition (Engine A NN / pitch / resonance modes).
+				     Placed first inside the right panel as the macro overview before the per-feature
+				     drill-downs. Sibling of #metrics-content so it stays visible regardless of
+				     Engine C availability. -->
+				<details id="stats-section" class="mc-collapsible stats-collapsible" open hidden>
+					<summary class="mc-collapsible-header">
+						<span data-i18n="stats.title">声音占比</span>
+						<span id="stats-dominant-tag" class="mc-collapsible-value" hidden></span>
+					</summary>
+					<div class="mc-collapsible-body">
 						<div
 							id="classify-mode-switcher"
 							class="classify-mode-switcher"
@@ -700,33 +714,33 @@
 								<span data-i18n="stats.modeResonance">共鸣</span>
 							</button>
 						</div>
-					</div>
-					<div class="stats-caption" data-i18n="stats.subtitle">仅人声片段（音乐 / 静音不计入）</div>
-					<div class="stats-grid">
-						<div class="stat-card stat-male">
-							<div class="stat-dot"></div>
-							<div class="stat-label" data-i18n="label.male">男声</div>
-							<div class="stat-pct" id="male-pct">—</div>
-							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="male-bar" style="width: 0%"></div></div>
-							<div class="stat-duration" id="male-duration">—</div>
+						<div class="stats-caption" data-i18n="stats.subtitle">仅人声片段（音乐 / 静音不计入）</div>
+						<div class="stats-grid">
+							<div class="stat-card stat-male">
+								<div class="stat-dot"></div>
+								<div class="stat-label" data-i18n="label.male">男声</div>
+								<div class="stat-pct" id="male-pct">—</div>
+								<div class="stat-bar-wrap"><div class="stat-bar-fill" id="male-bar" style="width: 0%"></div></div>
+								<div class="stat-duration" id="male-duration">—</div>
+							</div>
+							<!-- Neutral row: only shown in pitch / resonance modes (Engine A NN has no neutral output). -->
+							<div class="stat-card stat-neutral" hidden>
+								<div class="stat-dot"></div>
+								<div class="stat-label" data-i18n="label.neutral">中性</div>
+								<div class="stat-pct" id="neutral-pct">—</div>
+								<div class="stat-bar-wrap"><div class="stat-bar-fill" id="neutral-bar" style="width: 0%"></div></div>
+								<div class="stat-duration" id="neutral-duration">—</div>
+							</div>
+							<div class="stat-card stat-female">
+								<div class="stat-dot"></div>
+								<div class="stat-label" data-i18n="label.female">女声</div>
+								<div class="stat-pct" id="female-pct">—</div>
+								<div class="stat-bar-wrap"><div class="stat-bar-fill" id="female-bar" style="width: 0%"></div></div>
+								<div class="stat-duration" id="female-duration">—</div>
+							</div>
 						</div>
-						<div class="stat-card stat-female">
-							<div class="stat-dot"></div>
-							<div class="stat-label" data-i18n="label.female">女声</div>
-							<div class="stat-pct" id="female-pct">—</div>
-							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="female-bar" style="width: 0%"></div></div>
-							<div class="stat-duration" id="female-duration">—</div>
-						</div>
 					</div>
-				</section>
-			</main>
-
-			<!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
-			<aside class="panel panel-right">
-				<div class="panel-header">
-					<span class="panel-title" data-i18n="panel.metrics">综合声学特征</span>
-					<span id="mc-segment-label" class="mc-segment-label"></span>
-				</div>
+				</details>
 
 				<!-- Resonance panel: per-vowel level (Engine C only). -->
 				<details id="resonance-panel" class="mc-collapsible resonance-panel" open hidden>
@@ -810,7 +824,7 @@
 						</summary>
 						<div class="mc-collapsible-body">
 							<div class="pitch-range-bar">
-								<div class="pitch-zone pitch-zone-male" data-i18n-title="metrics.zoneMale" title="男性 85~155 Hz"></div>
+								<div class="pitch-zone pitch-zone-male" data-i18n-title="metrics.zoneMale" title="男性 80~145 Hz"></div>
 								<div
 									class="pitch-zone pitch-zone-overlap"
 									data-i18n-title="metrics.zoneOverlap"
@@ -819,7 +833,7 @@
 								<div
 									class="pitch-zone pitch-zone-female"
 									data-i18n-title="metrics.zoneFemale"
-									title="女性 175~255 Hz"
+									title="女性 185~255 Hz"
 								></div>
 								<div class="pitch-range-span" id="mc-pitch-range"></div>
 								<div class="pitch-indicator" id="mc-pitch-indicator"></div>
