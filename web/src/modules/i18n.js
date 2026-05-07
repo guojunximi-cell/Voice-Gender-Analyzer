@@ -268,8 +268,6 @@ const DICT = {
 			"声学倾向标签来自 inaSpeechSegmenter（CNN 分类器），主要由 F0 驱动；共振 / 共振峰只占很小权重。对应「音色倾向」而非完整的人耳听感。",
 
 		"advice.resonance.title": "共鸣表现",
-		"advice.resonance.typical.male": "典型顺性别男声",
-		"advice.resonance.typical.female": "典型顺性别女声",
 		"advice.resonance.summary.clearly_below_female": "顺性别男性区间",
 		"advice.resonance.summary.leans_male": "倾向于顺性别男性",
 		"advice.resonance.summary.mid_neutral": "无性别区间",
@@ -699,8 +697,6 @@ const DICT = {
 			"The tone tendency comes from inaSpeechSegmenter (a CNN classifier) and is dominated by F0; resonance / formants carry very little weight. Read it as a vocal-tone proxy, not a full human-ear judgement.",
 
 		"advice.resonance.title": "Resonance",
-		"advice.resonance.typical.male": "Typical cis-male voices",
-		"advice.resonance.typical.female": "Typical cis-female voices",
 		"advice.resonance.summary.clearly_below_female": "Cis-male range",
 		"advice.resonance.summary.leans_male": "Leans cis-male",
 		"advice.resonance.summary.mid_neutral": "Androgynous range",
@@ -1149,8 +1145,6 @@ const DICT = {
 
 		// TODO(fr): native review of resonance copy
 		"advice.resonance.title": "Résonance",
-		"advice.resonance.typical.male": "Voix cis-masculines typiques",
-		"advice.resonance.typical.female": "Voix cis-féminines typiques",
 		"advice.resonance.summary.clearly_below_female": "Plage cis-masculine",
 		"advice.resonance.summary.leans_male": "Tendance cis-masculine",
 		"advice.resonance.summary.mid_neutral": "Plage androgyne",

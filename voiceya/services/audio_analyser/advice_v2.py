@@ -246,10 +246,6 @@ def _resonance_panel(engine_c: dict | None, tier: str) -> dict | None:
         "per_vowel": per_vowel_levels,
         "summary_text_key": f"advice.resonance.summary.{zone_key}" if zone_key else None,
         "caveat_key": caveat_key,
-        # Cis-M / cis-F population IQR for the active language — frontend
-        # draws "typical range" whiskers from this. Pass-through; no
-        # interpretation here since the field is purely visual reference.
-        "empirical_bands": engine_c.get("resonance_empirical_bands"),
     }
 
 

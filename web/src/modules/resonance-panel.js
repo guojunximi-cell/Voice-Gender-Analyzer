@@ -87,7 +87,7 @@ function _vowelDisplay(vowel) {
 	return vowel.replace(/[0-9]+$/, "");
 }
 
-function _renderMedianBar(median, perVowel, empiricalBands) {
+function _renderMedianBar(median, perVowel) {
 	const block = document.getElementById("resonance-median-block");
 	if (!block) return;
 
@@ -116,34 +116,6 @@ function _renderMedianBar(median, perVowel, empiricalBands) {
 
 	const indicatorPct = Math.max(0, Math.min(100, median * 100));
 	_setStyle("resonance-indicator", "left", `${indicatorPct}%`);
-
-	// Typical-range whiskers: cis-M / cis-F IQR from calibration_v1, served
-	// by the backend in panelData.empirical_bands. Mark "active" the band
-	// the user's median falls inside — that's the framing payoff: a typical
-	// cis-male reading no longer reads as "stuck low", it reads as "in the
-	// typical cis-male range".
-	const whiskersWrap = document.getElementById("resonance-whiskers");
-	if (whiskersWrap) {
-		const m = empiricalBands?.m;
-		const f = empiricalBands?.f;
-		if (m && f) {
-			const positionWhisker = (id, band, value) => {
-				const el = document.getElementById(id);
-				if (!el) return;
-				const left = band.p25 * 100;
-				const width = (band.p75 - band.p25) * 100;
-				el.style.left = `${left}%`;
-				el.style.width = `${width}%`;
-				const inside = value >= band.p25 && value <= band.p75;
-				el.classList.toggle("is-active", inside);
-			};
-			positionWhisker("resonance-whisker-male", m, median);
-			positionWhisker("resonance-whisker-female", f, median);
-			whiskersWrap.hidden = false;
-		} else {
-			whiskersWrap.hidden = true;
-		}
-	}
 
 	// Range span: min..max of per-vowel medians. Matches the metaphor of
 	// .pitch-range-span (observed p5–p95 over zones). Hidden if no usable
@@ -229,7 +201,7 @@ export function renderResonancePanel(panelData, context = {}) {
 		summaryEl.hidden = true;
 	}
 
-	_renderMedianBar(median, panelData.per_vowel, panelData.empirical_bands);
+	_renderMedianBar(median, panelData.per_vowel);
 
 	const allSection = document.getElementById("resonance-all-vowels-section");
 	const allList = document.getElementById("resonance-all-vowels-list");
@@ -279,7 +251,6 @@ export function clearResonancePanel() {
 	_hide("resonance-summary");
 	_hide("resonance-median-tag");
 	_hide("resonance-median-block");
-	_hide("resonance-whiskers");
 	_hide("resonance-history-header");
 	_hide("resonance-divergence-advisory");
 	_hide("resonance-all-vowels-section");
