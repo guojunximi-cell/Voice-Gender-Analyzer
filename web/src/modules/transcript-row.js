@@ -13,6 +13,7 @@
  *
  */
 
+import { getBandMode, onBandModeChange } from "./band-mode.js";
 import { t } from "./i18n.js";
 
 const FADE_MS = 150;
@@ -50,6 +51,7 @@ export class TranscriptRow {
 		this._readout.setAttribute("aria-live", "polite");
 		this._readout.innerHTML =
 			`<span class="vga-transcript-readout__char">\u2014</span>` +
+			`<span class="vga-transcript-readout__phone" aria-hidden="true">\u2014</span>` +
 			`<span class="vga-transcript-readout__metric"><span class="vga-transcript-readout__label">${t("timeline.readoutPitch")}</span><span class="vga-transcript-readout__pitch">\u2014</span></span>` +
 			`<span class="vga-transcript-readout__metric"><span class="vga-transcript-readout__label">${t("timeline.readoutResonance")}</span><span class="vga-transcript-readout__res">\u2014</span></span>`;
 		// Readout is externally placed when readoutContainer is given (so
@@ -61,8 +63,16 @@ export class TranscriptRow {
 			wrap.appendChild(this._readout);
 		}
 		this._readoutChar = this._readout.querySelector(".vga-transcript-readout__char");
+		this._readoutPhone = this._readout.querySelector(".vga-transcript-readout__phone");
 		this._readoutPitch = this._readout.querySelector(".vga-transcript-readout__pitch");
 		this._readoutRes = this._readout.querySelector(".vga-transcript-readout__res");
+		// Phone pill is a per-phone read-out — only meaningful in "phone" band
+		// mode (each cell == one phone).  In "word" mode the bands aggregate to
+		// char level, so a per-phone label there would mismatch what the user
+		// sees in the strip below.  Toggle visibility via class so the pill's
+		// flex slot collapses cleanly.
+		this._syncPhoneVisibility(getBandMode());
+		this._offBandMode = onBandModeChange((mode) => this._syncPhoneVisibility(mode));
 
 		this._group = document.createElement("div");
 		this._group.setAttribute("role", "group");
@@ -120,6 +130,12 @@ export class TranscriptRow {
 			}
 		};
 		bus.on("activeSentenceChanged", this._onActiveSentence);
+
+		// Per-tick phone refinement: piggybacks on the same currentTimeChanged
+		// stream HeatmapBand uses for its active-rect highlight, so the readout
+		// pill always agrees with the band's highlighted cell.
+		this._onTime = (time) => this._refreshPhoneAt(time);
+		bus.on("currentTimeChanged", this._onTime);
 
 		// Return-to-current: user-initiated, treat as manual nav.
 		this._returnBtn = null;
@@ -339,6 +355,7 @@ export class TranscriptRow {
 			this._readoutChar.textContent = "\u2014";
 			this._readoutPitch.textContent = "\u2014";
 			this._readoutRes.textContent = "\u2014";
+			if (this._readoutPhone) this._readoutPhone.textContent = "\u2014";
 			return;
 		}
 		this._readoutChar.textContent = c.char || "\u2014";
@@ -350,6 +367,38 @@ export class TranscriptRow {
 		this._readoutPitch.textContent =
 			displayPitch != null ? `${isInterp ? "~" : ""}${Math.round(displayPitch)} Hz` : "\u2014";
 		this._readoutRes.textContent = c.resonance != null ? c.resonance.toFixed(2) : "\u2014";
+		// First phone is a sensible default until the next currentTimeChanged
+		// tick refines it (covers the "user clicked a char while paused" path,
+		// where t lands at c.start and the first phone is the right answer).
+		if (this._readoutPhone) {
+			const firstPhone = c.phones?.[0]?.phone;
+			this._readoutPhone.textContent = firstPhone || "\u2014";
+		}
+	}
+
+	_refreshPhoneAt(time) {
+		if (!this._readoutPhone) return;
+		const idx = this.state?.activeCharIdx ?? -1;
+		const c = idx >= 0 ? this.chars?.[idx] : null;
+		const phones = c?.phones;
+		if (!phones?.length) return;
+		// Linear scan \u2014 at most a handful of phones per char.  Half-open
+		// interval matches HeatmapBand._highlightAt so the pill and the active
+		// rect resolve identically at boundaries.
+		let hit = null;
+		for (const p of phones) {
+			if (time >= p.start && time < p.end) {
+				hit = p;
+				break;
+			}
+		}
+		if (!hit) hit = time < phones[0].start ? phones[0] : phones[phones.length - 1];
+		this._readoutPhone.textContent = hit.phone || "\u2014";
+	}
+
+	_syncPhoneVisibility(mode) {
+		if (!this._readoutPhone) return;
+		this._readoutPhone.classList.toggle("is-hidden", mode === "word");
 	}
 
 	_onCharKey(e, i) {
@@ -417,7 +466,10 @@ export class TranscriptRow {
 			if (this._onActiveChar) this.bus.off("activeCharChanged", this._onActiveChar);
 			if (this._onActiveSentence) this.bus.off("activeSentenceChanged", this._onActiveSentence);
 			if (this._onAutoScroll) this.bus.off("autoScrollChanged", this._onAutoScroll);
+			if (this._onTime) this.bus.off("currentTimeChanged", this._onTime);
 		}
+		this._offBandMode?.();
+		this._offBandMode = null;
 		if (this._group && this._onGroupClick) this._group.removeEventListener("click", this._onGroupClick);
 		this._resizeObs?.disconnect();
 		this._resizeObs = null;

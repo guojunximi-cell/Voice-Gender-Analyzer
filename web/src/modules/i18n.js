@@ -384,10 +384,10 @@ const DICT = {
 		"help.how.1": "拖拽音频 / 点击上传 / 录音（≤ {mb} MB，< {min} 分钟）",
 		"help.how.2": "点击「开始分析」，等待鸭子跑完进度条",
 		"help.how.3": "三块面板自动填充，无需额外点击",
-		"help.heatmap.h": "热力图中",
+		"help.heatmap.h": "术语",
 		"help.heatmap.resonanceDT": "共鸣",
 		"help.heatmap.resonanceDD":
-			"音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考——0.5 是<strong>女性参考均值</strong>，不是男女中线。calibration_v1 实测：男声 median ≈ 35–49%，女声 median ≈ 65–81%（视语言而异，详见 tests/reports/calibration_v1）。",
+			"音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。calibration_v1 实测 median（p25–p75）：zh-CN 男 38%（29–46）／女 73%（62–85）。详见 tests/reports/calibration_v1。",
 		"help.heatmap.pitchDT": "音高",
 		"help.heatmap.pitchDD": "音素内的 F0。被认为是男女性化声音的主要边界。",
 		"help.overall.h": "整段分析",
@@ -811,10 +811,10 @@ const DICT = {
 		"help.how.1": "Drag a file, pick one, or record (≤ {mb} MB, < {min} min).",
 		"help.how.2": "Press Analyze and wait for the duck progress bar.",
 		"help.how.3": "The three panels fill in automatically, no extra clicks needed.",
-		"help.heatmap.h": "In the heatmap",
+		"help.heatmap.h": "Terminology",
 		"help.heatmap.resonanceDT": "Resonance",
 		"help.heatmap.resonanceDD":
-			"Resonance within each phone. Vowels only. Derived from a weighted blend of F1, F2, and F3. Baseline calibrated against a cis-voice reference corpus — <strong>0.5 is the female-reference mean</strong>, not the male/female midline. calibration_v1 empirical medians: male ≈ 35–49%, female ≈ 65–81% (language-dependent; see tests/reports/calibration_v1).",
+			"Resonance within each phone. Vowels only. Derived from a weighted blend of F1, F2, and F3. Baseline calibrated against a cis-voice reference corpus. calibration_v1 medians (p25–p75): en-US M 49% (38–64) / F 81% (69–99). See tests/reports/calibration_v1.",
 		"help.heatmap.pitchDT": "Pitch",
 		"help.heatmap.pitchDD":
 			"F0 within each phone. Considered the primary acoustic boundary between masculine and feminine voice perception.",
@@ -1250,10 +1250,10 @@ const DICT = {
 		"help.how.1": "Glissez un fichier, choisissez-en un, ou enregistrez (≤ {mb} Mo, < {min} min).",
 		"help.how.2": "Cliquez Analyser et attendez la barre de progression du canard.",
 		"help.how.3": "Les trois panneaux se remplissent automatiquement, sans clic supplémentaire.",
-		"help.heatmap.h": "Dans la carte thermique",
+		"help.heatmap.h": "Terminologie",
 		"help.heatmap.resonanceDT": "Résonance",
 		"help.heatmap.resonanceDD":
-			"Résonance à l'intérieur de chaque phonème. Voyelles uniquement. Issue d'une combinaison pondérée de F1, F2 et F3. Ligne de base calibrée sur un corpus de voix cis — <strong>0,5 est la moyenne de référence féminine</strong>, pas la médiane masculin/féminin. Médianes empiriques calibration_v1 : masculine ≈ 35–49 %, féminine ≈ 65–81 % (selon la langue ; voir tests/reports/calibration_v1).",
+			"Résonance à l'intérieur de chaque phonème. Voyelles uniquement. Issue d'une combinaison pondérée de F1, F2 et F3. Ligne de base calibrée sur un corpus de voix cis. Médianes calibration_v1 (p25–p75) : fr-FR H 35 % (29–42) / F 65 % (55–75). Voir tests/reports/calibration_v1.",
 		"help.heatmap.pitchDT": "Hauteur",
 		"help.heatmap.pitchDD":
 			"F0 à l'intérieur de chaque phonème. Considérée comme la frontière acoustique principale entre la perception masculine et féminine de la voix.",

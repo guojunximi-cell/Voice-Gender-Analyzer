@@ -278,6 +278,21 @@
 	text-align: center;
 }
 
+.vga-transcript-readout__phone {
+	font-family: "SF Mono", "JetBrains Mono", "Fira Mono", monospace;
+	font-size: 0.78rem;
+	color: var(--text-secondary);
+	background: var(--bg-primary);
+	padding: 1px 8px;
+	border-radius: 999px;
+	letter-spacing: 0.02em;
+	font-variant-numeric: tabular-nums;
+}
+
+.vga-transcript-readout__phone.is-hidden {
+	display: none;
+}
+
 .vga-transcript-readout__metric {
 	display: inline-flex;
 	align-items: baseline;

@@ -122,6 +122,7 @@
 							<line x1="12" y1="17" x2="12.01" y2="17" />
 						</svg>
 					</button>
+					<!-- disclosure UI disabled (使用前请先了解) — uncomment to restore.
 					<button
 						id="disclosure-toggle"
 						class="icon-btn"
@@ -146,6 +147,8 @@
 							<line x1="12" y1="16" x2="12.01" y2="16" />
 						</svg>
 					</button>
+					-->
+
 					<button id="theme-toggle" class="icon-btn" data-i18n-aria-label="header.theme" aria-label="切换主题">
 						<svg
 							class="icon-sun"
@@ -921,12 +924,12 @@
 				</section>
 
 				<section class="vga-help-section">
-					<h4 data-i18n="help.heatmap.h">热力图中</h4>
+					<h4 data-i18n="help.heatmap.h">术语</h4>
 					<dl>
 						<dt data-i18n="help.heatmap.resonanceDT">共鸣</dt>
 						<dd data-i18n="help.heatmap.resonanceDD">
-							音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考——0.5 是<strong>女性参考均值</strong>，不是男女中线。calibration_v1
-							实测：男声 median ≈ 35–49%，女声 median ≈ 65–81%（视语言而异，详见 tests/reports/calibration_v1）。
+							音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。calibration_v1
+							实测 median（p25–p75）：zh-CN 男 38%（29–46）／女 73%（62–85）。详见 tests/reports/calibration_v1。
 						</dd>
 						<dt data-i18n="help.heatmap.pitchDT">音高</dt>
 						<dd data-i18n="help.heatmap.pitchDD">音素内的 F0。被认为是男女性化声音的主要边界。</dd>
@@ -1136,7 +1139,8 @@
 			</div>
 		</div>
 
-		<!-- 首次启动 disclosure 浮层（同 vga-help-modal 视觉，独立逻辑） -->
+		<!-- disclosure UI disabled (使用前请先了解) — was: 首次启动浮层，同 vga-help-modal 视觉、独立逻辑.
+		     Uncomment + restore disclosure-toggle button + main.js wiring to bring it back.
 		<div
 			id="disclosure-modal"
 			class="vga-help-modal"
@@ -1206,6 +1210,8 @@
 				</button>
 			</div>
 		</div>
+		-->
+
 
 		<style>
 			/* ── Overlay container ───────────────────────────── */
