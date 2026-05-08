@@ -159,10 +159,7 @@ export function findPriorAttempt({ sessions, language, currentTokens, currentScr
 		if ((s.createdAt ?? 0) >= cutoff) continue;
 
 		// Preset id shortcut: deterministic and free.
-		const presetMatch =
-			currentScriptId &&
-			currentScriptId !== CUSTOM_SCRIPT_ID &&
-			s.script_id === currentScriptId;
+		const presetMatch = currentScriptId && currentScriptId !== CUSTOM_SCRIPT_ID && s.script_id === currentScriptId;
 
 		let score = 0;
 		if (presetMatch) {
