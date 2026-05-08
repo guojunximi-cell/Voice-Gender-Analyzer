@@ -170,6 +170,87 @@ export function downloadExport(exportObj) {
 	return { filename, size: blob.size };
 }
 
+// MIME → 扩展名兜底；audioFile.name 已带扩展名时优先信它，这里只在无名/无扩展时用。
+const MIME_EXT = {
+	"audio/wav": ".wav",
+	"audio/x-wav": ".wav",
+	"audio/wave": ".wav",
+	"audio/mpeg": ".mp3",
+	"audio/mp3": ".mp3",
+	"audio/mp4": ".m4a",
+	"audio/x-m4a": ".m4a",
+	"audio/aac": ".aac",
+	"audio/ogg": ".ogg",
+	"audio/webm": ".webm",
+	"audio/flac": ".flac",
+};
+
+function _extFromMime(mime) {
+	return MIME_EXT[String(mime || "").toLowerCase()] || ".bin";
+}
+
+function _hasExt(name) {
+	return /\.[A-Za-z0-9]{1,8}$/.test(name || "");
+}
+
+function _safeAudioName(audioFile, session) {
+	const raw = audioFile?.name || "";
+	if (raw && _hasExt(raw)) return raw;
+	const stem = (raw || deriveFileBasename(session) || "recording").replace(/[/\\]+/g, "-");
+	return stem + _extFromMime(audioFile?.type);
+}
+
+function _dedupeName(name, used) {
+	if (!used.has(name)) return name;
+	const dot = name.lastIndexOf(".");
+	const stem = dot > 0 ? name.slice(0, dot) : name;
+	const ext = dot > 0 ? name.slice(dot) : "";
+	let i = 2;
+	while (used.has(`${stem}-${i}${ext}`)) i++;
+	return `${stem}-${i}${ext}`;
+}
+
+/**
+ * 单条音频另存。沿用 downloadExport 的 createObjectURL + 隐藏 <a download> 模式。
+ * 返回 { filename, size }；audioFile 缺失返回 null。
+ */
+export function downloadAudioFile(audioFile, suggestedName) {
+	if (!audioFile) return null;
+	const name = suggestedName || audioFile.name || "audio";
+	const url = URL.createObjectURL(audioFile);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = name;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
+	return { filename: name, size: audioFile.size || 0 };
+}
+
+/**
+ * 多 session 串行下载。Chrome 对 same-origin 连发 a.click() 会弹「该网站正在
+ * 下载多个文件」权限请求，这是浏览器原生行为；250ms 间隔只是让事件循环喘口气，
+ * 不解决拦截。冷态历史拿不到 audioFile 的算 skipped。
+ */
+export async function downloadAudioFilesSequential(sessions, { delayMs = 250 } = {}) {
+	let downloaded = 0;
+	let skipped = 0;
+	const used = new Set();
+	for (const s of sessions) {
+		if (!s?.audioFile) {
+			skipped++;
+			continue;
+		}
+		const name = _dedupeName(_safeAudioName(s.audioFile, s), used);
+		used.add(name);
+		downloadAudioFile(s.audioFile, name);
+		downloaded++;
+		if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+	}
+	return { downloaded, skipped };
+}
+
 /**
  * 解析导入文件。校验失败抛带 i18n key 的 Error。
  * 返回 { sessions: [{summary, analysis, filename, audioFile?}] }——

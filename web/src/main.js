@@ -5,7 +5,12 @@ import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
 // disclosure UI disabled (使用前请先了解) — uncomment to restore the gate + header button.
 // import { mountDisclosureModal, showDisclosure } from "./modules/disclosure-modal.js";
-import { buildExportPayload, downloadExport, parseImportFile } from "./modules/export-import.js";
+import {
+	buildExportPayload,
+	downloadAudioFilesSequential,
+	downloadExport,
+	parseImportFile,
+} from "./modules/export-import.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
 import { applyStaticDom, getLang, onLangChange, setLang, t } from "./modules/i18n.js";
 import { clearMetricsPanel } from "./modules/metrics-panel.js";
@@ -978,19 +983,32 @@ async function _refreshExportDialogSize() {
 	if (!dialog?.open) return;
 	const scope = dialog.querySelector('input[name="export-scope"]:checked')?.value || "current";
 	const includeAudio = $("export-include-audio")?.checked ?? false;
+	const alsoAudio = $("export-also-audio")?.checked ?? false;
 	const sizeEl = $("export-audio-size");
-	if (!sizeEl) return;
-	if (!includeAudio) {
-		sizeEl.textContent = t("export.audioSizeNone");
-		return;
+	const alsoHintEl = $("export-also-audio-hint");
+
+	// 任一勾选都要拉 audioFile —— includeAudio 用于估 base64 体积，alsoAudio 用于估文件数。
+	const needAudio = includeAudio || alsoAudio;
+	const stat = needAudio
+		? await _collectSessionsForExport({ scope, includeAudio: true })
+		: { audioBytes: 0, audioCount: 0 };
+
+	if (sizeEl) {
+		if (!includeAudio || stat.audioCount === 0) {
+			sizeEl.textContent = t("export.audioSizeNone");
+		} else if (scope === "all") {
+			sizeEl.textContent = t("export.audioSizeMultiFmt", { n: stat.audioCount, size: _formatBytes(stat.audioBytes) });
+		} else {
+			sizeEl.textContent = t("export.audioSizeFmt", { size: _formatBytes(stat.audioBytes) });
+		}
 	}
-	const { audioBytes, audioCount } = await _collectSessionsForExport({ scope, includeAudio: true });
-	if (audioCount === 0) {
-		sizeEl.textContent = t("export.audioSizeNone");
-	} else if (scope === "all") {
-		sizeEl.textContent = t("export.audioSizeMultiFmt", { n: audioCount, size: _formatBytes(audioBytes) });
-	} else {
-		sizeEl.textContent = t("export.audioSizeFmt", { size: _formatBytes(audioBytes) });
+
+	if (alsoHintEl) {
+		if (alsoAudio && stat.audioCount > 1) {
+			alsoHintEl.textContent = t("export.alsoAudioHintMulti", { n: stat.audioCount });
+		} else {
+			alsoHintEl.textContent = "";
+		}
 	}
 }
 
@@ -1033,12 +1051,18 @@ function _closeExportDialog() {
 async function _confirmExport() {
 	const dialog = $("export-dialog");
 	if (!dialog) return;
+	const confirmBtn = $("export-dialog-confirm");
 	const scope = dialog.querySelector('input[name="export-scope"]:checked')?.value || "current";
 	const includeAudio = $("export-include-audio")?.checked ?? true;
 	const includeEngineC = $("export-include-engine-c")?.checked ?? true;
+	const alsoAudio = $("export-also-audio")?.checked ?? false;
 
+	if (confirmBtn) confirmBtn.disabled = true;
 	try {
-		const { sessions } = await _collectSessionsForExport({ scope, includeAudio });
+		// alsoAudio 也要 audioFile，所以即使 includeAudio=false 也得 fetch——
+		// _collectSessionsForExport 的 includeAudio 参数决定要不要 await audioCache.get。
+		const needAudioFiles = includeAudio || alsoAudio;
+		const { sessions } = await _collectSessionsForExport({ scope, includeAudio: needAudioFiles });
 		if (sessions.length === 0) {
 			showToast(t(scope === "all" ? "export.errEmptyHistory" : "export.errNoData"), "error");
 			return;
@@ -1048,20 +1072,40 @@ async function _confirmExport() {
 			options: { includeAudio, includeEngineC },
 		});
 		const { filename, size } = downloadExport(exportObj);
+
+		// JSON 已落盘——dialog 不再挡 UI，音频在后台串行下载，用户靠浏览器下载条 + toast 跟进度。
 		_closeExportDialog();
 		showToast(t("export.successFmt", { name: filename, size: _formatBytes(size) }));
+
+		if (alsoAudio) {
+			await new Promise((r) => setTimeout(r, 200));
+			const audioStat = await downloadAudioFilesSequential(sessions);
+			if (audioStat.downloaded > 0) {
+				showToast(t("export.audioDownloadedFmt", { n: audioStat.downloaded }));
+			}
+			if (audioStat.skipped > 0) {
+				showToast(t("export.audioSkippedFmt", { n: audioStat.skipped }), "warn");
+			}
+		}
 	} catch (err) {
 		showToast(t("toast.failedFmt", { msg: err.message }), "error");
+	} finally {
+		if (confirmBtn) confirmBtn.disabled = false;
 	}
 }
 
 $("export-result-btn")?.addEventListener("click", _openExportDialog);
 $("export-dialog-cancel")?.addEventListener("click", _closeExportDialog);
 $("export-dialog-confirm")?.addEventListener("click", _confirmExport);
-// 切 scope / 切 include-audio 都会改变预估体积——重算一次。
+// 切 scope / 切 include-audio / also-audio 都可能改变 hint——重算一次。
 $("export-dialog")?.addEventListener("change", (e) => {
 	const tgt = e.target;
-	if (tgt?.name === "export-scope" || tgt?.id === "export-include-audio" || tgt?.id === "export-include-engine-c") {
+	if (
+		tgt?.name === "export-scope" ||
+		tgt?.id === "export-include-audio" ||
+		tgt?.id === "export-include-engine-c" ||
+		tgt?.id === "export-also-audio"
+	) {
 		_refreshExportDialogSize();
 	}
 });
