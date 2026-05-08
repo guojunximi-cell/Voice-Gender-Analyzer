@@ -11,6 +11,7 @@
 // i18n：导出时 advice 字段保留 i18n key + params（advice_v2 输出格式），
 // 导入按当前 UI locale 重渲染——切换语言后导入旧文件自动跟随。
 
+import { encodeWAV } from "./analyzer.js";
 import { getLang, t } from "./i18n.js";
 
 export const EXPORT_SCHEMA_VERSION = "1";
@@ -210,6 +211,40 @@ function _dedupeName(name, used) {
 	return `${stem}-${i}${ext}`;
 }
 
+// 浏览器录音默认产出 webm/opus（或 ogg/opus），Windows 原生播放器 / iOS 相册都打不开。
+// 导出时把这些容器解码后重编为 PCM WAV——无损（已经过 opus 解码）、体积变大但人人能播。
+const _UNFRIENDLY_MIME = /(?:^|\/)(?:webm|ogg|opus|x-opus)\b/i;
+const _UNFRIENDLY_EXT = /\.(webm|ogg|oga|opus)$/i;
+
+function _needsWavConversion(file) {
+	if (!file) return false;
+	if (_UNFRIENDLY_MIME.test(file.type || "")) return true;
+	return _UNFRIENDLY_EXT.test(file.name || "");
+}
+
+async function _convertToWav(file) {
+	let ctx = null;
+	try {
+		const buf = await file.arrayBuffer();
+		ctx = new (window.AudioContext || window.webkitAudioContext)();
+		const audioBuf = await ctx.decodeAudioData(buf);
+		const stem = (file.name || "audio").replace(/\.[^.]+$/, "") || "audio";
+		const blob = encodeWAV(audioBuf);
+		return new File([blob], stem + ".wav", {
+			type: "audio/wav",
+			lastModified: Number.isFinite(file.lastModified) && file.lastModified > 0 ? file.lastModified : Date.now(),
+		});
+	} catch (err) {
+		console.warn("[VGA export] WAV 转码失败，回落到原文件:", err);
+		return file;
+	} finally {
+		if (ctx)
+			try {
+				await ctx.close();
+			} catch {}
+	}
+}
+
 /**
  * 单条音频另存。沿用 downloadExport 的 createObjectURL + 隐藏 <a download> 模式。
  * 返回 { filename, size }；audioFile 缺失返回 null。
@@ -242,9 +277,10 @@ export async function downloadAudioFilesSequential(sessions, { delayMs = 250 } =
 			skipped++;
 			continue;
 		}
-		const name = _dedupeName(_safeAudioName(s.audioFile, s), used);
+		const out = _needsWavConversion(s.audioFile) ? await _convertToWav(s.audioFile) : s.audioFile;
+		const name = _dedupeName(_safeAudioName(out, s), used);
 		used.add(name);
-		downloadAudioFile(s.audioFile, name);
+		downloadAudioFile(out, name);
 		downloaded++;
 		if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
 	}

@@ -20,7 +20,7 @@ function _writeStr(view, off, str) {
 	for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
 }
 
-function _encodeWAV(ab) {
+export function encodeWAV(ab) {
 	const numCh = ab.numberOfChannels;
 	const sr = ab.sampleRate;
 	const frames = ab.length;
@@ -77,7 +77,7 @@ async function _stripMetadata(file) {
 		}
 
 		const strippedName = file.name.replace(/\.[^.]+$/, "") + ".wav";
-		return new File([_encodeWAV(audioBuf)], strippedName, { type: "audio/wav" });
+		return new File([encodeWAV(audioBuf)], strippedName, { type: "audio/wav" });
 	} catch (err) {
 		console.warn("[声音分析鸭] 元数据剥离失败，使用原始文件:", err);
 		return file;
