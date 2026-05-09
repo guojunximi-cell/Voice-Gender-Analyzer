@@ -116,6 +116,58 @@ run_engine_c()                              # engine_c.py
 
 Sidecar 源码 vendor 自 [guojunximi-cell/gender-voice-visualization](https://github.com/guojunximi-cell/gender-voice-visualization.git)（working-chinese-version，同步 2026-04-16 @ 446f124），放在 `voiceya/sidecars/visualizer-backend/`，FastAPI 薄壳在 `voiceya/sidecars/wrapper/main.py`。英文资源 `cmudict.txt` 从 upstream master 分支单独补入 vendor 目录（详见 `voiceya/sidecars/README.md`）。
 
+## 本地数据资产（仅本机 D: 盘，不入仓库）
+
+WSL 路径 `/mnt/d/project_vocieduck/`（Windows `D:\project_vocieduck\`）。**不进 git**——隐私（语音含说话人身份）+ 体积（CV fr 单项 ~32 GB）。所有 baseline 数值与 zone 阈值的源数据都在这里；新机器克隆仓库后跑 baseline 必须先复刻或外部存储。
+
+### `calibration_v1/` — 555-session 校准数据
+
+`tests/reports/calibration_v1/aggregate.csv` 与 `resonance_calibration.py` 现行 `_<LANG>_F_P*` 常量的源头。三语对称结构：
+
+```
+calibration_v1/
+  {en-US, fr-FR, zh-CN}/
+    raw/        # POST /analyze-voice 原始 .vga.json 导出
+    sessions/   # 拆分 + 加 metadata 后的 session JSON（按 F/M 分桶）
+    stitched/   # 60–90s 拼接的 WAV（送 sidecar 的实际输入；按 F/M 分桶）
+  en-US/
+    raw.5000hz_baseline_for_history/         # 2026-05-06 stats.json 重训前的 v0
+    sessions.5000hz_baseline_for_history/    # 配套，对照「P75=0.987 sat 26%」用
+```
+
+文件计数（每语言）：raw / sessions ≈ 183–188，stitched ≈ 200。生成方式：`scripts/calibration_v1/build_corpus.py <lang>` + `aggregate.py`。**en-US 的 5000hz_baseline 子目录是历史档案**——不要改、不要删，再跑 ablation 时是唯一对照。
+
+### `ablation/audio/` — 训练语料 + ablation 实验子集
+
+```
+ablation/audio/
+  cn/
+    AISHELL3/{train,test}/wav/<spk>/<utt>.wav   # 175 + 215 spk; train_stats_zh.py 的输入
+    AISHELL3/{spk-info.txt, content.txt}        # transcript + speaker meta
+    train_L/, train_S/                          # 含 TextGrid 的小集（~250 文件），对齐评估用
+  en/
+    LibriSpeech/train-clean-100/<spk>/...       # 251 spk; train_stats_en.py 的输入
+    cmu_arctic_extracted/{cmu_bdl,clb,rms,slt}/ # 4 spk × 8 wav，curated fixture
+    cis_female_en/, cis_male_en/                # 30 + 25 文件，curated 性别对照
+  fr/
+    clips/<hash>.mp3                            # CV fr v25 全 dump (~864k 文件，~32 GB);
+    {clip_durations,validated,train,dev,test}.tsv   # CV 标注表
+  normalized/                                   # 音量规范化后的小集
+    {en_female,en_male,zh_female,zh_male}/      # 30/25/120/99 文件
+```
+
+哪个脚本读哪：
+
+| 脚本 | 期望路径（默认或最常用 `--corpus`/`--aishell` 值） |
+|------|-----------------------------------------------|
+| `scripts/train_stats_zh.py` | `/mnt/d/project_vocieduck/ablation/audio/cn/AISHELL3` |
+| `scripts/train_stats_en.py` | `/mnt/d/project_vocieduck/ablation/audio/en/LibriSpeech/train-clean-100` |
+| `scripts/train_stats_fr.py` | CV fr 解压根（容器内 `/mnt/cv-fr/cv-corpus-25.0-XXXX/fr`） |
+| `scripts/audit_resonance_*.py` | 同上，按语言对应 |
+| `scripts/calibration_v1/build_corpus.py` | 写到 `calibration_v1/<lang>/{raw,sessions,stitched}` |
+
+调试 baseline 漂移时：先看 `tests/reports/calibration_v1/aggregate.csv`（git 里有），再去 D: 盘对应 `sessions/<F|M>/*.vga.json` 找具体 session（每个 JSON 含完整 `summary.engine_c.phones[]`，能直接 diff per-vowel 数值）。
+
 ## 协作约束（自我框架）
 
 1. **分支纪律**：当前分支 `dev-en`；合 main 需显式授权，不跨分支 cherry-pick。
