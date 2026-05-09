@@ -772,7 +772,46 @@
 						<div id="resonance-history-header" class="resonance-history-header" hidden></div>
 						<div id="resonance-divergence-advisory" class="resonance-divergence-advisory" hidden></div>
 						<div id="resonance-all-vowels-section" class="resonance-all-vowels-section" hidden>
-							<div class="resonance-section-title" data-i18n="advice.resonance.section_title_all">元音</div>
+							<div class="resonance-section-header">
+								<span class="resonance-section-title" data-i18n="advice.resonance.section_title_all">元音</span>
+								<div
+									id="resonance-consonants-toggle"
+									class="resonance-consonants-toggle"
+									role="radiogroup"
+									data-i18n-aria-label="advice.resonance.consonants.aria_label"
+									aria-label="是否包含辅音"
+								>
+									<button
+										type="button"
+										class="resonance-consonants-btn"
+										data-mode="vowels"
+										role="radio"
+										aria-checked="false"
+									>
+										<span data-i18n="advice.resonance.consonants.toggle_vowels_only">仅元音</span>
+									</button>
+									<button
+										type="button"
+										class="resonance-consonants-btn is-active"
+										data-mode="all"
+										role="radio"
+										aria-checked="true"
+									>
+										<span data-i18n="advice.resonance.consonants.toggle_all_phones">包含辅音</span>
+									</button>
+									<button
+										type="button"
+										id="resonance-consonants-info"
+										class="resonance-consonants-info"
+										data-i18n-title="advice.resonance.consonants.tooltip"
+										data-i18n-aria-label="advice.resonance.consonants.tooltip"
+										aria-label="辅音说明"
+										title="辅音（鼻音 /m n ŋ/、半元音 /j w/ 等）的共振峰也反映声道共振状态，但训练目标通常聚焦元音。"
+									>
+										ⓘ
+									</button>
+								</div>
+							</div>
 							<div id="resonance-all-vowels-list" class="resonance-all-vowels-list"></div>
 						</div>
 						<div id="resonance-caveat" class="advice-caveat" hidden></div>

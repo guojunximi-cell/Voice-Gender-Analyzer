@@ -1344,12 +1344,83 @@ body {
 	margin-top: 2px;
 }
 
+.resonance-section-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
 .resonance-section-title {
 	font-size: 0.72rem;
 	font-weight: 600;
 	color: var(--text-secondary);
 	letter-spacing: 0.02em;
 	text-transform: uppercase;
+}
+
+/* Toggle: 仅元音 / 包含辅音.  Mirrors .classify-mode-switcher visually but
+   sized smaller — sits inline with the section title instead of as a
+   primary control. */
+.resonance-consonants-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 2px;
+	background: var(--bg-elevated, var(--surface, transparent));
+	border: 1px solid var(--border-strong);
+	border-radius: 999px;
+}
+
+.resonance-consonants-btn {
+	background: transparent;
+	border: none;
+	padding: 3px 10px;
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	border-radius: 999px;
+	cursor: pointer;
+	transition:
+		background 160ms ease,
+		color 160ms ease;
+	font-variant-numeric: tabular-nums;
+}
+
+.resonance-consonants-btn:hover:not(.is-active) {
+	color: var(--text-primary);
+	background: color-mix(in srgb, var(--text-secondary) 6%, transparent);
+}
+
+.resonance-consonants-btn.is-active {
+	background: var(--accent);
+	color: var(--accent-contrast, #fff);
+}
+
+.resonance-consonants-btn:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.resonance-consonants-info {
+	background: transparent;
+	border: none;
+	padding: 0 2px;
+	margin-left: 2px;
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	cursor: help;
+	line-height: 1;
+}
+
+.resonance-consonants-info:hover {
+	color: var(--text-primary);
+}
+
+.resonance-consonants-info:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 4px;
 }
 
 .resonance-all-vowels-list {
@@ -1360,7 +1431,7 @@ body {
 
 .resonance-vowel-row {
 	display: grid;
-	grid-template-columns: auto 1fr auto;
+	grid-template-columns: auto 1fr auto auto;
 	align-items: center;
 	gap: 10px;
 	padding: 4px 8px;
@@ -1373,6 +1444,22 @@ body {
 
 .resonance-vowel-row:hover {
 	background: color-mix(in srgb, var(--text-secondary) 4%, transparent);
+}
+
+/* Consonant rows: italic IPA + muted color so users can tell at a glance
+   which entries aren't trainable vowel targets.  Bar fill stays the same
+   gradient but at 65% opacity. */
+.resonance-vowel-row.is-consonant .resonance-vowel-label {
+	font-style: italic;
+	color: var(--text-muted);
+}
+
+.resonance-vowel-row.is-consonant .resonance-vowel-bar-fill {
+	opacity: 0.65;
+}
+
+.resonance-vowel-row.is-consonant .resonance-vowel-pct {
+	color: var(--text-muted);
 }
 
 .resonance-vowel-label {
@@ -1406,9 +1493,20 @@ body {
 	text-align: right;
 }
 
+.resonance-vowel-n {
+	font-size: 0.66rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	opacity: 0.75;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.resonance-vowel-bar-fill,
 	.resonance-vowel-row {
+		transition: none;
+	}
+	.resonance-consonants-btn {
 		transition: none;
 	}
 }

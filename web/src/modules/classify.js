@@ -9,12 +9,18 @@
  *   pitch:     male < 145 Hz   ≤  neutral  ≤ 185 Hz < female
  *   resonance: male < p25      ≤  neutral  ≤ p75    < female  (per language)
  *
+ * In resonance mode, the global "include consonants" toggle (consonants-
+ * toggle.js) decides whether non-vowel phones contribute to the segment
+ * count.  Default ON so the top tab and the 共鸣表现 panel stay aligned;
+ * flipping to OFF gives a vowel-only view in both places at once.
+ *
  * Output segment shape mirrors Engine A's analysis[] entries:
  *   { label: "male"|"neutral"|"female"|"other", start_time, end_time, confidence }
  * Consecutive phones of the same label merge; confidence is the
  * duration-weighted mean within the merged run.
  */
 
+import { getIncludeConsonants } from "./consonants-toggle.js";
 import { getLang } from "./i18n.js";
 import { pitchConfidence, pitchZone, resonanceConfidence, resonanceZone } from "./zones.js";
 
@@ -47,9 +53,15 @@ function _finalize(run) {
 
 export function classifyPhones(phones, mode) {
 	if (!phones?.length || (mode !== "pitch" && mode !== "resonance")) return [];
+	// Resonance mode honours the consonants toggle; pitch mode is unaffected
+	// (F0 is meaningful for sonorants but not a UX concern here — pitch
+	// has no "include consonants" toggle exposed).  Phones missing the
+	// `is_vowel` field default to true to preserve old session behaviour.
+	const dropConsonants = mode === "resonance" && !getIncludeConsonants();
 	const segs = [];
 	let cur = null;
 	for (const p of phones) {
+		if (dropConsonants && p.is_vowel === false) continue;
 		const c = _classifyPhone(p, mode);
 		if (!c) continue;
 		const dur = Math.max(0, (p.end ?? 0) - (p.start ?? 0));

@@ -4,13 +4,32 @@
  * Source: `summary.advice.resonance_panel` (built by advice_v2._resonance_panel).
  * Renders a Pitch-Range-style scale bar showing the panel-level median
  * resonance positioned within language-aware male / androgynous / female
- * zones, plus a per-vowel list styled like the Distribution panel's
+ * zones, plus a per-phone list styled like the Distribution panel's
  * stat-cards (label + slim progress bar + percentage). Hidden when Engine C
  * is off, the panel is null (minimal tier), or zone is unknown.
+ *
+ * As of 2026-05-08 the per-phone list includes consonants (sonorants the
+ * sidecar successfully scored — /m/, /n/, /j/, /w/, /l/, /ŋ/, …) so users
+ * can see the full diagnostic distribution.  A toggle ("仅元音 / 包含辅音")
+ * lets the user filter consonants out; default is "包含辅音".  The toggle
+ * state also drives the median-bar recompute so the headline number stays
+ * consistent with what's visible.  Backend keeps weakness coaching
+ * vowel-only regardless of toggle (consonants aren't trainable targets).
  */
 
+import { getIncludeConsonants, onIncludeConsonantsChange, setIncludeConsonants } from "./consonants-toggle.js";
 import { getLang, t } from "./i18n.js";
 import { RESONANCE_ZONES } from "./zones.js";
+
+let _lastPanelData = null;
+let _lastContext = null;
+
+// When the toggle flips (from anywhere), re-render this panel.  main.js
+// independently subscribes to drive the 共鸣 tab; both fire from the same
+// source of truth.
+onIncludeConsonantsChange(() => {
+	if (_lastPanelData) renderResonancePanel(_lastPanelData, _lastContext || {});
+});
 
 // Two breakpoints split the 0–100% bar into three zones: cis-male (0..p25)
 // covers `clearly_below_female` + `leans_male`; androgynous (p25..p75) is
@@ -87,7 +106,7 @@ function _vowelDisplay(vowel) {
 	return vowel.replace(/[0-9]+$/, "");
 }
 
-function _renderMedianBar(median, perVowel) {
+function _renderMedianBar(median, visibleRows) {
 	const block = document.getElementById("resonance-median-block");
 	if (!block) return;
 
@@ -117,12 +136,12 @@ function _renderMedianBar(median, perVowel) {
 	const indicatorPct = Math.max(0, Math.min(100, median * 100));
 	_setStyle("resonance-indicator", "left", `${indicatorPct}%`);
 
-	// Range span: min..max of per-vowel medians. Matches the metaphor of
-	// .pitch-range-span (observed p5–p95 over zones). Hidden if no usable
-	// per-vowel data — minimal tier already short-circuits the panel.
+	// Range span: min..max of currently-visible per-phone medians (toggle-
+	// aware).  Matches the metaphor of .pitch-range-span (observed p5–p95
+	// over zones).  Hidden if fewer than 2 rows are visible.
 	const span = document.getElementById("resonance-range-span");
 	if (span) {
-		const vals = (perVowel || []).map((v) => v.resonance_med).filter((v) => typeof v === "number");
+		const vals = (visibleRows || []).map((v) => v.resonance_med).filter((v) => typeof v === "number");
 		if (vals.length >= 2) {
 			const lo = Math.max(0, Math.min(...vals));
 			const hi = Math.min(1, Math.max(...vals));
@@ -137,12 +156,15 @@ function _renderMedianBar(median, perVowel) {
 	block.hidden = false;
 }
 
-// One row in the all-vowels list — mirrors the Distribution panel's
-// stat-card recipe: vowel label | gradient progress bar | right-aligned %.
-// rAF-deferred bar width set so the CSS transition kicks in on render.
+// One row in the all-phones list — mirrors the Distribution panel's
+// stat-card recipe: phone label | gradient progress bar | right-aligned %
+// + (n=X) sample-count annotation.  Consonant rows (is_vowel=false) get
+// `.is-consonant` so CSS can italicize + mute them.  rAF-deferred bar
+// width set so the CSS transition kicks in on render.
 function _buildVowelRow(row) {
 	const el = document.createElement("div");
 	el.className = "resonance-vowel-row";
+	if (row.is_vowel === false) el.classList.add("is-consonant");
 	el.dataset.vowel = row.vowel;
 
 	const vowelEl = document.createElement("span");
@@ -160,15 +182,39 @@ function _buildVowelRow(row) {
 	valueEl.className = "resonance-vowel-pct";
 	valueEl.textContent = `${pct}%`;
 
-	el.append(vowelEl, barWrap, valueEl);
+	const nEl = document.createElement("span");
+	nEl.className = "resonance-vowel-n";
+	nEl.textContent = row.n != null ? `(n=${row.n})` : "";
+
+	el.append(vowelEl, barWrap, valueEl, nEl);
 	requestAnimationFrame(() => {
 		barFill.style.width = `${pct}%`;
 	});
 	return el;
 }
 
+function _syncToggleButtons() {
+	const group = document.getElementById("resonance-consonants-toggle");
+	if (!group) return;
+	const includeConsonants = getIncludeConsonants();
+	const buttons = group.querySelectorAll(".resonance-consonants-btn");
+	buttons.forEach((btn) => {
+		const wantsAll = btn.dataset.mode === "all";
+		const active = wantsAll === includeConsonants;
+		btn.classList.toggle("is-active", active);
+		btn.setAttribute("aria-checked", active ? "true" : "false");
+	});
+}
+
+function _filterByToggle(rows) {
+	if (getIncludeConsonants()) return rows;
+	return rows.filter((r) => r.is_vowel !== false);
+}
+
 export function renderResonancePanel(panelData, context = {}) {
 	const generation = ++_renderGeneration;
+	_lastPanelData = panelData;
+	_lastContext = context;
 
 	const root = document.getElementById("resonance-panel");
 	if (!root) return;
@@ -177,12 +223,14 @@ export function renderResonancePanel(panelData, context = {}) {
 		return;
 	}
 
-	// Recompute panel-level median + zone client-side from per_vowel medians
-	// so imported sessions (whose cached median_resonance / zone_key were
-	// computed by the pre-fix flat-list algorithm) display the new robust
-	// median. New analyses already ship the correct value from advice_v2.py;
-	// this client recompute is idempotent in that case.
-	const meds = (panelData.per_vowel || []).map((v) => v.resonance_med).filter((v) => typeof v === "number");
+	const allRows = panelData.per_vowel || [];
+	const visibleRows = _filterByToggle(allRows);
+
+	// Recompute panel-level median + zone client-side from currently-visible
+	// per-phone medians. Toggle off → vowel-only median; toggle on → all-phone
+	// median. Imported sessions (with cached pre-2026-05-08 median_resonance)
+	// always recompute too, so old rows render with the new aggregation.
+	const meds = visibleRows.map((v) => v.resonance_med).filter((v) => typeof v === "number");
 	let median = panelData.median_resonance;
 	let zoneKey = panelData.zone_key;
 	if (meds.length) {
@@ -201,22 +249,23 @@ export function renderResonancePanel(panelData, context = {}) {
 		summaryEl.hidden = true;
 	}
 
-	_renderMedianBar(median, panelData.per_vowel);
+	_renderMedianBar(median, visibleRows);
 
 	const allSection = document.getElementById("resonance-all-vowels-section");
 	const allList = document.getElementById("resonance-all-vowels-list");
 	// "low" rows (resonance_med < _VOWEL_RES_WEAK) stay hidden — they add
 	// noise without an actionable next step. "weak" and "good" stay.
-	const perVowel = (panelData.per_vowel || []).filter((row) => row.level_key !== "low");
+	const displayRows = visibleRows.filter((row) => row.level_key !== "low");
 	if (allSection && allList) {
 		allList.replaceChildren();
-		if (perVowel.length) {
-			for (const row of perVowel) allList.appendChild(_buildVowelRow(row));
+		if (displayRows.length) {
+			for (const row of displayRows) allList.appendChild(_buildVowelRow(row));
 			allSection.hidden = false;
 		} else {
 			allSection.hidden = true;
 		}
 	}
+	_syncToggleButtons();
 
 	const historyHeader = document.getElementById("resonance-history-header");
 	if (historyHeader) historyHeader.hidden = true;
@@ -237,11 +286,29 @@ export function renderResonancePanel(panelData, context = {}) {
 	}
 
 	root.hidden = false;
+	wireResonanceConsonantsToggle();
 
 	// History-compare async path retired 2026-05-04 — context arguments are
 	// retained on the public API for future revival.
-	void context;
 	void generation;
+}
+
+// Wire the toggle on first render. Idempotent — flag prevents duplicate
+// listener registration if renderResonancePanel is called multiple times.
+// State changes flow through consonants-toggle.js so subscribers (main.js
+// for the 共鸣 tab) re-render in lockstep with this panel.
+let _toggleWired = false;
+export function wireResonanceConsonantsToggle() {
+	if (_toggleWired) return;
+	const group = document.getElementById("resonance-consonants-toggle");
+	if (!group) return;
+	group.addEventListener("click", (e) => {
+		const btn = e.target.closest(".resonance-consonants-btn");
+		if (!btn) return;
+		const wantsAll = btn.dataset.mode === "all";
+		setIncludeConsonants(wantsAll);
+	});
+	_toggleWired = true;
 }
 
 export function clearResonancePanel() {

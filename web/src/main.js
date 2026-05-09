@@ -3,6 +3,7 @@ import * as audioCache from "./modules/audio-cache.js";
 import { readEmbeddedCreatedAt } from "./modules/audio-metadata.js";
 import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
+import { onIncludeConsonantsChange } from "./modules/consonants-toggle.js";
 // disclosure UI disabled (使用前请先了解) — uncomment to restore the gate + header button.
 // import { mountDisclosureModal, showDisclosure } from "./modules/disclosure-modal.js";
 import {
@@ -326,6 +327,16 @@ function _initClassifyModeSwitcher() {
 	});
 	onModeChange(() => {
 		_updateClassifyModeSwitcher();
+		_renderClassifiedForCurrent();
+		scatterRedraw();
+	});
+	// Consonants toggle only affects resonance-mode views, but it's safe to
+	// re-render unconditionally — engineA / pitch paths short-circuit in
+	// classifyPhones and produce identical segments.  Mirrors the
+	// onModeChange wire so both toggles funnel through the same render
+	// pipeline.
+	onIncludeConsonantsChange(() => {
+		if (getMode() !== "resonance") return;
 		_renderClassifiedForCurrent();
 		scatterRedraw();
 	});
