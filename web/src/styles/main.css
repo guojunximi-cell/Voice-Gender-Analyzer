@@ -1104,11 +1104,16 @@ body {
 }
 
 /* ============================================================
-   THREE-PANEL LAYOUT
+   APP LAYOUT — 2-col stacked
+   左栏 history 全高；右栏始终在中栏底下，不再有 3-col 模式。
    ============================================================ */
 .app-layout {
 	display: grid;
-	grid-template-columns: 240px 1fr 304px;
+	grid-template-columns: 240px 1fr;
+	grid-template-rows: minmax(280px, auto) minmax(0, 1fr);
+	grid-template-areas:
+		"left center"
+		"left right";
 	height: calc(100vh - 56px);
 	overflow: hidden;
 }
@@ -1130,12 +1135,14 @@ body {
 }
 
 .panel-left {
+	grid-area: left;
 	border-right: 1px solid var(--border);
 	display: flex;
 	flex-direction: column;
 }
 
 .panel-center {
+	grid-area: center;
 	padding: 20px 20px 48px;
 	display: flex;
 	flex-direction: column;
@@ -1144,7 +1151,8 @@ body {
 }
 
 .panel-right {
-	border-left: 1px solid var(--border);
+	grid-area: right;
+	border-top: 1px solid var(--border);
 	overflow-y: auto;
 }
 
@@ -1998,7 +2006,7 @@ body {
    ============================================================ */
 @media (max-width: 1000px) {
 	.app-layout {
-		grid-template-columns: 200px 1fr 270px;
+		grid-template-columns: 200px 1fr;
 	}
 }
 
@@ -2006,21 +2014,24 @@ body {
 	.app-layout {
 		grid-template-columns: 1fr;
 		grid-template-rows: auto auto auto;
+		grid-template-areas: none;
 		height: auto;
 		overflow: visible;
 	}
 	.panel-center {
+		grid-area: auto;
 		order: 1;
 	}
 	.panel-left {
+		grid-area: auto;
 		order: 2;
 		height: auto;
 		border-right: none;
 		border-top: 1px solid var(--border);
 	}
 	.panel-right {
+		grid-area: auto;
 		order: 3;
-		border-left: none;
 		border-top: 1px solid var(--border);
 	}
 	.upload-section {
