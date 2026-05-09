@@ -115,11 +115,13 @@ _EN_VOWELS: frozenset[str] = frozenset(
 # ARPABET stress-digit suffix.  ``IY1.rstrip("012") == "IY"`` would do, but a
 # regex makes the intent explicit and matches scripts/audit_resonance_en.py.
 _ARPABET_STRESS_RE = re.compile(r"[012]$")
-# Per-vowel guidance is suppressed below this many tokens \u2014 single-digit
+# Per-phone guidance is suppressed below this many tokens \u2014 single-digit
 # samples make medians too noisy to act on (one mis-aligned phone can swing
-# z_F2_med by 0.5 \u03c3).  Picked to roughly match the sidecar's >2 \u03c3 outlier
-# trim convention.
-_PER_VOWEL_MIN_TOKENS = 3
+# z_F2_med by 0.5 \u03c3).  Lowered 3\u21922 (2026-05-08) so 30 s recordings surface
+# more long-tail vowels + sonorant consonants; advice_v2._WEAKNESS_MIN_TOKENS
+# moved in lockstep.  n=2 still gives a "min-of-two" robustness; UI
+# annotates each row with (n=X) so users can judge reliability.
+_PER_VOWEL_MIN_TOKENS = 2
 
 # language 归一化：前端/上游传 BCP-47 形式（zh-CN、en-US），sidecar / 调度用短码。
 _LANG_SHORT: dict[str, str] = {
@@ -261,7 +263,7 @@ async def run_engine_c(
 
     # 源 resonance.py 可能因样本不足而不填某些字段；全部按 None-safe 取。
     raw_phones = data.get("phones") or []
-    phones = _build_phone_array(raw_phones, data.get("words") or [])
+    phones = _build_phone_array(raw_phones, data.get("words") or [], lang_short)
 
     # Silence ranges come from ffmpeg silencedetect (-30 dB, 0.5s min) run
     # in the sidecar wrapper alongside MFA.  The frontend uses them as the
@@ -397,15 +399,39 @@ def _alignment_confidence(
     }
 
 
+def _phone_is_vowel(label: str, lang_short: str) -> bool:
+    """Whether ``label`` is a vowel in ``lang_short``'s inventory.
+
+    Mirrors the normalization in ``_aggregate_per_vowel`` — zh strips IPA
+    tone diacritics, en strips ARPABET stress digits.  Used both per-phone
+    (so the frontend can filter by vowel-ness without duplicating the
+    inventory) and per-aggregate (the bucket's flag).
+    """
+    if not label or lang_short not in ("zh", "fr", "en"):
+        return False
+    if lang_short == "zh":
+        return _TONE_RE.sub("", label) in _ZH_VOWELS
+    if lang_short == "fr":
+        return label in _FR_VOWELS
+    # en
+    return _ARPABET_STRESS_RE.sub("", label) in _EN_VOWELS
+
+
 def _build_phone_array(
     raw_phones: list[dict[str, Any]],
     words: list[dict[str, Any]],
+    lang_short: str,
 ) -> list[dict[str, Any]]:
     """Transform sidecar phone dicts into the frontend-facing format.
 
     Each raw phone has ``time`` (start) but no explicit end — the end is
     the next phone's start time.  We also map each phone back to its hanzi
     character via the ``word_index`` cross-reference.
+
+    ``is_vowel`` is computed against the language's vowel inventory so the
+    frontend's resonance classifier (classify.js) can filter consonants in
+    the 共鸣 tab when the user toggles "仅元音", without duplicating the
+    vowel sets across stacks.
     """
     if not raw_phones:
         return []
@@ -437,12 +463,14 @@ def _build_phone_array(
         # can do per-vowel guidance without re-reading stats files.  None
         # for consonants whose phoneme isn't in stats[expected].
         f_stdevs = p.get("F_stdevs") or []
+        phone_label = p.get("phoneme", "")
         phones.append(
             {
                 "start": round(start, 3),
                 "end": round(end, 3),
                 "char": char,
-                "phone": p.get("phoneme", ""),
+                "phone": phone_label,
+                "is_vowel": _phone_is_vowel(phone_label, lang_short),
                 "pitch": _safe_float(formants[0]) if len(formants) > 0 else None,
                 "resonance": _safe_float(p.get("resonance")),
                 "F1": _safe_float(formants[1]) if len(formants) > 1 else None,
@@ -461,30 +489,38 @@ def _aggregate_per_vowel(
     phones: list[dict[str, Any]],
     lang_short: str,
 ) -> list[dict[str, Any]]:
-    """Bucket phones by vowel class, return per-class median z + Hz medians.
+    """Bucket scored phones by phoneme label, return per-class medians.
+
+    Naming kept as ``_aggregate_per_vowel`` (and field ``resonance_per_vowel``)
+    for schema continuity, but as of 2026-05-08 we no longer filter to the
+    ``_ZH/EN/FR_VOWELS`` set — any phone the sidecar attached a ``resonance``
+    score to is bucketed.  Sonorants (/m/, /n/, /j/, /w/, /l/, …) carry real
+    vocal-tract resonance information; obstruents are ones the sidecar
+    typically can't score (no F-stdevs → no resonance).  Each entry now
+    carries ``is_vowel`` so downstream layers can keep weakness coaching
+    vowel-only while letting the UI display all phones.
 
     Phase A baseline (2026-05-01) showed the clamped resonance score loses
     diagnostic power on most vowels (sat_rate > 50 % for /a / aw / aj /…).
     The raw F-vector z-scores still carry signal below the clamp, so
-    advice_v2 will use this aggregate to drive per-vowel coaching.
+    advice_v2 uses this aggregate to drive per-phone display + coaching.
 
     Output shape::
 
-        [{"vowel": "i", "n": 22,
+        [{"vowel": "i", "n": 22, "is_vowel": True,
           "z_F1_med": -0.05, "z_F2_med": +0.10, "z_F3_med": -0.20,
-          "F1_med_hz": 380, "F2_med_hz": 2520, "F3_med_hz": 3100}, ...]
+          "F1_med_hz": 380, "F2_med_hz": 2520, "F3_med_hz": 3100,
+          "resonance_med": 0.71}, ...]
 
-    Sorted by descending sample count so the UI can naturally surface the
-    most-spoken vowel classes first.  Vowels with fewer than
+    Sorted by descending sample count so the UI naturally surfaces the
+    most-spoken phone classes first.  Phones with fewer than
     ``_PER_VOWEL_MIN_TOKENS`` tokens are dropped (medians too noisy).
 
     en uses ARPABET phone labels with stress digits (``IY1``, ``AH0``); the
     digits are stripped before bucketing so all stress variants of a vowel
-    aggregate together.  stats.json's calibration is still 5000 Hz baseline
-    (en isn't in `_ADAPTIVE_LANGS` as of 2026-05-01) but the F_stdevs values
-    the sidecar attaches per-phone are computed against that same baseline,
-    so the per-vowel z-scores are internally consistent — they just live in
-    a slightly different overall distribution than zh / fr.
+    aggregate together.  Consonants in ARPABET have no stress digit, so the
+    regex is a no-op for them.  zh strips IPA tone diacritics — also a no-op
+    for tone-less consonants.
     """
     if not phones or lang_short not in ("zh", "fr", "en"):
         return []
@@ -501,9 +537,13 @@ def _aggregate_per_vowel(
     buckets: dict[str, dict[str, list[float]]] = {}
     for p in phones:
         raw_label = p.get("phone") or ""
-        label = normalize("", raw_label) if lang_short in ("zh", "en") else raw_label
-        if label not in vowel_set:
+        if not raw_label:
             continue
+        # Skip phones the sidecar couldn't score — without a resonance value
+        # the row carries no signal worth aggregating.
+        if p.get("resonance") is None:
+            continue
+        label = normalize("", raw_label) if lang_short in ("zh", "en") else raw_label
         bucket = buckets.setdefault(
             label,
             {"z_F1": [], "z_F2": [], "z_F3": [], "F1": [], "F2": [], "F3": [], "resonance": []},
@@ -514,21 +554,22 @@ def _aggregate_per_vowel(
                 bucket[key].append(float(v))
 
     out: list[dict[str, Any]] = []
-    for vowel, b in buckets.items():
-        n = len(b["z_F1"])
+    for label, b in buckets.items():
+        n = len(b["resonance"])
         if n < _PER_VOWEL_MIN_TOKENS:
             continue
         out.append(
             {
-                "vowel": vowel,
+                "vowel": label,
                 "n": n,
+                "is_vowel": label in vowel_set,
                 "z_F1_med": _round_or_none(_median(b["z_F1"]), 3),
                 "z_F2_med": _round_or_none(_median(b["z_F2"]), 3),
                 "z_F3_med": _round_or_none(_median(b["z_F3"]), 3),
                 "F1_med_hz": _round_or_none(_median(b["F1"]), 0),
                 "F2_med_hz": _round_or_none(_median(b["F2"]), 0),
                 "F3_med_hz": _round_or_none(_median(b["F3"]), 0),
-                # Per-vowel resonance score (0-1, same scale as the panel-level
+                # Per-phone resonance score (0-1, same scale as the panel-level
                 # median_resonance). advice_v2 uses this to drive the simple
                 # good/low/weak classification that replaced the F-axis logic.
                 "resonance_med": _round_or_none(_median(b["resonance"]), 3),

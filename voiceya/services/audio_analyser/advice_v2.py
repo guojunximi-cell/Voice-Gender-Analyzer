@@ -35,12 +35,14 @@ WEAK_TONE_THRESHOLD = 0.50
 GATING_MINIMAL_MAX_S = 10.0
 GATING_STANDARD_MAX_S = 30.0
 
-# Resonance weakness picker tuning. n>=5 floor avoids surfacing single-outlier
-# vowels in standard tier (where /i/ may appear only 3-4× and one bad
-# alignment yanks the median). z<-0.8 cuts noise from vowels essentially at
-# the female reference distribution. Top-K=3 caps the card list.
+# Resonance per-phone display + weakness picker tuning.  Lowered 5→2 on
+# 2026-05-08 to align with engine_c._PER_VOWEL_MIN_TOKENS so the panel surfaces
+# more long-tail phones in 30 s recordings.  The (n=X) annotation in the UI
+# lets users judge reliability of single-digit-n rows.  Weakness coaching
+# additionally filters on is_vowel, so sonorants (/m/, /n/, /j/, /w/, …) appear
+# in the diagnostic list but never in "train this" cards.
 _WEAKNESS_Z_THRESHOLD = -0.8
-_WEAKNESS_MIN_TOKENS = 5
+_WEAKNESS_MIN_TOKENS = 2
 _WEAKNESS_TOP_K = 3
 
 # Per-vowel level buckets for the all-vowels list. Pre-2026-05-04 these used
@@ -146,14 +148,20 @@ def _level_key_by_resonance(resonance_med: float | None) -> str | None:
 
 
 def _pick_weakness_vowels(per_vowel: list[dict]) -> list[dict]:
-    """Top-3 lowest-resonance vowels with n ≥ 5 and resonance_med < weak threshold.
+    """Top-3 lowest-resonance *vowels* with n ≥ floor and resonance < weak threshold.
 
-    Replaces the previous worst-formant logic — the panel-level median already
-    speaks in resonance %, so per-vowel cards stay on the same scale.
+    Filters on ``is_vowel`` so sonorants/consonants never appear here — the
+    weakness card is "train this" coaching, and rooting the recommendation in
+    /m/ /n/ /j/ /w/ would mislead (their formants reflect nasal/glide
+    articulation, not the trainable vocal-tract resonance dimension).  Older
+    cached entries without the flag default to ``True`` (backwards-compat with
+    pre-2026-05-08 sessions, which only contained vowels anyway).
     """
     candidates: list[dict] = []
     for v in per_vowel:
         if (v.get("n") or 0) < _WEAKNESS_MIN_TOKENS:
+            continue
+        if not v.get("is_vowel", True):
             continue
         r = v.get("resonance_med")
         if r is None or r >= _VOWEL_RES_WEAK:
@@ -171,10 +179,12 @@ def _pick_weakness_vowels(per_vowel: list[dict]) -> list[dict]:
 
 
 def _build_per_vowel_levels(per_vowel: list[dict]) -> list[dict]:
-    """All vowels with n ≥ 5, classified by per-vowel resonance score.
+    """All scored phones with n ≥ floor, classified by resonance score.
 
-    Ordered weak → low → good, then by resonance ascending within each bucket
-    so the most-actionable vowel surfaces first.
+    Includes consonants (with ``is_vowel=False``) so the frontend can render
+    them in a visually distinct style under the "包含辅音" toggle.  Ordered
+    weak → low → good, then by resonance ascending within each bucket so the
+    most-actionable phone surfaces first.
     """
     out: list[dict] = []
     for v in per_vowel:
@@ -190,6 +200,7 @@ def _build_per_vowel_levels(per_vowel: list[dict]) -> list[dict]:
                 "resonance_med": round(float(r), 3),
                 "n": v["n"],
                 "level_key": lvl,
+                "is_vowel": bool(v.get("is_vowel", True)),
             }
         )
     out.sort(key=lambda c: (_LEVEL_SORT_RANK[c["level_key"]], c["resonance_med"]))
