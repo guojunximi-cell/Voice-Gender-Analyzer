@@ -18,6 +18,7 @@ import { clearMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
 import { buildScriptIdentity } from "./modules/resonance-history.js";
+import { wireResonanceConsonantsToggle } from "./modules/resonance-panel.js";
 import { renderFromSummary } from "./modules/results-render.js";
 import { renderStats, resetResults } from "./modules/results.js";
 import { getScatterMode, onScatterModeChange, setScatterMode } from "./modules/scatter-mode.js";
@@ -312,6 +313,11 @@ function _updateClassifyModeSwitcher() {
 		btn.disabled = needsEC && !ecAvailable;
 		btn.title = btn.disabled ? t("stats.lockedTip") : btn.dataset.originalTitle || btn.title;
 	});
+	// 仅元音 / 包含辅音 toggle is the resonance mode's sub-control: only meaningful
+	// when classify-mode is resonance and Engine C delivered phone data. Hide
+	// otherwise so it doesn't visually compete with the primary tab strip.
+	const toggle = $("resonance-consonants-toggle");
+	if (toggle) toggle.hidden = !(mode === "resonance" && ecAvailable);
 }
 
 function _initClassifyModeSwitcher() {
@@ -325,6 +331,11 @@ function _initClassifyModeSwitcher() {
 		if (!btn || btn.disabled) return;
 		setMode(btn.dataset.mode);
 	});
+	// Toggle now lives next to the classify-mode tabs, so wire its click
+	// handler at app init rather than waiting for resonance-panel's first
+	// render. The wiring inside resonance-panel.js is idempotent so
+	// double-calling is safe.
+	wireResonanceConsonantsToggle();
 	onModeChange(() => {
 		_updateClassifyModeSwitcher();
 		_renderClassifiedForCurrent();

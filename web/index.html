@@ -683,43 +683,72 @@
 						<span id="stats-dominant-tag" class="mc-collapsible-value" hidden></span>
 					</summary>
 					<div class="mc-collapsible-body">
-						<div
-							id="classify-mode-switcher"
-							class="classify-mode-switcher"
-							role="radiogroup"
-							data-i18n-aria-label="stats.modeAria"
-							aria-label="占比依据"
-						>
-							<button
-								class="classify-mode-btn is-active"
-								data-mode="engineA"
-								role="radio"
-								aria-checked="true"
-								data-i18n-title="stats.modeATip"
-								title="依 inaSpeechSegmenter 神经网络标签"
+						<div class="classify-controls-row">
+							<div
+								id="classify-mode-switcher"
+								class="classify-mode-switcher"
+								role="radiogroup"
+								data-i18n-aria-label="stats.modeAria"
+								aria-label="占比依据"
 							>
-								<span data-i18n="stats.modeA">神经网络</span>
-							</button>
-							<button
-								class="classify-mode-btn"
-								data-mode="pitch"
-								role="radio"
-								aria-checked="false"
-								data-i18n-title="stats.modePitchTip"
-								title="依每个音素的基频（165 Hz 为中性线）"
+								<button
+									class="classify-mode-btn is-active"
+									data-mode="engineA"
+									role="radio"
+									aria-checked="true"
+									data-i18n-title="stats.modeATip"
+									title="依 inaSpeechSegmenter 神经网络标签"
+								>
+									<span data-i18n="stats.modeA">神经网络</span>
+								</button>
+								<button
+									class="classify-mode-btn"
+									data-mode="pitch"
+									role="radio"
+									aria-checked="false"
+									data-i18n-title="stats.modePitchTip"
+									title="依每个音素的基频（165 Hz 为中性线）"
+								>
+									<span data-i18n="stats.modePitch">音高</span>
+								</button>
+								<button
+									class="classify-mode-btn"
+									data-mode="resonance"
+									role="radio"
+									aria-checked="false"
+									data-i18n-title="stats.modeResonanceTip"
+									title="依每个音素的共鸣值（0.5 = 女性参考均值，不是男女中线；实测男声 median ≈ 0.35–0.49）"
+								>
+									<span data-i18n="stats.modeResonance">共鸣</span>
+								</button>
+							</div>
+							<div
+								id="resonance-consonants-toggle"
+								class="resonance-consonants-toggle"
+								role="radiogroup"
+								data-i18n-aria-label="advice.resonance.consonants.aria_label"
+								aria-label="是否包含辅音"
+								hidden
 							>
-								<span data-i18n="stats.modePitch">音高</span>
-							</button>
-							<button
-								class="classify-mode-btn"
-								data-mode="resonance"
-								role="radio"
-								aria-checked="false"
-								data-i18n-title="stats.modeResonanceTip"
-								title="依每个音素的共鸣值（0.5 = 女性参考均值，不是男女中线；实测男声 median ≈ 0.35–0.49）"
-							>
-								<span data-i18n="stats.modeResonance">共鸣</span>
-							</button>
+								<button
+									type="button"
+									class="resonance-consonants-btn"
+									data-mode="vowels"
+									role="radio"
+									aria-checked="false"
+								>
+									<span data-i18n="advice.resonance.consonants.toggle_vowels_only">仅元音</span>
+								</button>
+								<button
+									type="button"
+									class="resonance-consonants-btn is-active"
+									data-mode="all"
+									role="radio"
+									aria-checked="true"
+								>
+									<span data-i18n="advice.resonance.consonants.toggle_all_phones">包含辅音</span>
+								</button>
+							</div>
 						</div>
 						<div class="stats-caption" data-i18n="stats.subtitle">仅人声片段（音乐 / 静音不计入）</div>
 						<div class="stats-grid">
@@ -774,43 +803,6 @@
 						<div id="resonance-all-vowels-section" class="resonance-all-vowels-section" hidden>
 							<div class="resonance-section-header">
 								<span class="resonance-section-title" data-i18n="advice.resonance.section_title_all">元音</span>
-								<div
-									id="resonance-consonants-toggle"
-									class="resonance-consonants-toggle"
-									role="radiogroup"
-									data-i18n-aria-label="advice.resonance.consonants.aria_label"
-									aria-label="是否包含辅音"
-								>
-									<button
-										type="button"
-										class="resonance-consonants-btn"
-										data-mode="vowels"
-										role="radio"
-										aria-checked="false"
-									>
-										<span data-i18n="advice.resonance.consonants.toggle_vowels_only">仅元音</span>
-									</button>
-									<button
-										type="button"
-										class="resonance-consonants-btn is-active"
-										data-mode="all"
-										role="radio"
-										aria-checked="true"
-									>
-										<span data-i18n="advice.resonance.consonants.toggle_all_phones">包含辅音</span>
-									</button>
-									<button
-										type="button"
-										id="resonance-consonants-info"
-										class="resonance-consonants-info"
-										data-i18n-title="advice.resonance.consonants.tooltip"
-										data-i18n-aria-label="advice.resonance.consonants.tooltip"
-										aria-label="辅音说明"
-										title="辅音（鼻音 /m n ŋ/、半元音 /j w/ 等）的共振峰也反映声道共振状态，但训练目标通常聚焦元音。"
-									>
-										ⓘ
-									</button>
-								</div>
 							</div>
 							<div id="resonance-all-vowels-list" class="resonance-all-vowels-list"></div>
 						</div>

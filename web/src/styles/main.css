@@ -1368,67 +1368,60 @@ body {
 	text-transform: uppercase;
 }
 
-/* Toggle: 仅元音 / 包含辅音.  Mirrors .classify-mode-switcher visually but
-   sized smaller — sits inline with the section title instead of as a
-   primary control. */
+/* Row hosting the classify-mode tabs (神经网络 / 音高 / 共鸣) and, when
+   resonance mode is active, the inline 仅元音 / 包含辅音 toggle on the right.
+   Same row so both segmented controls share the surface-bg active style and
+   read as one control bar. */
+.classify-controls-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+/* Toggle: 仅元音 / 包含辅音.  Visually identical to .classify-mode-btn so the
+   resonance sub-control reads as part of the same control bar as the
+   神经网络 / 音高 / 共鸣 tabs to its left. */
 .resonance-consonants-toggle {
 	display: inline-flex;
-	align-items: center;
-	gap: 2px;
-	padding: 2px;
-	background: var(--bg-elevated, var(--surface, transparent));
-	border: 1px solid var(--border-strong);
-	border-radius: 999px;
+	gap: 6px;
+}
+
+.resonance-consonants-toggle[hidden] {
+	display: none;
 }
 
 .resonance-consonants-btn {
-	background: transparent;
-	border: none;
-	padding: 3px 10px;
+	font: inherit;
 	font-size: 0.7rem;
+	font-weight: 500;
 	color: var(--text-muted);
-	border-radius: 999px;
+	background: transparent;
+	border: 0;
+	padding: 3px 9px;
+	border-radius: 6px;
 	cursor: pointer;
 	transition:
-		background 160ms ease,
-		color 160ms ease;
+		background-color 0.12s ease,
+		color 0.12s ease;
+	line-height: 1.3;
 	font-variant-numeric: tabular-nums;
 }
 
 .resonance-consonants-btn:hover:not(.is-active) {
 	color: var(--text-primary);
-	background: color-mix(in srgb, var(--text-secondary) 6%, transparent);
 }
 
 .resonance-consonants-btn.is-active {
-	background: var(--accent);
-	color: var(--accent-contrast, #fff);
+	background: var(--surface);
+	color: var(--text-primary);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .resonance-consonants-btn:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
-}
-
-.resonance-consonants-info {
-	background: transparent;
-	border: none;
-	padding: 0 2px;
-	margin-left: 2px;
-	font-size: 0.78rem;
-	color: var(--text-muted);
-	cursor: help;
-	line-height: 1;
-}
-
-.resonance-consonants-info:hover {
-	color: var(--text-primary);
-}
-
-.resonance-consonants-info:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
-	border-radius: 4px;
+	outline: 2px solid var(--accent, #7aa);
+	outline-offset: 1px;
 }
 
 .resonance-all-vowels-list {
