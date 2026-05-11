@@ -15,7 +15,7 @@ from voiceya.services.audio_analyser.audio_gate import audio_gate
 from voiceya.services.audio_analyser.audio_tools import normalize_audio_for_analysis
 from voiceya.services.audio_analyser.engine_a import do_segmentation
 from voiceya.services.audio_analyser.engine_c import run_engine_c
-from voiceya.services.audio_analyser.f0_panel import compute_f0_panel
+from voiceya.services.audio_analyser.f0_panel import compute_f0_panel, prefer_praat_median
 from voiceya.services.audio_analyser.seg_analyser import do_analyse_segments
 from voiceya.services.audio_analyser.statics import do_statics
 from voiceya.services.sse import ProgressSSE
@@ -121,6 +121,12 @@ async def do_analyse(
 
     duration_sec = float(len(y_full)) / float(sr_full) if sr_full else 0.0
     f0_panel = await asyncio.to_thread(compute_f0_panel, y_full, int(sr_full), duration_sec)
+
+    # Praat phone-midpoint median (sidecar) is the authoritative F0 source
+    # when Engine C ran — pyin remains the source for p25/p75/voiced_dur
+    # since Praat doesn't expose those, but median + zone get overridden.
+    if engine_c_summary:
+        prefer_praat_median(f0_panel, engine_c_summary.get("median_pitch_hz"))
 
     result = do_statics(analyse_results, f0_median_hz=f0_panel.get("median_hz"))
     summary = result["summary"]

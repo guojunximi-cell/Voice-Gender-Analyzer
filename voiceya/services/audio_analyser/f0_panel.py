@@ -52,6 +52,33 @@ def _classify_zone(f0_hz: float) -> str:
     return "high"
 
 
+def prefer_praat_median(panel: dict, praat_median_hz: float | None) -> dict:
+    """Override pyin median with Praat's phone-midpoint median when available.
+
+    Praat (sidecar `resonance.py:112`) samples F0 at each phone's midpoint
+    using Praat's autocorrelation pitch tracker (75-600 Hz default). Per
+    user feedback 2026-05-10, this is more reliable than pyin[60-250] —
+    pyin's narrow window protects against octave-doubling but exposes
+    octave-halving when fmin=60 picks up subharmonics on low-F0 speakers
+    (e.g. 128 Hz → 64 Hz). Praat phone-midpoint avoids that because it
+    only samples voiced phone centers (the silence/clicks pyin trips on
+    are never sampled).
+
+    p25/p75/voiced_duration_sec/reliability stay pyin-derived because
+    Praat doesn't expose per-frame distribution data — only the median.
+    range_zone_key is recomputed against the Praat median so the zone
+    label matches what the PITCH RANGE block displays.
+
+    Mutates and returns the panel dict.
+    """
+    if not praat_median_hz or praat_median_hz <= 0:
+        return panel
+    panel["median_hz"] = round(float(praat_median_hz), 1)
+    panel["median_source"] = "praat_phone_midpoint"
+    panel["range_zone_key"] = _classify_zone(float(praat_median_hz))
+    return panel
+
+
 def compute_f0_panel(y: np.ndarray, sr: int, recording_duration_sec: float) -> dict:
     """Compute the f0_panel dict for advice v2.
 
