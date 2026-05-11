@@ -366,6 +366,17 @@ export class PhoneTimeline {
 
 		this._legend = new GenderLegend();
 		this._legend.mount({ container: footerLegendEl });
+		// Mobile only: hoist the rendered .vga-gender-legend out of the
+		// timeline (whose containing block is panel-center, content-only
+		// ≈580px tall) up to `.app-layout` (page-tall) so `position: sticky`
+		// can pin the bar at top:56 across the entire page scroll instead of
+		// running out of travel as soon as panel-center scrolls past.
+		// Desktop keeps the legend in-timeline — sticky isn't useful there
+		// because panel-center already fits in one viewport.
+		this._mobileMq = matchMedia("(max-width: 780px)");
+		this._mobileMqHandler = () => this._reflowLegendForViewport(footerLegendEl);
+		this._mobileMq.addEventListener("change", this._mobileMqHandler);
+		this._reflowLegendForViewport(footerLegendEl);
 
 		// Bar-mode toggle (phone detail vs word aggregate).  Hosted inside the
 		// readout row, right-aligned next to the active-char readout pill —
@@ -514,6 +525,13 @@ export class PhoneTimeline {
 		this._resonanceBand?.destroy();
 		this._transcript?.destroy();
 		this._legend?.destroy();
+		this._hoistedLegend?.remove();
+		this._hoistedLegend = null;
+		if (this._mobileMq && this._mobileMqHandler) {
+			this._mobileMq.removeEventListener("change", this._mobileMqHandler);
+		}
+		this._mobileMq = null;
+		this._mobileMqHandler = null;
 		this._bus?.destroy();
 		this._sync = null;
 		this._pitchBand = null;
@@ -521,6 +539,33 @@ export class PhoneTimeline {
 		this._transcript = null;
 		this._legend = null;
 		this._bus = null;
+	}
+
+	/**
+	 * Move .vga-gender-legend between its in-timeline footer slot (desktop)
+	 * and a hoisted wrapper inside .app-layout (mobile). Called on init and
+	 * whenever the (max-width: 780px) media query flips.
+	 */
+	_reflowLegendForViewport(footerLegendEl) {
+		const isMobile = this._mobileMq?.matches;
+		const legendEl = this._hoistedLegend?.firstElementChild || footerLegendEl.firstElementChild;
+		if (!legendEl) return;
+		if (isMobile) {
+			if (this._hoistedLegend) return; // already hoisted
+			const appLayout = document.querySelector(".app-layout");
+			const panelCenter = appLayout?.querySelector(".panel-center");
+			if (!appLayout || !panelCenter) return;
+			const wrapper = document.createElement("div");
+			wrapper.className = "vga-timeline__footer-legend vga-timeline__footer-legend--hoisted";
+			wrapper.appendChild(legendEl);
+			panelCenter.insertAdjacentElement("afterend", wrapper);
+			this._hoistedLegend = wrapper;
+		} else {
+			if (!this._hoistedLegend) return; // already in-timeline
+			footerLegendEl.appendChild(legendEl);
+			this._hoistedLegend.remove();
+			this._hoistedLegend = null;
+		}
 	}
 
 	/**

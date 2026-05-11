@@ -1296,17 +1296,24 @@ body::-webkit-scrollbar {
 	color: var(--text-muted);
 	cursor: grab;
 	opacity: 0;
+	/* pointer-events:none keeps the invisible handle truly inert pre-arm —
+	   without this, gridstack would still pick up drags from the empty pixels
+	   where the handle sits, even at opacity 0. */
+	pointer-events: none;
 	transition: opacity var(--transition);
 	letter-spacing: -0.15em;
 }
 .block-drag-handle:active {
 	cursor: grabbing;
 }
-.block-card:hover .block-drag-handle,
+/* Direction indicators + edit affordances unlock only after the user
+   long-presses (0.8s) to enter edit mode — see armBlock in dashboard.js. */
+.grid-stack-item[data-edit-armed="true"] .block-drag-handle,
 .block-card:focus-within .block-drag-handle {
-	opacity: 0.55;
+	opacity: 0.7;
+	pointer-events: auto;
 }
-.block-card:hover .block-drag-handle:hover {
+.grid-stack-item[data-edit-armed="true"] .block-drag-handle:hover {
 	opacity: 1;
 	color: var(--text-secondary);
 }
@@ -1326,16 +1333,51 @@ body::-webkit-scrollbar {
 	line-height: 1;
 	cursor: pointer;
 	opacity: 0;
+	pointer-events: none;
 	transition: all var(--transition);
 }
-.block-card:hover .block-hide-btn,
+.grid-stack-item[data-edit-armed="true"] .block-hide-btn,
 .block-card:focus-within .block-hide-btn {
-	opacity: 0.55;
+	opacity: 0.7;
+	pointer-events: auto;
 }
 .block-hide-btn:hover {
 	opacity: 1;
 	background: var(--surface-hover);
 	color: var(--text-primary);
+}
+
+/* Collapse chevron — always visible (primary affordance, vs hover-only drag/hide). */
+.block-collapse-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	border-radius: 4px;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: all var(--transition);
+}
+.block-collapse-btn:hover {
+	background: var(--surface-hover);
+	color: var(--text-primary);
+}
+.block-collapse-btn svg {
+	transition: transform 0.2s ease;
+}
+.grid-stack-item[data-collapsed="true"] .block-collapse-btn svg {
+	transform: rotate(-180deg);
+}
+/* Collapsed: hide body, drop the header divider so the card reads as a clean strip. */
+.grid-stack-item[data-collapsed="true"] .block-body {
+	display: none;
+}
+.grid-stack-item[data-collapsed="true"] .block-header {
+	border-bottom: 0;
 }
 
 .block-body {
@@ -1380,17 +1422,53 @@ body::-webkit-scrollbar {
 	gap: 10px;
 }
 
-/* Gridstack resize handles: also hover-induced so they don't draw the eye
-   when the user isn't trying to rearrange. */
+/* Gridstack resize handles: also gated behind the long-press arm. Without
+   pointer-events:none they'd still grab pointer events from the corner pixels
+   even at opacity 0, letting the user resize before arming. */
 .grid-stack-item > .ui-resizable-handle {
 	opacity: 0;
+	pointer-events: none;
 	transition: opacity var(--transition);
 }
-.grid-stack-item:hover > .ui-resizable-handle {
-	opacity: 0.4;
+.grid-stack-item[data-edit-armed="true"] > .ui-resizable-handle {
+	opacity: 0.5;
+	pointer-events: auto;
 }
-.grid-stack-item > .ui-resizable-handle:hover {
-	opacity: 0.85;
+.grid-stack-item[data-edit-armed="true"] > .ui-resizable-handle:hover {
+	opacity: 0.9;
+}
+
+/* iOS-style "edit mode" jiggle — confirms to the user that the block is now
+   draggable/resizable. Wraps the inner card so the gridstack item itself
+   stays at clean integer positions for hit-testing. */
+@keyframes block-arm-jiggle {
+	0% {
+		transform: rotate(-0.55deg) translate(0, 0);
+	}
+	50% {
+		transform: rotate(0.55deg) translate(0, 0);
+	}
+	100% {
+		transform: rotate(-0.55deg) translate(0, 0);
+	}
+}
+.grid-stack-item[data-edit-armed="true"] > .grid-stack-item-content {
+	animation: block-arm-jiggle 0.45s ease-in-out infinite;
+	transform-origin: center center;
+}
+/* Pause the jiggle while the user is actively dragging or resizing — the
+   simultaneous motion would feel jittery. Gridstack tags the engaged item
+   with .ui-draggable-dragging / .ui-resizable-resizing. */
+.grid-stack-item.ui-draggable-dragging > .grid-stack-item-content,
+.grid-stack-item.ui-resizable-resizing > .grid-stack-item-content {
+	animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.grid-stack-item[data-edit-armed="true"] > .grid-stack-item-content {
+		animation: none;
+		outline: 2px dashed var(--accent, var(--text-secondary));
+		outline-offset: -2px;
+	}
 }
 
 /* While dragging, dim the placeholder + freeze hover effects so the visual
@@ -1758,7 +1836,12 @@ body::-webkit-scrollbar {
    item by dashboard.js's ResizeObserver). Wider blocks pack more columns so
    we don't need a scrollbar. */
 .grid-stack-item.block-w2 .resonance-all-vowels-list {
-	grid-template-columns: 1fr 1fr;
+	/* Each vowel row's min-content is ~240px (label 38 + bar 80 + pct 38 +
+	   n 38 + 3×10 gap + 2×8 padding). At block-w2 width (240-479px), 2 cols
+	   would force the grid to 480px and overflow horizontally — the right
+	   column gets clipped. Stay at 1 col until block-w3 (≥480px) where 2
+	   cols actually fit. */
+	grid-template-columns: 1fr;
 }
 .grid-stack-item.block-w3 .resonance-all-vowels-list {
 	/* Was 3 cols, but each vowel row needs ~280px (label + bar min + pct +
@@ -2468,6 +2551,44 @@ body::-webkit-scrollbar {
 	.panel-center {
 		grid-area: auto;
 		order: 1;
+		/* Sticky gender-legend below needs the body to be the scroll
+		   container — leaving panel-center as overflow:auto would pin the
+		   sticky element to this panel (which is content-sized and never
+		   scrolls), so the bar would never actually stay put. */
+		overflow-y: visible;
+		/* Drop flex on mobile: sticky on a flex item gets bound to the flex
+		   container's resolved height (which here is content-only ≈573px) and
+		   doesn't follow body scroll past the panel. Block layout lets sticky
+		   resolve against the body. */
+		display: block;
+	}
+	/* On mobile, dashboard blocks are full-width — even at 768px viewport the
+	   RESONANCE block lands in block-w4 bucket (≥720), packing 3 columns at
+	   ~240px each which overflows once you add padding/scrollbar. Force 1
+	   column regardless of bucket so vowel rows always fit. Same-specificity
+	   selector beats the bucket rules (above) by source order. */
+	.grid-stack-item.block-w2 .resonance-all-vowels-list,
+	.grid-stack-item.block-w3 .resonance-all-vowels-list,
+	.grid-stack-item.block-w4 .resonance-all-vowels-list {
+		grid-template-columns: 1fr;
+	}
+	/* Pin the gender-tendency gradient bar (Masculine/Androgynous/Feminine
+	   labels) to just below the header so users can scroll through the
+	   dashboard without losing track of where the voice landed. Mobile only —
+	   on desktop the bar already sits above an in-view dashboard.
+	   The legend is hoisted out of the timeline (phone-timeline.js) up to
+	   `.app-layout` so its sticky containing block is page-tall. */
+	.vga-timeline__footer-legend--hoisted {
+		position: sticky;
+		top: 56px;
+		z-index: 5;
+		background: var(--bg-glass);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		padding: 6px 20px 8px;
+		/* Match panel-center's order so it lands right after it and before
+		   panel-left in the mobile flex/grid order. */
+		order: 1;
 	}
 	.panel-left {
 		grid-area: auto;
@@ -2475,6 +2596,14 @@ body::-webkit-scrollbar {
 		height: auto;
 		border-right: none;
 		border-top: 1px solid var(--border);
+		/* Reset desktop's `position: fixed; top: 56px; left: 0; width: 240px`
+		   (added in 64b52fc to glue the panel to the viewport on desktop).
+		   Without this reset, mobile keeps the element out of normal flow,
+		   `order: 2` is ignored, and PAST SESSIONS floats over the player. */
+		position: static;
+		top: auto;
+		left: auto;
+		width: auto;
 	}
 	.panel-right {
 		grid-area: auto;
@@ -2900,7 +3029,10 @@ body::-webkit-scrollbar {
    ============================================================ */
 @media (max-width: 480px) {
 	.panel-center {
-		padding: 12px 12px 40px;
+		/* Bottom-padding kept tiny on phone — the next sibling on mobile is the
+		   hoisted gender-legend bar, so any extra padding here just inflates the
+		   gap between the timeline arrows and the bar. */
+		padding: 12px 12px 6px;
 	}
 	.upload-section {
 		padding: 12px;

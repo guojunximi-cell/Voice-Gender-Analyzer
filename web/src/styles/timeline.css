@@ -752,3 +752,20 @@
 		animation: none;
 	}
 }
+
+/* Mobile: trim the gap between the nav-row arrows and the (hoisted) gender
+   bar. Lives at the bottom so source order beats the base rules above. */
+@media (max-width: 780px) {
+	.vga-timeline {
+		min-height: 0;
+	}
+	#phone-timeline-root:not([hidden]) {
+		min-height: 0;
+	}
+	.vga-timeline__nav-row {
+		margin-top: 4px;
+	}
+	.vga-timeline__footer {
+		margin-top: 4px;
+	}
+}
