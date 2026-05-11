@@ -80,8 +80,8 @@ const DEFAULT_LAYOUT = (() => {
 })();
 
 // Mobile (<=780px) default — explicit single-column stack so gridstack's
-// oneColumn collapse can't reorder them. Order matches the user-approved
-// 2026-05-10 mobile screenshot: pitch → resonance → stats → formants.
+// oneColumn collapse can't reorder them. Order + heights captured from a
+// real user-tuned session 2026-05-10: pitch → resonance → stats → formants.
 // NN + advice stay hidden (available via "+加块" popover) just like desktop.
 const DEFAULT_LAYOUT_MOBILE = {
 	version: SCHEMA_VERSION,
@@ -89,8 +89,8 @@ const DEFAULT_LAYOUT_MOBILE = {
 	layout: [
 		{ id: "pitch", x: 0, y: 0, w: 12, h: 2 },
 		{ id: "resonance", x: 0, y: 2, w: 12, h: 8 },
-		{ id: "stats", x: 0, y: 10, w: 12, h: 6 },
-		{ id: "formants", x: 0, y: 16, w: 12, h: 2 },
+		{ id: "stats", x: 0, y: 10, w: 12, h: 5 },
+		{ id: "formants", x: 0, y: 15, w: 12, h: 3 },
 	],
 	hidden: ["nn", "advice"],
 };

@@ -1285,8 +1285,12 @@ body::-webkit-scrollbar {
 
 /* Drag handle: only fades in when block is hovered, so the body stays
    trivially clickable (collapsibles, mode switcher, toggles all native). */
+/* Drag handle is removed from layout entirely until the user long-presses
+   (0.8s) to enter edit mode — see armBlock in dashboard.js. Using display:none
+   instead of opacity:0 means the title can sit flush-left against the header
+   padding and the body stays trivially clickable. */
 .block-drag-handle {
-	display: inline-flex;
+	display: none;
 	align-items: center;
 	justify-content: center;
 	width: 16px;
@@ -1295,31 +1299,24 @@ body::-webkit-scrollbar {
 	line-height: 1;
 	color: var(--text-muted);
 	cursor: grab;
-	opacity: 0;
-	/* pointer-events:none keeps the invisible handle truly inert pre-arm —
-	   without this, gridstack would still pick up drags from the empty pixels
-	   where the handle sits, even at opacity 0. */
-	pointer-events: none;
-	transition: opacity var(--transition);
 	letter-spacing: -0.15em;
+	opacity: 0.7;
 }
 .block-drag-handle:active {
 	cursor: grabbing;
 }
-/* Direction indicators + edit affordances unlock only after the user
-   long-presses (0.8s) to enter edit mode — see armBlock in dashboard.js. */
-.grid-stack-item[data-edit-armed="true"] .block-drag-handle,
-.block-card:focus-within .block-drag-handle {
-	opacity: 0.7;
-	pointer-events: auto;
+.grid-stack-item[data-edit-armed="true"] .block-drag-handle {
+	display: inline-flex;
 }
 .grid-stack-item[data-edit-armed="true"] .block-drag-handle:hover {
 	opacity: 1;
 	color: var(--text-secondary);
 }
 
+/* Hide × button: out of layout until armed — same pattern as drag handle, so
+   the chevron sits flush against the right edge during normal reading. */
 .block-hide-btn {
-	display: inline-flex;
+	display: none;
 	align-items: center;
 	justify-content: center;
 	width: 18px;
@@ -1332,14 +1329,11 @@ body::-webkit-scrollbar {
 	font-size: 1.05rem;
 	line-height: 1;
 	cursor: pointer;
-	opacity: 0;
-	pointer-events: none;
-	transition: all var(--transition);
-}
-.grid-stack-item[data-edit-armed="true"] .block-hide-btn,
-.block-card:focus-within .block-hide-btn {
 	opacity: 0.7;
-	pointer-events: auto;
+	transition: background var(--transition), color var(--transition);
+}
+.grid-stack-item[data-edit-armed="true"] .block-hide-btn {
+	display: inline-flex;
 }
 .block-hide-btn:hover {
 	opacity: 1;
