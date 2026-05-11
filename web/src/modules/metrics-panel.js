@@ -10,6 +10,7 @@
  */
 
 import { certaintTag, fmt } from "../utils.js";
+import { setBlockHasContent } from "./dashboard.js";
 import { t } from "./i18n.js";
 import { clearResonancePanel } from "./resonance-panel.js";
 
@@ -58,20 +59,15 @@ function _weightedEngineA(analysis) {
 
 // ─── Public: render whole-file averages ──────────────────────
 export function renderMetricsPanel(summary, analysis) {
-	const empty = document.getElementById("metrics-empty");
-	const content = document.getElementById("metrics-content");
-	if (!empty || !content) return;
-
 	const ec = summary?.engine_c;
-	if (!ec || !ec.phones?.length) {
-		empty.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/><path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>${t("metrics.noEngineC")}</span>`;
-		empty.hidden = false;
-		content.hidden = true;
-		return;
-	}
-
-	empty.hidden = true;
-	content.hidden = false;
+	const hasEC = !!(ec && ec.phones?.length);
+	// Pitch + Formants are Engine C-derived (phone-mean F0, median formants).
+	setBlockHasContent("pitch", hasEC);
+	setBlockHasContent("formants", hasEC);
+	// NN block depends on the analysis array, not Engine C.
+	const hasNN = Array.isArray(analysis) && analysis.length > 0;
+	setBlockHasContent("nn", hasNN);
+	if (!hasEC) return;
 
 	// ── 对齐质量提示 ─────────────────────────────────────────
 	// phone_ratio < 0.8 / coverage < 0.3 时后端已标 low_quality，附上具体
@@ -181,13 +177,9 @@ export function renderMetricsPanel(summary, analysis) {
 }
 
 export function clearMetricsPanel() {
-	const empty = document.getElementById("metrics-empty");
-	const content = document.getElementById("metrics-content");
-	if (empty) {
-		empty.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/><path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>${t("metrics.emptyUpload")}</span>`;
-		empty.hidden = false;
-	}
-	if (content) content.hidden = true;
+	setBlockHasContent("pitch", false);
+	setBlockHasContent("formants", false);
+	setBlockHasContent("nn", false);
 	const warnEl = document.getElementById("mc-align-warning");
 	if (warnEl) warnEl.hidden = true;
 	clearAdvicePanel();
@@ -224,6 +216,7 @@ export function renderAdvicePanel(advice) {
 	if (!panel) return;
 	if (!advice) {
 		panel.hidden = true;
+		setBlockHasContent("advice", false);
 		return;
 	}
 
@@ -297,6 +290,7 @@ export function renderAdvicePanel(advice) {
 	}
 
 	panel.hidden = !any;
+	setBlockHasContent("advice", any);
 }
 
 export function clearAdvicePanel() {
@@ -307,4 +301,5 @@ export function clearAdvicePanel() {
 	_hide("advice-tone-caveat");
 	const warningsEl = document.getElementById("advice-warnings");
 	if (warningsEl) warningsEl.replaceChildren();
+	setBlockHasContent("advice", false);
 }

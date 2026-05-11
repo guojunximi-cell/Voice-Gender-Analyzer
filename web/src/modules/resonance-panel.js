@@ -18,6 +18,7 @@
  */
 
 import { getIncludeConsonants, onIncludeConsonantsChange, setIncludeConsonants } from "./consonants-toggle.js";
+import { setBlockHasContent } from "./dashboard.js";
 import { getLang, t } from "./i18n.js";
 import { RESONANCE_ZONES } from "./zones.js";
 
@@ -220,6 +221,7 @@ export function renderResonancePanel(panelData, context = {}) {
 	if (!root) return;
 	if (!panelData || !panelData.zone_key) {
 		root.hidden = true;
+		setBlockHasContent("resonance", false);
 		return;
 	}
 
@@ -286,6 +288,7 @@ export function renderResonancePanel(panelData, context = {}) {
 	}
 
 	root.hidden = false;
+	setBlockHasContent("resonance", true);
 	wireResonanceConsonantsToggle();
 
 	// History-compare async path retired 2026-05-04 — context arguments are
@@ -315,6 +318,7 @@ export function clearResonancePanel() {
 	_renderGeneration++;
 	const root = document.getElementById("resonance-panel");
 	if (root) root.hidden = true;
+	setBlockHasContent("resonance", false);
 	_hide("resonance-summary");
 	_hide("resonance-median-tag");
 	_hide("resonance-median-block");

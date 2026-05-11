@@ -1,5 +1,6 @@
 import { fmt } from "../utils.js";
 import { getMode } from "./classify-mode.js";
+import { setBlockHasContent } from "./dashboard.js";
 
 // ─── Animated counter ────────────────────────────────────────
 function animateCounter(el, target, suffix = "%", duration = 700) {
@@ -80,12 +81,14 @@ export function renderStats(analysis) {
 
 	const section = document.getElementById("stats-section");
 	if (section) section.hidden = false;
+	setBlockHasContent("stats", true);
 }
 
 // ─── Reset ────────────────────────────────────────────────────
 export function resetResults() {
 	const statsSection = document.getElementById("stats-section");
 	if (statsSection) statsSection.hidden = true;
+	setBlockHasContent("stats", false);
 
 	const ids = ["male-pct", "female-pct", "male-duration", "female-duration", "neutral-pct", "neutral-duration"];
 	ids.forEach((id) => {

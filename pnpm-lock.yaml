@@ -10,6 +10,9 @@ importers:
 
   web:
     dependencies:
+      gridstack:
+        specifier: ^11.5.1
+        version: 11.5.1
       uplot:
         specifier: ^1.6.32
         version: 1.6.32
@@ -528,6 +531,9 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  gridstack@11.5.1:
+    resolution: {integrity: sha512-qgbH65F6TtyKyi9t6fCkrxLhiobgYR3RBjnK0AzZl+YO7hreMVlsZ1MFbkPV0+7ZhjXdvcaRSZp3UA1yAJqYBQ==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -939,6 +945,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  gridstack@11.5.1: {}
 
   js-tokens@4.0.0: {}
 

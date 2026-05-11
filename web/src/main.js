@@ -4,6 +4,7 @@ import { readEmbeddedCreatedAt } from "./modules/audio-metadata.js";
 import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
 import { onIncludeConsonantsChange } from "./modules/consonants-toggle.js";
+import { getHiddenBlockIds, initDashboard, resetLayout, showBlock } from "./modules/dashboard.js";
 // disclosure UI disabled (使用前请先了解) — uncomment to restore the gate + header button.
 // import { mountDisclosureModal, showDisclosure } from "./modules/disclosure-modal.js";
 import {
@@ -1452,6 +1453,70 @@ onLangChange(() => {
 	scatterRedraw();
 });
 
+// ─── Acoustic dashboard wiring ────────────────────────────────
+// Init Gridstack on the right-panel container, then wire the panel-header
+// "+加块" popover and the reset button.
+function _initAcousticDashboard() {
+	const container = document.getElementById("acoustic-dashboard");
+	if (!container) return;
+	initDashboard(container);
+
+	const addBtn = document.getElementById("dashboard-add-block");
+	const resetBtn = document.getElementById("dashboard-reset");
+	const popover = document.getElementById("dashboard-popover");
+
+	function closePopover() {
+		if (popover) popover.classList.remove("is-open");
+		if (addBtn) addBtn.setAttribute("aria-expanded", "false");
+	}
+	function openPopover() {
+		if (!popover) return;
+		const hiddenIds = getHiddenBlockIds();
+		popover.replaceChildren();
+		if (hiddenIds.length === 0) {
+			const empty = document.createElement("div");
+			empty.className = "dashboard-popover-empty";
+			empty.textContent = t("dashboard.popoverEmpty");
+			popover.appendChild(empty);
+		} else {
+			for (const id of hiddenIds) {
+				const item = document.createElement("button");
+				item.type = "button";
+				item.className = "dashboard-popover-item";
+				item.dataset.blockId = id;
+				item.textContent = t(`dashboard.block.${id}`);
+				item.addEventListener("click", () => {
+					showBlock(id);
+					closePopover();
+				});
+				popover.appendChild(item);
+			}
+		}
+		popover.classList.add("is-open");
+		if (addBtn) addBtn.setAttribute("aria-expanded", "true");
+	}
+	const isOpen = () => popover?.classList.contains("is-open");
+
+	addBtn?.addEventListener("click", (e) => {
+		e.stopPropagation();
+		if (isOpen()) closePopover();
+		else openPopover();
+	});
+	// Click-outside / Esc to dismiss popover
+	document.addEventListener("click", (e) => {
+		if (!isOpen()) return;
+		if (popover.contains(e.target) || addBtn?.contains(e.target)) return;
+		closePopover();
+	});
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape" && isOpen()) closePopover();
+	});
+
+	resetBtn?.addEventListener("click", () => {
+		if (confirm(t("dashboard.resetLayout") + "?")) resetLayout();
+	});
+}
+
 // ─── Boot ─────────────────────────────────────────────────────
 initTheme();
 applyStaticDom();
@@ -1463,6 +1528,7 @@ _initClassifyModeSwitcher();
 _updateClassifyModeSwitcher();
 _initScatterModeSwitcher();
 _updateScatterModeSwitcher();
+_initAcousticDashboard();
 initScatterFromStorage();
 
 // disclosure UI disabled (使用前请先了解) — uncomment to restore the gate + header button.
