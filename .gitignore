@@ -50,3 +50,10 @@ docker-compose.override.yaml
 # Engine C sidecar local dev settings (Dockerfile generates this at build time;
 # baseline rebuild scripts also rely on a local copy pointing at miniconda mfa).
 voiceya/sidecars/visualizer-backend/settings.json
+
+# planning-with-files working memory (per-task, per-dev — not project artifact)
+task_plan.md
+findings.md
+progress.md
+.planning/
+.plan-attestation
