@@ -51,16 +51,16 @@ cp /path/to/gender-voice-visualization/cmudict.txt \
 
 ### Vendor patches（必须在 rsync 后手动 reapply）
 
-`acousticgender/library/*.py` 在 vendor 之上加了 voiceya 自己的法语分支
-（grep `voiceya patch` 可以找到全部锚点）。每次 rsync 升级 upstream 后，
-必须把以下 3 处 diff 重新打回：
+`acousticgender/library/*.py` 在 vendor 之上加了 voiceya 自己的法语 / 韩语
+分支（grep `voiceya patch` 可以找到全部锚点）。每次 rsync 升级 upstream 后，
+必须把以下 diff 重新打回：
 
 | 文件 | 行（升级前位置） | 改动 |
 |------|------------------|------|
-| `preprocessing.py` | L87 `mfa_model = ...` | 改成 3-way map：`{'zh':'mandarin_mfa','fr':'french_mfa'}.get(lang,'english_mfa')` |
-| `phones.py` | L25-44 `pronunciation_dict` 装载块 | 加 `elif lang == 'fr'` 分支，`french_mfa_dict.txt` UTF-8；`if lang == 'zh':` 解析判断扩成 `lang in ('zh', 'fr')`；`word_key` 的 upper 例外同步扩 fr |
+| `preprocessing.py` | L87 `mfa_model = ...` | 改成 4-way map：`{'zh':'mandarin_mfa','fr':'french_mfa','ko':'korean_mfa'}.get(lang,'english_mfa')` |
+| `phones.py` | L25-44 `pronunciation_dict` 装载块 | 加 `elif lang == 'fr'` / `elif lang == 'ko'` 分支，对应 `french_mfa_dict.txt` / `korean_mfa_dict.txt` UTF-8；`if lang == 'zh':` 解析判断扩成 `lang in ('zh', 'fr', 'ko')`；`word_key` 的 upper 例外同步扩 fr + ko |
 | `phones.py` | L17 `if line == "Phonemes:": ...` 之后 | 加 section-boundary 短路：识别任意以 `:` 结尾且不含 tab 的 header 视为新 section，把 `active_list` 置 None。`textgrid-formants.praat` 多 ceiling 版会追加 `Multi-Ceiling-Formants:` section，没这块兜底 phones.parse 会把多 ceiling 行也当 phoneme 解析→ IndexError |
-| `resonance.py` | L14-16 `ZH_VOWELS` 旁 / L43 `stats_file` / L66 `isVowel` | 加 `FR_VOWELS = {a,ɑ,e,ɛ,i,o,ɔ,u,y,ø,œ,ə,ɛ̃,ɑ̃,ɔ̃,œ̃}`；`stats_file` 改 3-way map；`isVowel` 加 `elif lang == 'fr'` 直查 FR_VOWELS |
+| `resonance.py` | `ZH_VOWELS` 旁 / `stats_file` / `isVowel` | 加 `FR_VOWELS = {a,ɑ,e,ɛ,i,o,ɔ,u,y,ø,œ,ə,ɛ̃,ɑ̃,ɔ̃,œ̃}` + `KO_VOWELS = {ɐ, e, eː, ɛ, ɛː, i, iː, o, oː, u, uː, ɨ, ɨː, ʌ, ʌː}`（7 base × 短/长 + ɐ，15 个 IPA label）；`stats_file` 改 4-way map；`isVowel` 加 `elif lang == 'fr'` + `elif lang == 'ko'` 直查对应 vowel set |
 | `textgrid-formants.praat` | 整脚本 | 单 ceiling 5000 Hz → 多 ceiling sweep（4500 / 5000 / 5500 / 6000 / 6500 Hz），原 `Phonemes:` section 保留以兼容老 wrapper（5000 Hz baseline），追加 `Multi-Ceiling-Formants:` section 给 `wrapper/ceiling_selector.py` 挑最优 ceiling 用。详见脚本头部注释 |
 
 `wrapper/ceiling_selector.py` 不属于 vendor — 它在 wrapper 层消费 `Multi-Ceiling-Formants:` section，按"同元音类内 F1/F2/F3 变异最小"挑 ceiling，重写 `Phonemes:` section 后给 `phones.parse` 喂回。`multichunk.process_from_wav` 与 `main.py` 单 chunk 路径都接进去了，输出多一个 `formant_ceiling_hz` 字段供 worker 透传。回归测试在 `tests/test_french_ceiling_selector.py`（含 4 男 + 4 女 fr CommonVoice fixture）。
@@ -73,6 +73,16 @@ cp /path/to/gender-voice-visualization/cmudict.txt \
 - `weights_fr.json`：抄 ZH v0.2.1 `[0.762, 0.236, 0.002]`，不单独训。EN `[0.732, 0.268, 0.0]` 与 ZH v0.2.1 在 spk-disjoint holdout 上验证过 F1+F2 主导的物理关系跨语言一致。重训必须 `--weights-spk-cv --weights-min-f2 0.20`（utt-level CV 会把 F2 砍掉、spk-CV 但 floor 太松又会偏向 F1-only，都是坑）。
 - `french_mfa_dict.txt`：`mfa model download dictionary french_mfa` 后从
   `~/Documents/MFA/pretrained_models/dictionary/` 拷出来。
+
+韩语资源（同样并列堆 `visualizer-backend/`）：
+- `stats_ko.json`：voiceya 自训 baseline，由 `scripts/train_stats_ko.py` 跑
+  Zeroth-Korean（OpenSLR SLR40，~51 hr，105 spk，CC BY 4.0，免 auth）的
+  ~10k 段产出。schema 与 `stats.json` / `stats_fr.json` 一致。
+- `weights_ko.json`：抄 ZH v0.2.1 `[0.762, 0.236, 0.002]`，不单独训
+  （同 fr 红线——utt-level CV 暴搜会把 F2 砍掉）。
+- `korean_mfa_dict.txt`：`mfa model download dictionary korean_mfa` 后从
+  `/opt/mfa_root/pretrained_models/dictionary/` 拷出来（21 009 条
+  Hangul → IPA 多概率前缀），Dockerfile 构建时自动 `find` + `cp` 到 /app/.
 
 ### 法语 baseline 训练（一次性，手动）
 
@@ -134,6 +144,88 @@ curl -F audio=@fr_sample.wav -F mode=script \
 
 断言：`summary.engine_c.language == "fr-FR"`，`phones[]` 非空，
 `alignment_confidence.low_quality == false`。
+
+### 韩语 baseline 训练（一次性，手动）
+
+`stats_ko.json` 也是 voiceya 自己训的。Dockerfile 已经把 `korean_mfa`
+声学模型 + 字典烤进镜像；缺 `stats_ko.json` 时 sidecar 不会把 `ko`
+放进 `/healthz` 的 `languages`，worker 请求 ko-KR 会 503 → `engine_c
+= null` 优雅降级。
+
+#### 数据集
+
+用 [Zeroth-Korean (OpenSLR SLR40)](https://www.openslr.org/40/)：
+51.6 hr / 105 speaker / `m`/`f` 性别标签 / CC BY 4.0 / 免 auth 直链 10 GB。
+
+```bash
+mkdir -p /mnt/d/project_vocieduck/ablation/audio/ko
+cd /mnt/d/project_vocieduck/ablation/audio/ko
+wget -c https://openslr.trmal.net/resources/40/zeroth_korean.tar.gz
+tar -xzf zeroth_korean.tar.gz
+```
+
+结构：
+- `AUDIO_INFO` — pipe-separated `SPEAKERID|NAME|SEX|SCRIPTID|DATASET`
+- `train_data_01/<script>/<spk>/<spk>_<script>.trans.txt` — utterance manifest
+- 同目录 `<spk>_<script>_<utt>.flac` — 16 kHz mono FLAC
+- 总 22 263 train + 457 test utterance，14k F / 8k M
+
+或者用 Common Voice ko v25（需要 click-through 下载，gender 列在
+`validated.tsv`），与 fr 同一套读取方式——`train_stats_ko.py
+--corpus-format cv` 走该路径。
+
+#### 训练流程
+
+```bash
+# 1) 起 sidecar（构建会下载 korean_mfa，首次约 +5 min、+500 MB）
+docker compose --profile engine-c up -d --build
+
+# 2) 挂语料进容器：docker-compose.override.yml 加 volumes:
+#    - /mnt/d/project_vocieduck/ablation/audio/ko:/mnt/ko-corpus:ro
+#    然后 docker compose up -d 重 recreate
+
+# 3) 把训练脚本 cp 进去
+docker cp scripts/train_stats_ko.py visualizer-backend:/tmp/
+
+# 4) 跑训练（10k 段，4 worker，~3-4 h CPU）
+docker exec -d voice-gender-analyzer-visualizer-backend-1 \
+    python /tmp/train_stats_ko.py \
+        --corpus-format zeroth \
+        --corpus /mnt/ko-corpus \
+        --out /app/stats_ko.json \
+        --n-segments 10000 \
+        --num-workers 4
+
+# 跟进度
+docker exec voice-gender-analyzer-visualizer-backend-1 tail -F /tmp/train_ko.log
+
+# 5) 拿出 stats_ko.json 提交到 vendor 目录、重新打镜像
+docker cp visualizer-backend:/app/stats_ko.json \
+          voiceya/sidecars/visualizer-backend/stats_ko.json
+docker compose --profile engine-c up -d --build
+```
+
+#### 冒烟测试
+
+```bash
+# 验证 sidecar 上线了 ko
+curl http://localhost:8001/healthz
+# 期望: {"ok": true, "languages": ["zh", "en", "fr", "ko"]}
+
+# 端到端：ko-KR 跟读模式（最稳，绕开 ASR）
+curl -F audio=@ko_sample.wav -F mode=script \
+     -F script="안녕하세요 만나서 반갑습니다" \
+     -F language=ko-KR \
+     http://localhost:8080/analyze-voice
+```
+
+断言：`summary.engine_c.language == "ko-KR"`，`phones[]` 非空，
+`alignment_confidence.low_quality == false`。
+
+**训完后还要做**：手动把 `wrapper/ceiling_selector.py:_ADAPTIVE_LANGS`
+加上 `"ko"`——`stats_ko.json` 已经按 5500 Hz Praat ceiling 训练完
+（同 fr / zh），adaptive ceiling 与 stats 校准一致。在那之前 ko 走
+legacy 5000 Hz path，避免 over-correction。
 
 ### 本地构建 & 冒烟测试
 
