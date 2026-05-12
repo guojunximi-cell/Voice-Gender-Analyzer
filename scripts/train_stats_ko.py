@@ -1,16 +1,32 @@
-"""Train stats_ko.json baseline for Engine C from Common Voice ko.
+"""Train stats_ko.json baseline for Engine C from a Korean speech corpus.
 
 Designed to run **inside the sidecar container** (where ffmpeg, sox, praat,
 MFA and the korean_mfa acoustic + dictionary are baked in).  Bypasses the
 HTTP ``/engine_c/analyze`` layer because before training stats_ko.json is
 empty and ``resonance.compute_resonance`` would crash on ``mean([])``.
 
-Usage (inside container):
+Supports two corpus formats:
+
+* ``--corpus-format zeroth`` — Zeroth-Korean (OpenSLR SLR40, ~51 hr,
+  105 speakers, CC BY 4.0).  Top-level ``AUDIO_INFO`` file maps
+  ``SPEAKERID|NAME|SEX|SCRIPTID|DATASET`` (``m`` / ``f`` gender labels).
+  Audio in ``{train,test}_data_01/<script>/<spk>/<spk>_<script>_<utt>.flac``;
+  transcripts in sibling ``<spk>_<script>.trans.txt`` (one utt per line,
+  space-separated ``utt_id sentence``).
+
+* ``--corpus-format cv`` — Common Voice ko v25 (requires click-through
+  download).  Reads ``validated.tsv`` with ``gender`` column filter on
+  ``male_masculine`` / ``female_feminine``.  Audio in ``clips/*.mp3``.
+
+Usage (inside container, Zeroth):
 
     docker compose --profile engine-c up -d --build
+    # Mount the corpus (host /mnt/d/.../ko → container /mnt/ko-corpus)
+    # via docker-compose.yml volumes: section
     docker compose cp scripts/train_stats_ko.py visualizer-backend:/tmp/
     docker compose exec visualizer-backend python /tmp/train_stats_ko.py \\
-        --corpus /mnt/cv-ko/cv-corpus-25.0-2026-XX-XX/ko \\
+        --corpus-format zeroth \\
+        --corpus /mnt/ko-corpus \\
         --out /app/stats_ko.json \\
         --n-segments 10000
 
@@ -20,18 +36,6 @@ voiceya/sidecars/visualizer-backend/stats_ko.json, rebuild image.
 Resumable: appends one JSONL row per phoneme observation to
 ``--checkpoint`` (default /tmp/train_ko_phones.jsonl).  Re-running with the
 same checkpoint skips any audio_path already seen and just re-aggregates.
-
-Corpus expectations
--------------------
-Common Voice ko v25 layout::
-
-    cv-corpus-25.0-XXXX/ko/
-        clips/             # *.mp3
-        validated.tsv      # client_id\\tpath\\tsentence\\t...\\tgender\\t...
-
-Filters: ``gender in {male_masculine, female_feminine}`` (CV v25 schema),
-duration 5-15 s (read by librosa to skip ffmpeg roundtrip), distinct
-client_id buckets so no single speaker dominates the per-phoneme stats.
 
 Korean ASR cleanup differs from fr: we keep ONLY Hangul precomposed
 syllables (U+AC00–U+D7A3) + whitespace.  Mirrors
@@ -139,11 +143,11 @@ def _sample_balanced(
 	return picked[:n_target]
 
 
-def _load_corpus_index(
+def _load_corpus_index_cv(
 	corpus_dir: Path,
 	max_scan_rows: int,
 ) -> list[dict]:
-	"""Read validated.tsv and return rows that pass schema + gender filters.
+	"""Read validated.tsv (Common Voice ko) and return filtered rows.
 
 	``max_scan_rows`` caps the scan so we don't read the entire TSV when we
 	only want 10k segments.  CV ko v25 has ~30k validated rows total — set
@@ -191,6 +195,96 @@ def _load_corpus_index(
 
 	logger.info("scanned %d rows; %d passed gender+path+sentence filter", scanned, len(rows))
 	return rows
+
+
+def _load_corpus_index_zeroth(corpus_dir: Path) -> list[dict]:
+	"""Walk Zeroth-Korean tree, join AUDIO_INFO speaker→gender, return rows.
+
+	Zeroth-Korean layout (OpenSLR SLR40)::
+
+	    AUDIO_INFO                        # SPEAKERID|NAME|SEX|SCRIPTID|DATASET
+	    train_data_01/<script>/<spk>/<spk>_<script>_<utt>.flac
+	    train_data_01/<script>/<spk>/<spk>_<script>.trans.txt    # utt_id<SP>sentence per line
+	    test_data_01/...                  # same structure, smaller
+
+	We include both train + test splits — this is a stats-only training pass
+	(no held-out evaluation), so the extra speakers in test_data_01 just
+	broaden the per-phoneme distribution.  Gender labels are ``m`` / ``f``
+	(no inclusive enum like CV's male_masculine — the corpus pre-dates that
+	convention).  Filter rejects rows whose speaker isn't gender-labeled.
+	"""
+	info_path = corpus_dir / "AUDIO_INFO"
+	if not info_path.exists():
+		raise FileNotFoundError(f"AUDIO_INFO not found at {info_path}")
+
+	# Parse AUDIO_INFO: pipe-separated, first row is header.
+	spk_gender: dict[str, str] = {}
+	with info_path.open(encoding="utf-8") as f:
+		for i, line in enumerate(f):
+			if i == 0 or not line.strip():
+				continue
+			cols = line.strip().split("|")
+			if len(cols) < 3:
+				continue
+			spk_id, _name, sex = cols[0].strip(), cols[1].strip(), cols[2].strip().lower()
+			if sex == "m":
+				spk_gender[spk_id] = "male"
+			elif sex == "f":
+				spk_gender[spk_id] = "female"
+
+	logger.info("AUDIO_INFO: %d gender-labeled speakers", len(spk_gender))
+
+	rows: list[dict] = []
+	# Walk train_data_01/ and test_data_01/ for .trans.txt files
+	for split in ("train_data_01", "test_data_01"):
+		split_dir = corpus_dir / split
+		if not split_dir.is_dir():
+			continue
+		for trans_file in split_dir.rglob("*.trans.txt"):
+			# trans file lives at <split>/<script>/<spk>/<spk>_<script>.trans.txt
+			spk_id = trans_file.parent.name
+			gender_short = spk_gender.get(spk_id)
+			if not gender_short:
+				continue
+			with trans_file.open(encoding="utf-8") as f:
+				for line in f:
+					line = line.strip()
+					if not line:
+						continue
+					# "utt_id<SP>sentence..."
+					parts = line.split(" ", 1)
+					if len(parts) != 2:
+						continue
+					utt_id, sentence = parts
+					sentence = sentence.strip()
+					if not sentence:
+						continue
+					audio_path = trans_file.parent / f"{utt_id}.flac"
+					if not audio_path.exists():
+						continue
+					rows.append({
+						"client_id": spk_id,
+						"audio_path": str(audio_path),
+						"sentence": sentence,
+						"gender_short": gender_short,
+					})
+
+	logger.info("Zeroth corpus: %d utterances from %d speakers (gender-labeled)",
+	            len(rows), len({r["client_id"] for r in rows}))
+	return rows
+
+
+def _load_corpus_index(
+	corpus_dir: Path,
+	max_scan_rows: int,
+	corpus_format: str,
+) -> list[dict]:
+	"""Dispatch to the right corpus reader based on --corpus-format."""
+	if corpus_format == "zeroth":
+		return _load_corpus_index_zeroth(corpus_dir)
+	if corpus_format == "cv":
+		return _load_corpus_index_cv(corpus_dir, max_scan_rows)
+	raise ValueError(f"unknown corpus_format: {corpus_format}")
 
 
 def _audio_duration_ok(path: str) -> bool:
@@ -332,8 +426,15 @@ def _aggregate_to_stats(checkpoint_path: Path, out_path: Path) -> None:
 
 
 def main() -> int:
-	parser = argparse.ArgumentParser(description="Train stats_ko.json from CV ko v25")
-	parser.add_argument("--corpus", required=True, type=Path, help="path to cv-corpus-25.0-XXX/ko/")
+	parser = argparse.ArgumentParser(description="Train stats_ko.json from Korean speech corpus")
+	parser.add_argument(
+		"--corpus-format", choices=["zeroth", "cv"], default="zeroth",
+		help="zeroth = OpenSLR SLR40 (Zeroth-Korean, gender-labeled, ~51 hr); "
+		"cv = Common Voice ko v25 (requires manual download)",
+	)
+	parser.add_argument("--corpus", required=True, type=Path,
+		help="corpus root: zeroth=dir with AUDIO_INFO + train/test_data_01/; "
+		"cv=cv-corpus-25.0-XXX/ko/")
 	parser.add_argument("--out", required=True, type=Path, help="output stats_ko.json path")
 	parser.add_argument(
 		"--checkpoint", default=Path("/tmp/train_ko_phones.jsonl"), type=Path,
@@ -364,7 +465,7 @@ def main() -> int:
 		_aggregate_to_stats(args.checkpoint, args.out)
 		return 0
 
-	rows = _load_corpus_index(args.corpus, args.max_scan_rows)
+	rows = _load_corpus_index(args.corpus, args.max_scan_rows, args.corpus_format)
 	picked = _sample_balanced(
 		rows,
 		args.n_segments,
