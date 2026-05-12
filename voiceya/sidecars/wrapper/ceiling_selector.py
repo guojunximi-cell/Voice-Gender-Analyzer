@@ -100,6 +100,21 @@ _ZH_VOWELS = {
     "ʐ̩",
     "z̩",
 }
+# voiceya patch (2026-05-12): Korean MFA v3 vowel nuclei.  Mirrors
+# acousticgender.library.resonance.KO_VOWELS — both lists must agree on the
+# 15 labels (7 base × short/long + ɐ).  Glides (j, w, ɰ, ɥ) excluded —
+# Korean diphthongs are emitted as glide+vowel sequences, not composite
+# labels.  Inventory verified against `mfa model inspect acoustic korean_mfa`.
+_KO_VOWELS = {
+    "ɐ",
+    "e", "eː",
+    "ɛ", "ɛː",
+    "i", "iː",
+    "o", "oː",
+    "u", "uː",
+    "ɨ", "ɨː",
+    "ʌ", "ʌː",
+}
 
 # Default when too few vowels qualify for a meaningful score (fr only — see
 # _ADAPTIVE_LANGS below).  5500 Hz is Praat's official recommendation for adult
@@ -144,6 +159,10 @@ def _is_vowel(phone: str | None, lang: str) -> bool:
         # Strip tone diacritics first — Mandarin phone labels carry them
         # (`i˥`, `a˧˨`), but ZH_VOWELS holds only the base nuclei.
         return _TONE_RE.sub("", phone) in _ZH_VOWELS
+    if lang == "ko":
+        # Direct IPA membership; Korean has no tone diacritics.  Short
+        # and long are separate phones in KO_VOWELS.
+        return phone in _KO_VOWELS
     return any(c in "AEIOUY" for c in phone)
 
 

@@ -116,21 +116,28 @@ _LANG_ALIASES: dict[str, str] = {
     "fr-fr": "fr",
     "fr_fr": "fr",
     "french": "fr",
+    "ko": "ko",
+    "ko-kr": "ko",
+    "ko_kr": "ko",
+    "korean": "ko",
 }
 _LANG_WEIGHTS_FILE: dict[str, str] = {
     "zh": "weights_zh.json",
     "en": "weights.json",
     "fr": "weights_fr.json",
+    "ko": "weights_ko.json",
 }
 _LANG_STATS_FILE: dict[str, str] = {
     "zh": "stats_zh.json",
     "en": "stats.json",
     "fr": "stats_fr.json",
+    "ko": "stats_ko.json",
 }
 _LANG_DICT_FILE: dict[str, str] = {
     "zh": "mandarin_dict.txt",
     "en": "cmudict.txt",
     "fr": "french_mfa_dict.txt",
+    "ko": "korean_mfa_dict.txt",
 }
 
 
@@ -156,7 +163,7 @@ def _lang_available(lang: str) -> bool:
     )
 
 
-_SUPPORTED_LANGS: list[str] = [lang for lang in ("zh", "en", "fr") if _lang_available(lang)]
+_SUPPORTED_LANGS: list[str] = [lang for lang in ("zh", "en", "fr", "ko") if _lang_available(lang)]
 _WEIGHTS_BY_LANG: dict[str, list[float]] = {lang: _load_weights(lang) for lang in _SUPPORTED_LANGS}
 if not _SUPPORTED_LANGS:
     logger.error(
@@ -193,11 +200,13 @@ _ACOUSTIC_NAME_BY_LANG: dict[str, str] = {
     "en": "english_us_arpa",
     "zh": "mandarin_mfa",
     "fr": "french_mfa",
+    "ko": "korean_mfa",
 }
 _DICT_NAME_BY_LANG: dict[str, str] = {
     "en": "english_us_arpa",
     "zh": "mandarin_china_mfa",
     "fr": "french_mfa",
+    "ko": "korean_mfa",
 }
 
 _PRELOADED_ALIGNERS: dict[str, PreloadedAligner] = {}

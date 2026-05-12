@@ -23,6 +23,23 @@ FR_VOWELS = {
 	'ɛ̃', 'ɑ̃', 'ɔ̃', 'œ̃',
 }
 
+# voiceya patch (2026-05-12): Korean MFA v3 vowel nuclei.  7 base monophthongs
+# × short/long, plus /ɐ/ (no long form in the v3 phone set).  15 labels total.
+# Semi-vowels (j, w, ɰ, ɥ) excluded — Korean diphthongs are emitted by MFA as
+# glide+vowel sequences (two phones), not composite labels.  Modern Seoul
+# collapse already applied upstream — no /ø/ (ㅚ → we) or /y/ (ㅟ → wi).
+# Inventory verified against `mfa model inspect acoustic korean_mfa` v3.
+KO_VOWELS = {
+	'ɐ',
+	'e', 'eː',
+	'ɛ', 'ɛː',
+	'i', 'iː',
+	'o', 'oː',
+	'u', 'uː',
+	'ɨ', 'ɨː',
+	'ʌ', 'ʌː',
+}
+
 def compute_resonance(data, weights=[2/5, 2/5, 1/5], lang='en'):
 	assert(abs(sum(weights) - 1) < .01)
 
@@ -48,8 +65,13 @@ def compute_resonance(data, weights=[2/5, 2/5, 1/5], lang='en'):
 				data['phones'][p]['outlier'] = True
 				data['phones'][p]['F'][i] = None
 		
-	# voiceya patch: fr added 2026-04-28.  See voiceya/sidecars/README.md.
-	stats_file = {'zh': 'stats_zh.json', 'fr': 'stats_fr.json'}.get(lang, 'stats.json')
+	# voiceya patch: fr added 2026-04-28, ko added 2026-05-12.
+	# See voiceya/sidecars/README.md "Vendor patches".
+	stats_file = {
+		'zh': 'stats_zh.json',
+		'fr': 'stats_fr.json',
+		'ko': 'stats_ko.json',
+	}.get(lang, 'stats.json')
 	with open(stats_file) as f:
 		stats = json.loads(f.read())
 
@@ -80,6 +102,11 @@ def compute_resonance(data, weights=[2/5, 2/5, 1/5], lang='en'):
 		elif lang == 'fr':
 			# voiceya patch (2026-04-28): direct IPA membership; no tone strip.
 			isVowel = currentPhone['phoneme'] in FR_VOWELS
+		elif lang == 'ko':
+			# voiceya patch (2026-05-12): direct IPA membership; no tone strip.
+			# Korean has phonemic length contrast — short and long are
+			# separate labels in KO_VOWELS so the set covers both.
+			isVowel = currentPhone['phoneme'] in KO_VOWELS
 		else:
 			isVowel = currentPhone['phoneme'] and len([
 				value for value in list(currentPhone['phoneme'])
