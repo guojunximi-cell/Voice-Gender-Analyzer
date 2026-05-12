@@ -6,7 +6,7 @@
 			(function () {
 				var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
 				document.documentElement.setAttribute("data-theme", t);
-				var SUPPORTED = ["zh-CN", "en-US", "fr-FR"];
+				var SUPPORTED = ["zh-CN", "en-US", "fr-FR", "ko-KR"];
 				var storedLang = localStorage.getItem("vga.lang");
 				var navLang = (navigator.language || "").toLowerCase();
 				var lang =
@@ -16,7 +16,9 @@
 							? "zh-CN"
 							: navLang.indexOf("fr") === 0
 								? "fr-FR"
-								: "en-US";
+								: navLang.indexOf("ko") === 0
+									? "ko-KR"
+									: "en-US";
 				document.documentElement.setAttribute("lang", lang);
 			})();
 		</script>
@@ -104,6 +106,15 @@
 								data-i18n="header.langName.fr"
 							>
 								Français
+							</button>
+							<button
+								type="button"
+								role="menuitem"
+								class="lang-menu-item"
+								data-lang="ko-KR"
+								data-i18n="header.langName.ko"
+							>
+								한국어
 							</button>
 						</div>
 					</div>

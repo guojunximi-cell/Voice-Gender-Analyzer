@@ -5,6 +5,8 @@
 //     覆盖全部英语元音与常见辅音组合，长度约 30-60 s，适合做 Engine C 对齐。
 // FR：公版文学 + IPA 经典朗读样本（La bise et le soleil），覆盖 12 oral
 //     元音 + 4 鼻元音（ɛ̃ ɑ̃ ɔ̃ œ̃）+ 前圆唇 (y ø œ)，朗读约 30-60 s。
+// KO：北风과 태양 (IPA Handbook 韩语样本) + 公版文学（윤동주 / 김유정 /
+//     주요섭），覆盖 7 单元音 × 短/长 + glide+vowel 二合，朗读约 30-60 s。
 
 // "自定义" 槽位用这个 id；不在 PRESET_* 列表里 —— 文本由用户输入，
 // main.js 在 dropdown 末尾单独追加这个选项。
@@ -79,6 +81,29 @@ export const PRESET_SCRIPTS_FR = [
 	},
 ];
 
+export const PRESET_SCRIPTS_KO = [
+	{
+		id: "bukpung-taeyang",
+		title: "북풍과 태양 (IPA Handbook)",
+		text: "북풍과 태양이 누가 더 힘이 센지 다투고 있을 때, 한 나그네가 따뜻한 외투를 입고 걸어왔습니다. 그래서 둘은 누구든 먼저 나그네의 외투를 벗기는 쪽이 더 세다고 하기로 했습니다. 그러자 북풍은 있는 힘껏 불었지만, 북풍이 거세게 불수록 나그네는 외투를 더 단단히 여몄습니다. 마침내 북풍은 포기했습니다. 이번에는 태양이 따뜻하게 비추기 시작했고, 나그네는 곧 외투를 벗어 버렸습니다. 그래서 북풍은 둘 중에 태양이 더 세다는 것을 인정할 수밖에 없었습니다.",
+	},
+	{
+		id: "yun-byeol",
+		title: "윤동주 · 별 헤는 밤",
+		text: "계절이 지나가는 하늘에는 가을로 가득 차 있습니다. 나는 아무 걱정도 없이 가을 속의 별들을 다 헤일 듯합니다. 가슴 속에 하나 둘 새겨지는 별을 이제 다 못 헤는 것은 쉬이 아침이 오는 까닭이요, 내일 밤이 남은 까닭이요, 아직 나의 청춘이 다하지 않은 까닭입니다. 별 하나에 추억과 별 하나에 사랑과 별 하나에 쓸쓸함과 별 하나에 동경과 별 하나에 시와 별 하나에 어머니, 어머니.",
+	},
+	{
+		id: "kim-spring",
+		title: "김유정 · 동백꽃",
+		text: "오늘도 또 우리 수탉이 막 쪼키었다. 내가 점심을 먹고 나무를 하러 갈 양으로 나올 때이었다. 산으로 올라서려니까 등 뒤에서 푸드덕푸드덕 하고 닭의 횃소리가 야단이다. 깜짝 놀라 고개를 돌려 보니 아니나다르랴, 두 놈이 또 얼이 빠져서 그 비탈 위에서 등을 잔뜩 일으키고 깃을 곤두세웠다. 동백꽃이 활짝 핀 노란 산기슭이었다.",
+	},
+	{
+		id: "joo-friend",
+		title: "주요섭 · 사랑손님과 어머니",
+		text: "나는 금년 여섯 살 난 처녀애입니다. 내 이름은 박옥희이고요. 우리 집 식구라고는 세상에서 제일 예쁜 우리 어머니와 단 두 식구뿐이랍니다. 아차 큰일 났군, 외삼촌을 빼놓을 뻔했으니. 가만 있자, 그러니까 우리 집 식구는 어머니, 외삼촌, 그러고 나, 이렇게 세 식구입니다. 우리 어머니는 어떻게 곱고 어여쁜지 모르는 사람이 없답니다.",
+	},
+];
+
 // Back-compat: old callers import PRESET_SCRIPTS directly. Keep it pointing at
 // the zh-CN list so anything not yet language-aware still behaves.
 export const PRESET_SCRIPTS = PRESET_SCRIPTS_ZH;
@@ -86,6 +111,7 @@ export const PRESET_SCRIPTS = PRESET_SCRIPTS_ZH;
 export function scriptsForLang(lang) {
 	if (lang === "en-US") return PRESET_SCRIPTS_EN;
 	if (lang === "fr-FR") return PRESET_SCRIPTS_FR;
+	if (lang === "ko-KR") return PRESET_SCRIPTS_KO;
 	return PRESET_SCRIPTS_ZH;
 }
 

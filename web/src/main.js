@@ -1384,6 +1384,7 @@ const _LANG_SHORT_KEY = {
 	"zh-CN": "header.langShort.zh",
 	"en-US": "header.langShort.en",
 	"fr-FR": "header.langShort.fr",
+	"ko-KR": "header.langShort.ko",
 };
 function _updateLangToggleLabel() {
 	const lbl = $("lang-toggle-label");
