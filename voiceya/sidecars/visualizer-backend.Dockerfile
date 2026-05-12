@@ -64,11 +64,14 @@ RUN micromamba run -n mfa mfa model download acoustic mandarin_mfa \
  && micromamba run -n mfa mfa model inspect acoustic french_mfa \
  && micromamba run -n mfa mfa model inspect acoustic korean_mfa
 
-# mandarin_mfa G2P/alignment implicit deps.
-# Versions pinned from the known-good build (2026-04-17).
+# mandarin_mfa + korean_mfa G2P/alignment implicit deps.
+# Versions pinned from the known-good build (2026-04-17; korean_mfa adds
+# 2026-05-12 — python-mecab-ko/jamo are MFA's check_language_tokenizer_
+# availability gate, raises ImportError on ko align without them).
 RUN micromamba run -n mfa pip install --no-cache-dir \
         "python-magic==0.4.27" \
         "spacy-pkuseg==1.0.1" "dragonmapper==0.3.0" "hanziconv==0.3.2" \
+        "python-mecab-ko==1.3.7" "python-mecab-ko-dic==2.1.1.post2" "jamo==0.4.1" \
         "fastapi==0.136.0" "uvicorn[standard]==0.44.0" "python-multipart==0.0.26"
 
 WORKDIR /app
