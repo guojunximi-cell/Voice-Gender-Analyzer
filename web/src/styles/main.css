@@ -41,6 +41,12 @@
 
 	--transition: 180ms ease;
 
+	/* Dashboard block-card chrome: slightly stronger border (between
+	   --border and --border-strong) + softer shadow than --shadow-sm
+	   so the border, not the lift, draws the card edge.  Tuned 2026-05-11. */
+	--block-card-border: rgba(0, 0, 0, 0.11);
+	--block-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
 	/* Safari fallbacks (color-mix not supported) */
 	--bg-glass: rgba(247, 246, 243, 0.8);
 	--accent-border: rgba(201, 100, 66, 0.3);
@@ -101,6 +107,9 @@
 	   deep enough to read on pure-dark OLED. */
 	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.25);
 	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+
+	--block-card-border: rgba(255, 255, 255, 0.12);
+	--block-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* ============================================================
@@ -1238,9 +1247,9 @@ body::-webkit-scrollbar {
 
 .grid-stack-item-content.block-card {
 	background: var(--surface);
-	border: 1px solid var(--border);
+	border: 1px solid var(--block-card-border);
 	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-sm);
+	box-shadow: var(--block-card-shadow);
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
@@ -1250,14 +1259,14 @@ body::-webkit-scrollbar {
 }
 .grid-stack-item:hover > .grid-stack-item-content.block-card {
 	border-color: var(--border-strong);
-	box-shadow: var(--shadow-md);
+	box-shadow: var(--shadow-sm);
 }
 
 .block-header {
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	padding: 4px 10px 4px 6px;
+	padding: 8px 12px;
 	border-bottom: 1px solid var(--border);
 	font-size: 0.68rem;
 	font-weight: 600;
@@ -1377,14 +1386,14 @@ body::-webkit-scrollbar {
 .block-body {
 	flex: 1;
 	min-height: 0;
-	padding: 6px 10px 8px;
+	padding: 10px 12px 12px;
 	/* hidden, not auto: when content is too tall, we expect ResizeObserver
 	   to add .block-w<N> classes that swap inner layout (see #2 in task_plan).
 	   A scrollbar would be the failure mode, not the feature. */
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 8px;
 }
 
 /* RESONANCE block: per-vowel list can have 12+ rows; let the body scroll
