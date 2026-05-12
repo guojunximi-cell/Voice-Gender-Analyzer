@@ -1,7 +1,7 @@
 /**
  * dashboard.js — Right-panel acoustic blocks.
  *
- * Blocks (pitch / formants / nn / resonance / stats / advice) live in
+ * Blocks (pitch / formants / nn / resonance / stats) live in
  * `index.html` as `.grid-stack-item[data-block-id="…"]`
  * templates. We wire them into a Gridstack v11 grid so the user can drag,
  * resize, hide, or re-add via the panel-header "+加块" popover. Drag handle
@@ -33,7 +33,8 @@ const STORAGE_KEY = "vga.acoustic.dashboard";
 // v6 = added viewportType branch (separate mobile default).
 // v7 = added collapsed map (per-block fold state).
 // v8 = desktop default redesigned (full-width pitch + resonance, 4-up bottom row).
-const SCHEMA_VERSION = 8;
+// v9 = advice block removed; bottom row reflows to stats(8) + formants(2) + nn(2).
+const SCHEMA_VERSION = 9;
 // Height to which a block shrinks when collapsed (1 cell ≈ 50px = header only).
 const COLLAPSED_H = 1;
 const MOBILE_BREAKPOINT = 780;
@@ -45,24 +46,23 @@ const MOBILE_BREAKPOINT = 780;
  * default layout, save/load all flow from this object.
  */
 // Desktop default (captured 2026-05-10 from a real user-tuned session, v4):
-// pitch + resonance go full-width on top, then a wide DISTRIBUTION + three
-// narrow blocks on the bottom row. All 6 blocks visible by default.
+// pitch + resonance go full-width on top, then DISTRIBUTION (stats) + two
+// narrow blocks on the bottom row. All 5 blocks visible by default.
 //   ┌────────────────────────────────────┐
 //   │  PITCH 12×2                        │ y=0..1
 //   ├────────────────────────────────────┤
 //   │  RESONANCE 12×8                    │ y=2..9
 //   │                                    │
-//   ├────────────────┬─────┬─────┬───────┤
-//   │   STATS        │FORM │ NN  │ADVICE │ y=10..14
-//   │   6×5          │ 2×5 │ 2×5 │ 2×5   │
-//   └────────────────┴─────┴─────┴───────┘
+//   ├────────────────────────┬─────┬─────┤
+//   │   STATS                │FORM │ NN  │ y=10..14
+//   │   8×5                  │ 2×5 │ 2×5 │
+//   └────────────────────────┴─────┴─────┘
 const BLOCK_REGISTRY = {
 	pitch: { defaultSize: { w: 12, h: 2 }, defaultLayout: { x: 0, y: 0 }, defaultVisible: true },
 	resonance: { defaultSize: { w: 12, h: 8 }, defaultLayout: { x: 0, y: 2 }, defaultVisible: true },
-	stats: { defaultSize: { w: 6, h: 5 }, defaultLayout: { x: 0, y: 10 }, defaultVisible: true },
-	formants: { defaultSize: { w: 2, h: 5 }, defaultLayout: { x: 6, y: 10 }, defaultVisible: true },
-	nn: { defaultSize: { w: 2, h: 5 }, defaultLayout: { x: 8, y: 10 }, defaultVisible: true },
-	advice: { defaultSize: { w: 2, h: 5 }, defaultLayout: { x: 10, y: 10 }, defaultVisible: true },
+	stats: { defaultSize: { w: 8, h: 5 }, defaultLayout: { x: 0, y: 10 }, defaultVisible: true },
+	formants: { defaultSize: { w: 2, h: 5 }, defaultLayout: { x: 8, y: 10 }, defaultVisible: true },
+	nn: { defaultSize: { w: 2, h: 5 }, defaultLayout: { x: 10, y: 10 }, defaultVisible: true },
 };
 export const ALL_BLOCK_IDS = Object.keys(BLOCK_REGISTRY);
 
@@ -82,7 +82,7 @@ const DEFAULT_LAYOUT = (() => {
 // Mobile (<=780px) default — explicit single-column stack so gridstack's
 // oneColumn collapse can't reorder them. Order + heights captured from a
 // real user-tuned session 2026-05-10: pitch → resonance → stats → formants.
-// NN + advice stay hidden (available via "+加块" popover) just like desktop.
+// NN stays hidden (available via "+加块" popover) just like desktop.
 const DEFAULT_LAYOUT_MOBILE = {
 	version: SCHEMA_VERSION,
 	viewportType: "mobile",
@@ -92,7 +92,7 @@ const DEFAULT_LAYOUT_MOBILE = {
 		{ id: "stats", x: 0, y: 10, w: 12, h: 5 },
 		{ id: "formants", x: 0, y: 15, w: 12, h: 3 },
 	],
-	hidden: ["nn", "advice"],
+	hidden: ["nn"],
 };
 
 function _viewportType() {

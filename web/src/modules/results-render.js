@@ -1,14 +1,14 @@
 // 把面板渲染抽出来：analyze 成功路径、历史还原、导入文件、切语言重渲染
 // 都共用这一组——避免漂移。
 //
-// 故意只管"不依赖波形 ready 的"那几步：stats / metrics / advice。
+// 故意只管"不依赖波形 ready 的"那几步：stats / metrics / resonance。
 // drawTimeline（依赖 wavesurfer.duration）和 _phoneTimeline.setData（依赖
 // 时间线生命周期）由调用方按各自时机处理。返回值 segs 方便调用方在波形
 // ready 后直接 drawTimeline(segs)。
 
 import { getMode } from "./classify-mode.js";
 import { classifyForMode } from "./classify.js";
-import { renderAdvicePanel, renderMetricsPanel } from "./metrics-panel.js";
+import { renderMetricsPanel } from "./metrics-panel.js";
 import { renderResonancePanel } from "./resonance-panel.js";
 import { renderStats } from "./results.js";
 
@@ -26,6 +26,5 @@ export function renderFromSummary({ summary, analysis, createdAt }) {
 	renderStats(segs);
 	renderMetricsPanel(summary, analysis);
 	renderResonancePanel(summary?.advice?.resonance_panel, { summary, createdAt });
-	renderAdvicePanel(summary?.advice);
 	return segs;
 }
