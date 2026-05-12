@@ -36,10 +36,17 @@ logger = logging.getLogger(__name__)
 _LOW_PHONE_RATIO_ZH = 0.8  # phones / hanzi
 _LOW_PHONE_RATIO_EN = 1.5  # phones / word token
 _LOW_PHONE_RATIO_FR = 1.5  # phones / word token — 起步同英文，跑通 baseline 后再调
+# 韩语每个 Hangul 音节 ≈ 2-3 phones（初声+中声+可选终声）；起步抄 en/fr，
+# calibration_v1 跑完后再调。Hangul 音节而非 eojeol（更接近 zh 数 hanzi 的语义）。
+_LOW_PHONE_RATIO_KO = 1.5  # phones / Hangul syllable
 # 对齐的音素区间 / 音频总时长；低于 30% 一般意味着用户只读了开头几秒就停了。
 _LOW_COVERAGE_THRESHOLD = 0.3
 # 匹配单个汉字（BMP 范围够用；扩展 A/B 区等生僻字几乎不会进日常脚本）。
 _HAN_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
+# \u5339\u914d Hangul \u97f3\u8282\u5757\uff08U+AC00\u2013U+D7A3\uff0c11 172 \u4e2a\u9884\u7ec4\u5408\u97f3\u8282\uff0c\u8986\u76d6\u73b0\u4ee3\u97e9\u6587 100%\uff09\u3002
+# \u4e0d\u5339\u914d Jamo\uff08U+1100\u2013U+11FF\uff09\u2014 \u73b0\u4ee3\u6b63\u5b57\u6cd5\u90fd\u7528\u9884\u7ec4\u5408\u5f62\u5f0f\uff0cJamo \u4e3b\u8981\u51fa\u73b0\u5728
+# \u53e4\u6587\u732e\u6216\u952e\u76d8\u8f93\u5165\u4e2d\u95f4\u6001\uff0cASR \u8f93\u51fa\u548c MFA \u5b57\u5178\u90fd\u4e0d\u4f1a\u7528\u3002
+_HANGUL_SYLL_RE = re.compile(r"[\uac00-\ud7a3]")
 
 # IPA tone diacritics (matches resonance.py / ceiling_selector.py).  Mandarin
 # phone labels carry them (i\u02e5\u02e9, a\u02e5\u02e5); strip before bucketing so per-vowel
@@ -89,6 +96,32 @@ _FR_VOWELS: frozenset[str] = frozenset(
         "\u0153\u0303",
     }
 )
+# Korean MFA v3 vowel nuclei \u2014 must mirror sidecar's resonance.KO_VOWELS and
+# ceiling_selector._KO_VOWELS.  7 base monophthongs \u00d7 short/long + \u0250 (no
+# long variant), 15 labels total.  Glides (j, w, \u0270, \u0265) excluded \u2014
+# Korean diphthongs emit as glide+vowel sequences.  Modern Seoul collapse
+# already applied upstream (no \u00f8 / y in the v3 phone set).  Length mark
+# is \u02d0 (\u02d0).  Inventory verified against
+# `mfa model inspect acoustic korean_mfa`.
+_KO_VOWELS: frozenset[str] = frozenset(
+    {
+        "\u0250",
+        "e",
+        "e\u02d0",
+        "\u025b",
+        "\u025b\u02d0",
+        "i",
+        "i\u02d0",
+        "o",
+        "o\u02d0",
+        "u",
+        "u\u02d0",
+        "\u0268",
+        "\u0268\u02d0",
+        "\u028c",
+        "\u028c\u02d0",
+    }
+)
 # ARPABET vowel base classes (cmudict / english_us_arpa).  The MFA sidecar
 # emits stress-digited variants like ``IY1`` / ``AH0`` / ``EH2`` \u2014 strip the
 # trailing 0/1/2 before set membership.  No tone diacritics; en is single
@@ -131,6 +164,8 @@ _LANG_SHORT: dict[str, str] = {
     "en": "en",
     "fr-FR": "fr",
     "fr": "fr",
+    "ko-KR": "ko",
+    "ko": "ko",
 }
 
 
@@ -201,6 +236,10 @@ async def run_engine_c(
                 from voiceya.services.audio_analyser.engine_c_asr_fr import (  # noqa: PLC0415
                     transcribe_fr,
                 )
+            elif lang_short == "ko":
+                from voiceya.services.audio_analyser.engine_c_asr_ko import (  # noqa: PLC0415
+                    transcribe_ko,
+                )
             else:
                 from voiceya.services.audio_analyser.engine_c_asr import (  # noqa: PLC0415
                     transcribe_zh,
@@ -214,6 +253,8 @@ async def run_engine_c(
                 transcript, word_timestamps = await transcribe_en(audio_bytes)
             elif lang_short == "fr":
                 transcript, word_timestamps = await transcribe_fr(audio_bytes)
+            elif lang_short == "ko":
+                transcript, word_timestamps = await transcribe_ko(audio_bytes)
             else:
                 transcript = await transcribe_zh(audio_bytes)
         except Exception as exc:  # defensive — _transcribe itself swallows errors
@@ -372,6 +413,12 @@ def _alignment_confidence(
     elif lang_short == "fr":
         token_count = len(transcript.split())
         low_ratio_threshold = _LOW_PHONE_RATIO_FR
+    elif lang_short == "ko":
+        # Hangul syllables (NOT eojeol/words) — semantics close to how zh
+        # counts hanzi.  ASR cleanup strips Latin / digits so transcript is
+        # syllable-only; .findall over the syllable block is exact.
+        token_count = len(_HANGUL_SYLL_RE.findall(transcript))
+        low_ratio_threshold = _LOW_PHONE_RATIO_KO
     else:
         token_count = len(_HAN_CHAR_RE.findall(transcript))
         low_ratio_threshold = _LOW_PHONE_RATIO_ZH
@@ -522,7 +569,7 @@ def _aggregate_per_vowel(
     regex is a no-op for them.  zh strips IPA tone diacritics — also a no-op
     for tone-less consonants.
     """
-    if not phones or lang_short not in ("zh", "fr", "en"):
+    if not phones or lang_short not in ("zh", "fr", "en", "ko"):
         return []
     if lang_short == "zh":
         vowel_set = _ZH_VOWELS
@@ -530,6 +577,12 @@ def _aggregate_per_vowel(
     elif lang_short == "fr":
         vowel_set = _FR_VOWELS
         normalize = lambda _r, p: p  # noqa: E731 — short identity for the dispatcher  # type: ignore[assignment]
+    elif lang_short == "ko":
+        # Korean MFA v3 emits phone labels in raw IPA — no tone marks, no
+        # stress digits, no normalisation needed.  Short/long are separate
+        # phones in KO_VOWELS, so they aggregate into separate buckets.
+        vowel_set = _KO_VOWELS
+        normalize = lambda _r, p: p  # noqa: E731 — short identity  # type: ignore[assignment]
     else:  # en
         vowel_set = _EN_VOWELS
         normalize = _ARPABET_STRESS_RE.sub  # type: ignore[assignment]

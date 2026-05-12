@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # tiny / base / small / medium / large-v3 都可，base 在 CPU 上 ~2× 实时。
     engine_c_whisper_model_fr: str = "base"
 
+    # ─── Engine C / 韩语 ASR (faster-whisper multilingual) ───────
+    # 只有 free + ko-KR 模式触达；同 fr 复用多语言检查点（pin language="ko"）。
+    # 韩语 WER 在 base 模型 ~10-15%，MFA Viterbi 容错足够；想更高精度可上 small。
+    engine_c_whisper_model_ko: str = "base"
+
 
 CFG: Settings = None  # type: ignore
 

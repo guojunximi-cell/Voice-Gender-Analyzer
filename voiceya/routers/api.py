@@ -53,7 +53,7 @@ __RATE_LIMITER = pl.Limiter(
 
 
 Mode = Literal["free", "script"]
-Language = Literal["zh-CN", "en-US", "fr-FR"]
+Language = Literal["zh-CN", "en-US", "fr-FR", "ko-KR"]
 
 
 @router.post(

@@ -61,7 +61,7 @@ async def analyse_voice(
     progress_tacker: Annotated[ProgressTracker, TaskiqDepends()],
     mode: Literal["free", "script"] = "free",
     script: str | None = None,
-    language: Literal["zh-CN", "en-US", "fr-FR"] = "zh-CN",
+    language: Literal["zh-CN", "en-US", "fr-FR", "ko-KR"] = "zh-CN",
 ):
     await progress_tacker.set_progress(TaskStage.STARTED)
     await dequeue(context.message.task_id)

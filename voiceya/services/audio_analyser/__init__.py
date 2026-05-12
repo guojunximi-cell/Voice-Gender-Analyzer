@@ -34,7 +34,7 @@ async def do_analyse(
     *,
     mode: Literal["free", "script"] = "free",
     script: str | None = None,
-    language: Literal["zh-CN", "en-US", "fr-FR"] = "zh-CN",
+    language: Literal["zh-CN", "en-US", "fr-FR", "ko-KR"] = "zh-CN",
 ):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     sample = await normalize_audio_for_analysis(content, publish)
