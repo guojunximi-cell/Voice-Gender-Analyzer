@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     max_audio_duration_sec: PositiveInt = 3 * 60
     rate_limit_ct: PositiveInt = 10
     rate_limit_duration_sec: PositiveInt = 60
+    # Dev-only bypass for file size / duration caps; the .env files in
+    # repo root + WSL dev environment set this true so unconstrained local
+    # smoke testing works.  Production deployments leave it false (or unset)
+    # so the rate-limit / size guards stay enforced.  Field exists primarily
+    # to absorb the .env entry — readers are added on a per-feature basis.
+    debug_no_limits: bool = False
 
     # ─── 并发控制 ──────────────────────────────────────────────────
     max_concurrent: PositiveInt = 2
