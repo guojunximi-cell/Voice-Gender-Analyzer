@@ -122,22 +122,36 @@ def _sample_balanced(
 			len(speakers_male), len(speakers_female), min_per_gender,
 		)
 
+	# Round-robin across genders.  Track exhaustion explicitly via index
+	# bumps — the iter()-based variant inherited from train_stats_fr.py
+	# infinite-loops once both pools exhaust (iter([]) is truthy, so the
+	# original `not any(pools)` break never fires when speakers run out
+	# before n_target is reached).  Zeroth-Korean's small speaker pool
+	# (~115) makes this a real concern; fr's 1000+ speakers hid the bug.
+	pool_male_idx = 0
+	pool_female_idx = 0
 	picked: list[dict] = []
-	pools = [iter(speakers_male), iter(speakers_female)]
-	pool_idx = 0
-	while len(picked) < n_target and (pools[0] or pools[1]):
-		key = next(pools[pool_idx], None)
-		if key is None:
-			pools[pool_idx] = iter([])
-			pool_idx = 1 - pool_idx
-			if not any(pools):
-				break
-			continue
+	use_male = True  # alternate
+	while len(picked) < n_target:
+		if use_male:
+			if pool_male_idx >= len(speakers_male):
+				if pool_female_idx >= len(speakers_female):
+					break
+				use_male = False
+				continue
+			key = speakers_male[pool_male_idx]
+			pool_male_idx += 1
+		else:
+			if pool_female_idx >= len(speakers_female):
+				if pool_male_idx >= len(speakers_male):
+					break
+				use_male = True
+				continue
+			key = speakers_female[pool_female_idx]
+			pool_female_idx += 1
 		segs = by_speaker[key][:max_per_speaker]
 		picked.extend(segs)
-		pool_idx = 1 - pool_idx
-		if len(picked) >= n_target:
-			break
+		use_male = not use_male
 
 	rng.shuffle(picked)
 	return picked[:n_target]
