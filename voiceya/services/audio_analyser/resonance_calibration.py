@@ -150,6 +150,16 @@ _ZONES_EN: tuple[tuple[str, float | None], ...] = (
     ("at_ceiling", None),
 )
 
+# ko: bootstrap (2026-05-12).  No own baseline yet — `stats_ko.json` and
+# its paired calibration_v1 run haven't landed.  Per
+# `feedback_reuse_existing_params.md`, new-language zone constants start
+# by reusing the closest sibling's values; refine only when calibration_v1
+# measures a drift > 0.02 on any percentile.  fr is the structurally
+# closest sibling (CV-based corpus, multilingual whisper ASR, adaptive
+# ceiling path) — alias avoids two separate sets of magic numbers drifting
+# independently before we have data.
+_ZONES_KO = _ZONES_FR
+
 
 def _zones_for_lang(lang: str) -> tuple[tuple[str, float | None], ...]:
     short = lang.split("-", 1)[0].lower()
@@ -157,6 +167,8 @@ def _zones_for_lang(lang: str) -> tuple[tuple[str, float | None], ...]:
         return _ZONES_FR
     if short == "en":
         return _ZONES_EN
+    if short == "ko":
+        return _ZONES_KO
     return _ZONES_ZH
 
 
