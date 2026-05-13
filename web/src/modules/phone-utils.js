@@ -165,19 +165,28 @@ function _durWeightedMean(phones, key, predicate = null) {
 	return w > 0 ? sum / w : null;
 }
 
-// CJK ideograph (BMP Unified + Extension A).  A "char" that is a single CJK
-// codepoint is a hanzi → weight 1 (one visual square, same as pre-weight
-// behaviour).  Anything else is treated as an English word → its letter count
-// clamped to [2, 10]: floor of 2 so "a"/"I" don't collapse to invisible, ceiling
-// of 10 so "antidisestablishmentarianism" can't consume half a page.
+// One visual square = weight 1.  Covers:
+//   - CJK Unified Ideographs (BMP 0x4E00-0x9FFF + Extension A 0x3400-0x4DBF) —
+//     Mandarin hanzi
+//   - Hangul Syllables (0xAC00-0xD7A3) — Korean precomposed syllables (modern
+//     orthography is precomposed-only; standalone Jamo is rare and not added)
+// Anything else falls through to the "English word" branch: letter count
+// clamped to [2, 10] — floor 2 so "a"/"I" don't collapse to invisible, ceiling
+// 10 so "antidisestablishmentarianism" can't consume half a page.
 function _cellWeight(ch) {
 	if (!ch) return 0;
-	// Spread to iterate code points (handles surrogate pairs even though CJK
-	// BMP doesn't need it — future-proof for extension ranges).
+	// Spread to iterate code points (handles surrogate pairs even though the
+	// ranges we check are all BMP — future-proof for extension ranges).
 	const cps = [...ch];
 	if (cps.length === 1) {
 		const cp = cps[0].codePointAt(0);
-		if ((cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0x3400 && cp <= 0x4dbf)) return 1;
+		if (
+			(cp >= 0x4e00 && cp <= 0x9fff) || // CJK Unified Ideographs
+			(cp >= 0x3400 && cp <= 0x4dbf) || // CJK Unified Ideographs Extension A
+			(cp >= 0xac00 && cp <= 0xd7a3) // Hangul Syllables
+		) {
+			return 1;
+		}
 	}
 	const letters = ch.match(/[A-Za-z]/g);
 	const n = letters ? letters.length : cps.length;

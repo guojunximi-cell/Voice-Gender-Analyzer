@@ -66,6 +66,16 @@ const _ZONE_TIERS = {
 		["leans_female", 0.96],
 		["at_ceiling", null],
 	],
+	// ko-KR aliases fr-FR until calibration_v1 measures Korean — matches
+	// backend `_ZONES_KO = _ZONES_FR` (resonance_calibration.py).  When the
+	// backend unaliases, copy the new values here in the same commit.
+	"ko-KR": [
+		["clearly_below_female", 0.43],
+		["leans_male", 0.547],
+		["mid_neutral", 0.752],
+		["leans_female", 0.96],
+		["at_ceiling", null],
+	],
 };
 
 function _zonesFor(lang) {

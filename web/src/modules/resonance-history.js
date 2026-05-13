@@ -40,6 +40,8 @@ const MIN_DECORATED_FOR_DIAGNOSIS = 4;
 
 // CJK Unified Ideographs (Basic) — covers all preset zh content.
 const _CJK_RE = /[一-鿿]/;
+// Hangul precomposed syllables — covers all preset ko content.
+const _HANGUL_RE = /[가-힣]/;
 
 export function tokenizeForMatch(text, language) {
 	if (!text) return [];
@@ -47,6 +49,15 @@ export function tokenizeForMatch(text, language) {
 	if (language === "zh-CN") {
 		const out = [];
 		for (const ch of norm) if (_CJK_RE.test(ch)) out.push(ch);
+		return out;
+	}
+	if (language === "ko-KR") {
+		// Korean uses per-syllable tokenization (1 Hangul block = 1 token) —
+		// matches how zh-CN tokenizes per-hanzi.  Word-level Jaccard over
+		// eojeol would over-penalise small particle variations (을/를/이/가),
+		// so syllable-level is more forgiving for fuzzy preset matching.
+		const out = [];
+		for (const ch of norm) if (_HANGUL_RE.test(ch)) out.push(ch);
 		return out;
 	}
 	// Letters + digits + apostrophe (don't, l'air); everything else → space.
@@ -107,7 +118,7 @@ function _findBestPreset(tokens, language) {
  *
  * Returns:
  *   {
- *     language: "zh-CN" | "en-US" | "fr-FR" | null,
+ *     language: "zh-CN" | "en-US" | "fr-FR" | "ko-KR" | null,
  *     script_id: preset id | "custom" | null,
  *     spoken_text_norm: trimmed lowercase text (debug / future regex),
  *     spoken_text_tokens: pre-tokenized array for fast Jaccard at match time,

@@ -47,13 +47,15 @@ function base64ToBlob(b64, mime) {
 
 /**
  * 从 transcript / script / filename 推一个文件名词缀。
- * 中文按字符取前 2，英文按空白切前 2 词，其它字符过滤掉。
+ * 中文 / 韩文按字符取前 2，英文按空白切前 2 词，其它字符过滤掉。
  */
 export function deriveFileBasename({ summary, filename } = {}) {
 	const text = summary?.engine_c?.transcript || summary?.engine_c?.script || filename || "";
 	if (text) {
-		const cjk = text.match(/[一-鿿㐀-䶿]/g);
-		if (cjk && cjk.length >= 1) return cjk.slice(0, 2).join("");
+		// CJK ideographs (hanzi) + Hangul precomposed syllables: one-glyph =
+		// one semantic unit, just take the first 2.
+		const square = text.match(/[一-鿿㐀-䶿가-힣]/g);
+		if (square && square.length >= 1) return square.slice(0, 2).join("");
 		const tokens = text
 			.replace(/\.[a-zA-Z0-9]{1,8}$/, "")
 			.split(/[\s\-_]+/)

@@ -25,10 +25,14 @@ const PITCH_NEUTRAL_HALF = (PITCH_ZONES_HZ.female - PITCH_ZONES_HZ.male) / 2; //
 
 // Mirror voiceya/services/audio_analyser/resonance_calibration.py classify_zone:
 //   0..p25 = cis-male, p25..p75 = androgynous (mid_neutral), p75..1 = cis-female.
+// ko-KR aliases fr-FR until calibration_v1 measures Korean — matches the
+// backend `_ZONES_KO = _ZONES_FR` line in resonance_calibration.py.  Update
+// here AND backend in lockstep when calibration_v1 unaliases ko.
 export const RESONANCE_ZONES = {
 	"zh-CN": { p25: 0.612, p75: 0.842 },
 	"en-US": { p25: 0.458, p75: 0.682 },
 	"fr-FR": { p25: 0.547, p75: 0.752 },
+	"ko-KR": { p25: 0.547, p75: 0.752 },
 };
 
 export function pitchZone(hz) {
