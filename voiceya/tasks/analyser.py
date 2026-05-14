@@ -61,15 +61,16 @@ async def analyse_voice(
     progress_tacker: Annotated[ProgressTracker, TaskiqDepends()],
     mode: Literal["free", "script"] = "free",
     script: str | None = None,
-    language: Literal["zh-CN", "en-US", "fr-FR"] = "zh-CN",
+    language: Literal["zh-CN", "en-US", "fr-FR", "ko-KR"] = "zh-CN",
 ):
     await progress_tacker.set_progress(TaskStage.STARTED)
     await dequeue(context.message.task_id)
-    logger.info(
-        "worker 收到 %d 字节，mode=%s，language=%s，头 16: %r",
+    # INFO 不带任何文件指纹：字节数、文件头 magic 都是用户音频识别信息，
+    # mode/language 是低基数路由标签，留给生产日志辨别管线分支。
+    logger.info("worker 收到任务 mode=%s language=%s", mode, language)
+    logger.debug(
+        "worker 收到 %d 字节，头 16: %r",
         len(content),
-        mode,
-        language,
         content[:16],
     )
 

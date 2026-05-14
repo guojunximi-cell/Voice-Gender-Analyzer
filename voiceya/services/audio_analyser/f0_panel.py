@@ -1,9 +1,10 @@
 """Advice v2: file-level F0 measurement (pyin[60-250]).
 
-Used by advice_v2.compute_advice. Separate from acoustic_analyzer._extract_f0
-because it intentionally narrows pyin range to avoid octave-doubling on
-low-F0 speakers (verified by tests/stress_f0_window.py): pyin[60-1047] gives
-~316 Hz on a 176 Hz cis male; pyin[60-250] gives the correct 172 Hz.
+Used by advice_v2.compute_advice and (since Engine B was decommissioned
+2026-04-07) also by do_statics for summary.overall_f0_median_hz. The
+narrowed pyin range avoids octave-doubling on low-F0 speakers (verified by
+tests/stress_f0_window.py): pyin[60-1047] gives ~316 Hz on a 176 Hz cis
+male; pyin[60-250] gives the correct 172 Hz.
 
 Voicing is gated by pyin's own `voiced_flag` (viterbi-smoothed). An earlier
 revision layered `voiced_prob > 0.5` on top, but that only retained the
@@ -49,6 +50,33 @@ def _classify_zone(f0_hz: float) -> str:
     if f0_hz < ZONE_MID_UPPER_HI:
         return "mid_upper"
     return "high"
+
+
+def prefer_praat_median(panel: dict, praat_median_hz: float | None) -> dict:
+    """Override pyin median with Praat's phone-midpoint median when available.
+
+    Praat (sidecar `resonance.py:112`) samples F0 at each phone's midpoint
+    using Praat's autocorrelation pitch tracker (75-600 Hz default). Per
+    user feedback 2026-05-10, this is more reliable than pyin[60-250] —
+    pyin's narrow window protects against octave-doubling but exposes
+    octave-halving when fmin=60 picks up subharmonics on low-F0 speakers
+    (e.g. 128 Hz → 64 Hz). Praat phone-midpoint avoids that because it
+    only samples voiced phone centers (the silence/clicks pyin trips on
+    are never sampled).
+
+    p25/p75/voiced_duration_sec/reliability stay pyin-derived because
+    Praat doesn't expose per-frame distribution data — only the median.
+    range_zone_key is recomputed against the Praat median so the zone
+    label matches what the PITCH RANGE block displays.
+
+    Mutates and returns the panel dict.
+    """
+    if not praat_median_hz or praat_median_hz <= 0:
+        return panel
+    panel["median_hz"] = round(float(praat_median_hz), 1)
+    panel["median_source"] = "praat_phone_midpoint"
+    panel["range_zone_key"] = _classify_zone(float(praat_median_hz))
+    return panel
 
 
 def compute_f0_panel(y: np.ndarray, sr: int, recording_duration_sec: float) -> dict:

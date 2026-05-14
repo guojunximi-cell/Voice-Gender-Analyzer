@@ -115,7 +115,8 @@ def _transcribe_sync(audio_bytes: bytes) -> str:
     if "<unk>" in cleaned:
         before_count = cleaned.count("<unk>")
         cleaned = cleaned.replace("<unk>", "")
-        logger.info("FunASR: stripped %d <unk> tokens", before_count)
+        # <unk> 计数是用户转写内容的衍生指纹，下放 DEBUG。
+        logger.debug("FunASR: stripped %d <unk> tokens", before_count)
     return cleaned
 
 
@@ -131,7 +132,9 @@ async def transcribe_zh(audio_bytes: bytes) -> str:
     key = hashlib.sha256(audio_bytes).hexdigest()
     cached = _cache_get(key)
     if cached is not None:
-        logger.info("FunASR cache hit (%d chars)", len(cached))
+        # 命中是结构事件可保留 INFO；字符数是用户转写长度，移到 DEBUG。
+        logger.info("FunASR cache hit")
+        logger.debug("FunASR cache hit (%d chars)", len(cached))
         return cached
 
     try:

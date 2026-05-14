@@ -15,6 +15,7 @@ from voiceya.services.audio_analyser.audio_gate import audio_gate
 from voiceya.services.audio_analyser.audio_tools import normalize_audio_for_analysis
 from voiceya.services.audio_analyser.engine_a import do_segmentation
 from voiceya.services.audio_analyser.engine_c import run_engine_c
+from voiceya.services.audio_analyser.f0_panel import compute_f0_panel, prefer_praat_median
 from voiceya.services.audio_analyser.seg_analyser import do_analyse_segments
 from voiceya.services.audio_analyser.statics import do_statics
 from voiceya.services.sse import ProgressSSE
@@ -33,14 +34,14 @@ async def do_analyse(
     *,
     mode: Literal["free", "script"] = "free",
     script: str | None = None,
-    language: Literal["zh-CN", "en-US", "fr-FR"] = "zh-CN",
+    language: Literal["zh-CN", "en-US", "fr-FR", "ko-KR"] = "zh-CN",
 ):
     """Async generator: yields SSE event strings with real progress, last event has type='result'."""
     sample = await normalize_audio_for_analysis(content, publish)
 
     # ── 提前 load + Tier-1 闸门 ───────────────────────────
     # 闸门挡在 Engine A 之前，纯噪声/静音/削波样本直接拒，省 5–30s 的 VAD 时间。
-    # y_full / sr_full 顺手传给 Engine B，避免下游再 load 一次。
+    # y_full / sr_full 顺手传给下游 (pyin) 避免再 load 一次。
     try:
         y_full, sr_full = await asyncio.to_thread(librosa.load, sample, sr=None, mono=True)
     except Exception as e:
@@ -51,7 +52,11 @@ async def do_analyse(
     violations = audio_gate(y_full.astype(np.float32), int(sr_full))
     if violations:
         reasons = "; ".join(v["message"] for v in violations)
-        logger.warning("音频闸门拒绝：%s", reasons)
+        # 警告日志只暴露分类（i18n_key + metric 名），具体测量值（dBFS / clipping_ratio /
+        # voiced_ratio）下放到 DEBUG —— 这些数值是用户音频质量指纹，不进生产日志。
+        keys = ",".join(v.get("i18n_key") or v.get("metric") or "?" for v in violations)
+        logger.warning("音频闸门拒绝 (%d 项): %s", len(violations), keys)
+        logger.debug("音频闸门拒绝详情：%s", reasons)
         raise HTTPException(
             status_code=400,
             detail=json.dumps(
@@ -68,6 +73,9 @@ async def do_analyse(
     sample.seek(0)
 
     # ── Engine A: 时间分段 ─────────────────────────────────
+    # pct 分配按 scripts/profile_pipeline.py 实测时间份额校准。Engine B 下线后
+    # 中段没有持续输出的工作，pct 直接从 A 跳到 C/tail，前端 interp 负责过渡。
+    # 配比：with EC → A 40% / C 38% / tail 12%；no EC → A 75% / tail 15%.
     logger.info("Engine A 分析中…")
     await publish(
         ProgressSSE(
@@ -79,17 +87,9 @@ async def do_analyse(
 
     segmentation_results = await do_segmentation(sample)
 
-    # ── Engine B: 声学分析（仅对有声语音段）────────────
-    await publish(
-        ProgressSSE(pct=50, msg="鸭鸭听完了！正在整理笔记…", msg_key="progress.organizing")
-    )
-
-    # 开 Engine C 时给"开小灶"阶段留一大段进度预算（72→94）——它是最慢的一环，
-    # 进度太靠右会让用户以为马上就好，其实还要等 ASR + MFA + Praat 跑完。
-    seg_end_pct = 70 if CFG.engine_c_enabled else 95
-    analyse_results = await do_analyse_segments(
-        y_full, int(sr_full), segmentation_results, publish, end_pct=seg_end_pct
-    )
+    # do_analyse_segments 现在只是把 ina 元组转 pydantic 模型，<1ms；不再发
+    # progress，因为没什么可观察的工作量。
+    analyse_results = await do_analyse_segments(y_full, int(sr_full), segmentation_results, publish)
 
     # ── Engine C: 进阶分析（feature-flagged，默认关）────────
     engine_c_summary = None
@@ -101,21 +101,37 @@ async def do_analyse(
         else:
             msg = "鸭鸭开小灶做进阶分析…"
             msg_key = "progress.engineCFree"
-        await publish(ProgressSSE(pct=72, msg=msg, msg_key=msg_key))
+        await publish(ProgressSSE(pct=50, msg=msg, msg_key=msg_key))
         sample.seek(0)
         audio_bytes = sample.read()
         engine_c_summary = await run_engine_c(
             audio_bytes, analyse_results, mode=mode, script=script, language=language
         )
+        almost_done_pct = 92
+    else:
+        almost_done_pct = 85
 
-    # ── 全局汇总统计 ───────────────────────────────────────
-    await publish(ProgressSSE(pct=98, msg="鸭鸭快好了…", msg_key="progress.almostDone"))
+    # ── 全局汇总统计：pyin + statics + advice ──────────────
+    # pyin (compute_f0_panel) 是 tail 里最重的一块（30–60s 音频上 0.5–2s）。
+    # 算一次后塞给 do_statics 当 overall_f0_median_hz，再传给 compute_advice
+    # 当 f0_panel——避免在 advice 里重复跑一次 pyin。
+    await publish(
+        ProgressSSE(pct=almost_done_pct, msg="鸭鸭快好了…", msg_key="progress.almostDone")
+    )
 
-    result = do_statics(analyse_results)
+    duration_sec = float(len(y_full)) / float(sr_full) if sr_full else 0.0
+    f0_panel = await asyncio.to_thread(compute_f0_panel, y_full, int(sr_full), duration_sec)
+
+    # Praat phone-midpoint median (sidecar) is the authoritative F0 source
+    # when Engine C ran — pyin remains the source for p25/p75/voiced_dur
+    # since Praat doesn't expose those, but median + zone get overridden.
+    if engine_c_summary:
+        prefer_praat_median(f0_panel, engine_c_summary.get("median_pitch_hz"))
+
+    result = do_statics(analyse_results, f0_median_hz=f0_panel.get("median_hz"))
     summary = result["summary"]
     summary["engine_c"] = engine_c_summary
 
-    duration_sec = float(len(y_full)) / float(sr_full) if sr_full else 0.0
     summary["advice"] = compute_advice(
         y_full,
         int(sr_full),
@@ -123,15 +139,19 @@ async def do_analyse(
         duration_sec,
         summary.get("dominant_label"),
         weighted_margin=summary.get("dominant_confidence", 0.0),
+        f0_panel=f0_panel,
+        engine_c=engine_c_summary,
     )
 
-    logger.info(
-        "分析完成 — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.3f，Engine C=%s，advice tier=%s",
+    # INFO 日志只记录结构事件（任务完成 + Engine C 是否参与），不带任何用户测量值；
+    # F0 / gender_score / female_ratio / advice tier 都是用户解析结果，下放到 DEBUG。
+    logger.info("分析完成 (Engine C=%s)", "on" if engine_c_summary else "off/skip")
+    logger.debug(
+        "分析完成详情 — %d 段，F0=%s Hz，性别评分=%s，女性占比=%.3f，advice tier=%s",
         len(analyse_results),
         summary["overall_f0_median_hz"],
         summary["overall_gender_score"],
         summary["female_ratio"],
-        "on" if engine_c_summary else "off/skip",
         summary["advice"]["gating_tier"],
     )
 

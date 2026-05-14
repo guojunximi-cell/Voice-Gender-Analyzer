@@ -39,33 +39,92 @@ def test_classify_zone_boundary_zh():
 def test_classify_zone_lang_aliases():
     # BCP-47 ↔ short codes both routed.  zh has its own anchored table
     # (Phase B / 2026-05-01 baseline); fr has its own anchored table
-    # (audit_resonance_fr.py / 2026-05-01 baseline); en still inherits zh.
+    # (audit_resonance_fr.py / 2026-05-01 baseline); en got its own table
+    # 2026-05-05 (LibriSpeech audit) — no longer aliases zh; ko bootstrap-
+    # aliases to fr (2026-05-12) until calibration_v1 ko data lands.
     for lang in ("zh-CN", "zh", "Zh-CN", "ZH"):
         assert resonance_calibration.classify_zone(0.7, lang) == "mid_neutral"
     for lang in ("fr-FR", "fr"):
         assert resonance_calibration.classify_zone(0.7, lang) == "mid_neutral"
     for lang in ("en-US", "en"):
         assert resonance_calibration.classify_zone(0.7, lang) == "mid_neutral"
+    for lang in ("ko-KR", "ko"):
+        assert resonance_calibration.classify_zone(0.7, lang) == "mid_neutral"
     # Unknown lang falls back to zh defaults — fail-safe for new locales.
     assert resonance_calibration.classify_zone(0.7, "xx-XX") == "mid_neutral"
 
 
+def test_classify_zone_en_specific_boundaries():
+    # en boundaries from tests/reports/calibration_v1/aggregate.csv (2026-05-06):
+    # F P5=0.525, P25=0.689, P75=0.987 (clamped to AT_CEILING=0.98).  These
+    # differ from zh enough to produce visible misclassification at the
+    # corners — pin the diff so en never silently re-aliases zh.  Note:
+    # en's leans_female zone is empty by construction (mid_neutral upper =
+    # AT_CEILING = leans_female upper) since 26% of cis-female en speakers
+    # already saturate at the meter ceiling.
+    assert resonance_calibration.classify_zone(0.524, "en") == "clearly_below_female"
+    assert resonance_calibration.classify_zone(0.525, "en") == "leans_male"
+    assert resonance_calibration.classify_zone(0.688, "en") == "leans_male"
+    assert resonance_calibration.classify_zone(0.689, "en") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.92, "en") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.979, "en") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.98, "en") == "at_ceiling"
+    assert resonance_calibration.classify_zone(0.99, "en") == "at_ceiling"
+    # Cross-check: a value that's "leans_female" in zh is still "mid_neutral"
+    # in en — proves the tables aren't aliased.
+    assert resonance_calibration.classify_zone(0.85, "zh") == "leans_female"
+    assert resonance_calibration.classify_zone(0.85, "en") == "mid_neutral"
+
+
+def test_classify_zone_ko_aliases_fr_until_measured():
+    # ko is bootstrap-aliased to fr percentiles (resonance_calibration.py
+    # 2026-05-12 — _ZONES_KO = _ZONES_FR).  Pin this so a future calibration
+    # update unaliases ko explicitly + this test forces the update.
+    test_points = [0.40, 0.50, 0.65, 0.85, 0.95]
+    for v in test_points:
+        ko = resonance_calibration.classify_zone(v, "ko-KR")
+        fr = resonance_calibration.classify_zone(v, "fr-FR")
+        assert ko == fr, f"ko ({ko}) ≠ fr ({fr}) at v={v} — alias broke?"
+
+
+def test_mid_neutral_falls_inside_typical_female_range():
+    """``mid_neutral`` is the F P25..P75 band — i.e. half of real cis-female
+    speakers sit here.  This regression test exists because the pre-2026-05-05
+    summary copy ("still some distance from the female reference") directly
+    contradicted that fact.  If anyone repurposes ``mid_neutral`` as a
+    non-female zone, they MUST also update web/src/modules/i18n.js so we
+    don't reintroduce the contradiction."""
+    # zh: P25-P75 = 0.612-0.842
+    assert resonance_calibration.classify_zone(0.65, "zh-CN") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.83, "zh-CN") == "mid_neutral"
+    # en (calibration_v1): P25-P75 = 0.689-0.98 (P75 clamped to ceiling)
+    assert resonance_calibration.classify_zone(0.70, "en-US") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.92, "en-US") == "mid_neutral"
+    # fr (calibration_v1): P25-P75 = 0.547-0.752
+    assert resonance_calibration.classify_zone(0.60, "fr-FR") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.74, "fr-FR") == "mid_neutral"
+    # ko (aliased to fr): same P25-P75 band as fr
+    assert resonance_calibration.classify_zone(0.60, "ko-KR") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.74, "ko-KR") == "mid_neutral"
+
+
 def test_classify_zone_fr_specific_boundaries():
-    # fr boundaries from tests/reports/fr_resonance_baseline_2026-05-01.md:
-    # < 0.420 / 0.580 / 0.795 / 0.943.  These differ from zh enough to
-    # produce visible misclassification at the corners — pin the diff.
-    assert resonance_calibration.classify_zone(0.419, "fr") == "clearly_below_female"
-    assert resonance_calibration.classify_zone(0.420, "fr") == "leans_male"
-    assert resonance_calibration.classify_zone(0.579, "fr") == "leans_male"
-    assert resonance_calibration.classify_zone(0.580, "fr") == "mid_neutral"
-    assert resonance_calibration.classify_zone(0.794, "fr") == "mid_neutral"
-    assert resonance_calibration.classify_zone(0.795, "fr") == "leans_female"
-    assert resonance_calibration.classify_zone(0.942, "fr") == "leans_female"
-    assert resonance_calibration.classify_zone(0.943, "fr") == "at_ceiling"
+    # fr boundaries from tests/reports/calibration_v1/aggregate.csv (2026-05-06):
+    # < 0.430 / 0.547 / 0.752 / 0.960.  Drift from 2026-05-01 v17 baseline:
+    # P25 -0.033 and P75 -0.043 (90 spk × 11 stitched clips) — meaningful
+    # shifts toward male side.
+    assert resonance_calibration.classify_zone(0.429, "fr") == "clearly_below_female"
+    assert resonance_calibration.classify_zone(0.430, "fr") == "leans_male"
+    assert resonance_calibration.classify_zone(0.546, "fr") == "leans_male"
+    assert resonance_calibration.classify_zone(0.547, "fr") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.751, "fr") == "mid_neutral"
+    assert resonance_calibration.classify_zone(0.752, "fr") == "leans_female"
+    assert resonance_calibration.classify_zone(0.959, "fr") == "leans_female"
+    assert resonance_calibration.classify_zone(0.960, "fr") == "at_ceiling"
     # Cross-check: a value that's "mid_neutral" in zh but "at_ceiling" in fr
     # — proves the tables aren't aliased.
-    assert resonance_calibration.classify_zone(0.95, "zh") == "leans_female"
-    assert resonance_calibration.classify_zone(0.95, "fr") == "at_ceiling"
+    assert resonance_calibration.classify_zone(0.97, "zh") == "leans_female"
+    assert resonance_calibration.classify_zone(0.97, "fr") == "at_ceiling"
 
 
 def test_classify_zone_none_inputs():
@@ -113,11 +172,12 @@ def _phone(phone: str, *, z=(0.0, 0.0, 0.0), F=(400.0, 1500.0, 2500.0)) -> dict:
 
 def test_aggregate_empty_and_unknown_lang_noop():
     assert engine_c._aggregate_per_vowel([], "zh") == []
-    # Unknown lang short → no-op (only zh / fr / en supported).
+    # Unknown lang short → no-op (only zh / fr / en / ko supported).
     assert engine_c._aggregate_per_vowel([_phone("a")], "xx") == []
     # Sub-MIN_TOKENS samples drop out per language.
     assert engine_c._aggregate_per_vowel([_phone("AA1", z=(0.1, 0.2, 0.3))], "en") == []
     assert engine_c._aggregate_per_vowel([_phone("a", z=(0.1, 0.2, 0.3))], "fr") == []
+    assert engine_c._aggregate_per_vowel([_phone("ɐ", z=(0.1, 0.2, 0.3))], "ko") == []
 
 
 def test_aggregate_en_strips_stress_digits():
@@ -241,6 +301,42 @@ def test_aggregate_fr_uses_fr_inventory():
     out_zh = engine_c._aggregate_per_vowel(phones, "zh")
     assert any(r["vowel"] == "ɛ̃" for r in out_fr)
     assert out_zh == []
+
+
+def test_aggregate_ko_uses_ko_inventory():
+    # ko vowels: ɐ (Korean /a/, NOT plain "a"), short/long pairs (e/eː etc).
+    # Plain ASCII "a" must be REJECTED on ko path (no fr-style fallback)
+    # since MFA korean_mfa emits /ɐ/ for that nucleus.
+    ko_phones = [
+        _phone("ɐ", z=(0, 0, 0), F=(900.0, 1400.0, 2700.0)),
+        _phone("ɐ", z=(0.1, 0.05, -0.05), F=(880.0, 1380.0, 2680.0)),
+        _phone("ɐ", z=(-0.1, 0.1, 0.05), F=(910.0, 1420.0, 2720.0)),
+        # Short + long /i/ — separate buckets per length contrast.
+        _phone("i", z=(-0.2, 0.5, 0.3), F=(380.0, 2500.0, 3100.0)),
+        _phone("i", z=(-0.15, 0.45, 0.25), F=(375.0, 2480.0, 3080.0)),
+        _phone("iː", z=(-0.25, 0.55, 0.35), F=(370.0, 2520.0, 3120.0)),
+        _phone("iː", z=(-0.18, 0.50, 0.28), F=(382.0, 2510.0, 3110.0)),
+        # /ɨ/ Korean /ㅡ/ — never in fr/zh/en inventories.
+        _phone("ɨ", z=(0.1, -0.2, -0.3), F=(420.0, 1280.0, 2600.0)),
+        _phone("ɨ", z=(0.0, -0.25, -0.35), F=(415.0, 1290.0, 2620.0)),
+        # Plain ASCII "a" must be rejected — MFA emits "ɐ" instead.
+        _phone("a", z=(0, 0, 0)),
+        _phone("a", z=(0, 0, 0)),
+        # Glide /j/ — semi-vowel, not in KO_VOWELS, rejected.
+        _phone("j", z=(0, 0, 0)),
+        _phone("j", z=(0, 0, 0)),
+        _phone("j", z=(0, 0, 0)),
+    ]
+    out = engine_c._aggregate_per_vowel(ko_phones, "ko")
+    vowels = {r["vowel"] for r in out}
+    # /ɐ/ has n=3 → kept; short /i/ has n=2 → dropped; long /iː/ has n=2 → dropped;
+    # /ɨ/ has n=2 → dropped.  Plain "a" + /j/ never bucket because they're not
+    # in _KO_VOWELS.
+    assert vowels == {"ɐ"}, f"ko ko-only bucketing failed: {vowels}"
+    # Cross-lang check: ko phones run through fr path must NOT bucket /ɐ/
+    # (since it's not in _FR_VOWELS — fr has plain /a/ instead).
+    out_fr = engine_c._aggregate_per_vowel(ko_phones, "fr")
+    assert all(r["vowel"] != "ɐ" for r in out_fr), "ɐ leaked into fr inventory"
 
 
 # ── Runner ───────────────────────────────────────────────────────────

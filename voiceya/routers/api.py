@@ -29,6 +29,7 @@ API_CONFIGS = {
     "max_file_size_mb": CFG.max_file_size_mb,
     "max_audio_duration_sec": CFG.max_audio_duration_sec,
     "engine_c_enabled": CFG.engine_c_enabled,
+    "debug_no_limits": CFG.debug_no_limits,
     "tone_threshold": TONE_THRESHOLD,
     "weak_tone_threshold": WEAK_TONE_THRESHOLD,
 }
@@ -52,7 +53,7 @@ __RATE_LIMITER = pl.Limiter(
 
 
 Mode = Literal["free", "script"]
-Language = Literal["zh-CN", "en-US", "fr-FR"]
+Language = Literal["zh-CN", "en-US", "fr-FR", "ko-KR"]
 
 
 @router.post(
@@ -75,7 +76,7 @@ async def new_analyse(
     max_bytes = CFG.max_file_size_mb * 1024 * 1024
     while chunk := await audio.read(64 * 1024):
         buf.write(chunk)
-        if buf.tell() > max_bytes:
+        if not CFG.debug_no_limits and buf.tell() > max_bytes:
             raise FILE_EXCEED_SIZE_LIMIT_EXCEPTION
 
     if buf.tell() < 12:
@@ -84,13 +85,15 @@ async def new_analyse(
     buf.seek(0)
     is_valid_audio_file(buf.read(12))
 
-    logger.info("收到文件 (%d B, mode=%s, language=%s)", buf.tell(), mode, language)
+    # 字节数是用户文件指纹，下放 DEBUG；INFO 只保留低基数路由标签。
+    logger.info("收到文件 (mode=%s, language=%s)", mode, language)
+    logger.debug("收到文件字节数=%d", buf.tell())
     buf.seek(0)
 
     # ── 时长限制 ───────────────────────────────────────────
     with av.open(buf, "r") as s:
         duration = await asyncio.to_thread(get_duraton_sec, s)
-        if duration > CFG.max_audio_duration_sec:
+        if not CFG.debug_no_limits and duration > CFG.max_audio_duration_sec:
             raise HTTPException(
                 status_code=413,
                 detail=f"音频时长 {duration} 秒，超过 {CFG.max_audio_duration_sec} 秒限制",

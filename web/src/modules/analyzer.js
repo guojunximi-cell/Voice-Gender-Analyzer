@@ -1,6 +1,6 @@
 // POST /api/analyze-voice
 // Body: multipart/form-data — audio (file) + mode ("free" | "script") + script (optional string)
-//                              + language ("zh-CN" | "en-US" | "fr-FR")
+//                              + language ("zh-CN" | "en-US" | "fr-FR" | "ko-KR")
 // Response: { status, filename, summary, analysis: [{label, start_time, end_time, duration}] }
 
 import { getLang, t } from "./i18n.js";
@@ -20,7 +20,7 @@ function _writeStr(view, off, str) {
 	for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
 }
 
-function _encodeWAV(ab) {
+export function encodeWAV(ab) {
 	const numCh = ab.numberOfChannels;
 	const sr = ab.sampleRate;
 	const frames = ab.length;
@@ -77,7 +77,7 @@ async function _stripMetadata(file) {
 		}
 
 		const strippedName = file.name.replace(/\.[^.]+$/, "") + ".wav";
-		return new File([_encodeWAV(audioBuf)], strippedName, { type: "audio/wav" });
+		return new File([encodeWAV(audioBuf)], strippedName, { type: "audio/wav" });
 	} catch (err) {
 		console.warn("[声音分析鸭] 元数据剥离失败，使用原始文件:", err);
 		return file;
@@ -182,7 +182,7 @@ export async function analyzeAudio(file, { onProgress, mode = "free", script = n
 	// 后端 language 字段决定 sidecar 端的 MFA 词典 + 参考表。
 	// 未显式传入时跟随当前 UI 语言（也就是前端 i18n 的 getLang()）。
 	// keep in sync with SUPPORTED in i18n.js
-	const _ALLOWED_LANGS = ["zh-CN", "en-US", "fr-FR"];
+	const _ALLOWED_LANGS = ["zh-CN", "en-US", "fr-FR", "ko-KR"];
 	fd.append("language", _ALLOWED_LANGS.includes(language) ? language : getLang());
 
 	try {

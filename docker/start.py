@@ -68,25 +68,41 @@ def main() -> int:
     _spawn(
         "api",
         (
-            sys.executable, "-m", "uvicorn", "voiceya:app",
-            "--host", "0.0.0.0",
-            "--port", PORT,
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "voiceya:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            PORT,
             "--proxy-headers",
-            "--forwarded-allow-ips", "*",
+            "--forwarded-allow-ips",
+            "*",
         ),
         env,
     )
-    _spawn(
-        "worker",
-        (
-            sys.executable, "-m", "taskiq", "worker",
-            "voiceya.taskiq:broker",
-            "voiceya.tasks.analyser",
-            "--workers", "1",
-            "--log-level", "INFO",
-        ),
-        env,
-    )
+    # 旧部署（Railway）切到 VPS 后开 REDIRECT_TO，所有请求 308 短路在中间件里，
+    # 永远到不了 taskiq；worker 跑起来只会因为 Redis 不可达拖垮整个容器。
+    if os.environ.get("REDIRECT_TO"):
+        print("[start] REDIRECT_TO set — skipping worker (redirect-only mode)", flush=True)
+    else:
+        _spawn(
+            "worker",
+            (
+                sys.executable,
+                "-m",
+                "taskiq",
+                "worker",
+                "voiceya.taskiq:broker",
+                "voiceya.tasks.analyser",
+                "--workers",
+                "1",
+                "--log-level",
+                "INFO",
+            ),
+            env,
+        )
 
     signal.signal(signal.SIGINT, _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)

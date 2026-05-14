@@ -89,36 +89,40 @@ See [`docs/RAILWAY_DEPLOY.md`](./docs/RAILWAY_DEPLOY.md).
 
 ## Citations
 
-### Models / aligners / toolkits
+Voiceduck builds on the following published tools, pretrained models, and datasets. References below have been verified against arXiv / ISCA Archive / ACL Anthology / OpenSLR; if you publish results derived from this project, please cite the upstream sources directly.
 
-- **inaSpeechSegmenter**
-  Doukhan, D., Carrive, J., Vallet, F., Larcher, A., & Meignier, S. (2018). *An open-source speaker gender detection framework for monitoring gender equality.* ICASSP 2018.
-- **FunASR / Paraformer-zh**
-  Gao, Z., Zhang, S., McLoughlin, I., & Yan, Z. (2022). *Paraformer: Fast and Accurate Parallel Transformer for Non-autoregressive End-to-End Speech Recognition.* Interspeech 2022.
-  Gao, Z. et al. (2023). *FunASR: A Fundamental End-to-End Speech Recognition Toolkit.* Interspeech 2023.
-- **Whisper / faster-whisper**
-  Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., & Sutskever, I. (2022). *Robust Speech Recognition via Large-Scale Weak Supervision.* OpenAI.
-- **Montreal Forced Aligner (MFA)**
-  McAuliffe, M., Socolof, M., Mihuc, S., Wagner, M., & Sonderegger, M. (2017). *Montreal Forced Aligner: Trainable text-speech alignment using Kaldi.* Interspeech 2017.
-- **Praat**
-  Boersma, P., & Weenink, D. (2024). *Praat: doing phonetics by computer*
+### Models, aligners & toolkits
+
+- **inaSpeechSegmenter** — Engine A (VAD + gender segmentation).
+  Doukhan, D., Carrive, J., Vallet, F., Larcher, A., & Meignier, S. (2018). *An Open-Source Speaker Gender Detection Framework for Monitoring Gender Equality.* ICASSP 2018. — [code](https://github.com/ina-foss/inaSpeechSegmenter) · [k3-cat fork](https://github.com/k3-cat/inaSpeechSegmenter) (MIT)
+- **FunASR / Paraformer-zh** — Engine C ASR for `zh-CN`.
+  Gao, Z., Zhang, S., McLoughlin, I., & Yan, Z. (2022). *Paraformer: Fast and Accurate Parallel Transformer for Non-autoregressive End-to-End Speech Recognition.* Interspeech 2022. ([ISCA archive](https://www.isca-archive.org/interspeech_2022/gao22b_interspeech.html))
+  Gao, Z. et al. (2023). *FunASR: A Fundamental End-to-End Speech Recognition Toolkit.* Interspeech 2023. ([ISCA archive](https://www.isca-archive.org/interspeech_2023/gao23g_interspeech.html)) — [code](https://github.com/modelscope/FunASR) (Apache-2.0)
+- **Whisper / faster-whisper** — Engine C ASR for `en-US` and `fr-FR`.
+  Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., & Sutskever, I. (2022). *Robust Speech Recognition via Large-Scale Weak Supervision.* [arXiv:2212.04356](https://arxiv.org/abs/2212.04356); also ICML 2023. — [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2 inference, MIT)
+- **Montreal Forced Aligner (MFA)** — phone-level alignment.
+  McAuliffe, M., Socolof, M., Mihuc, S., Wagner, M., & Sonderegger, M. (2017). *Montreal Forced Aligner: Trainable Text-Speech Alignment Using Kaldi.* Interspeech 2017, 498–502. ([ISCA archive](https://www.isca-archive.org/interspeech_2017/mcauliffe17_interspeech.html), [DOI](https://doi.org/10.21437/Interspeech.2017-1386)) — [docs](https://montreal-forced-aligner.readthedocs.io/) (MIT)
+- **Praat** — formant tracking inside the Engine C sidecar.
+  Boersma, P., & Weenink, D. (2026). *Praat: doing phonetics by computer* [Computer program]. Version 6.4.65. — [praat.org](https://www.fon.hum.uva.nl/praat/) ([How to cite](https://www.fon.hum.uva.nl/praat/manual/FAQ__How_to_cite_Praat.html))
 
 ### Pretrained MFA acoustic models & dictionaries
+
+Sourced from the [MFA Models registry](https://mfa-models.readthedocs.io/), downloaded at sidecar build time:
 
 - `mandarin_mfa` v2.0.0 — `zh-CN`
 - `english_us_arpa` — `en-US`
 - `french_mfa` — `fr-FR`
 
-### Corpora used to build `stats_*.json`
+### Reference statistics — corpora used to build `stats_*.json`
 
-- **AISHELL-1** ([OpenSLR-33](https://www.openslr.org/33/)) — 400 speakers → contributes to `stats_zh.json` v0.2.0.
-  Bu, H., Du, J., Na, X., Wu, B., & Zheng, H. (2017). *AISHELL-1: An Open-Source Mandarin Speech Corpus and a Speech Recognition Baseline.* O-COCOSDA 2017.
-- **AISHELL-3** ([OpenSLR-93](https://www.openslr.org/93/)) — 218 speakers → contributes to `stats_zh.json` v0.2.0.
-  Shi, Y., Bu, H., Xu, X., Zhang, S., & Li, M. (2021). *AISHELL-3: A Multi-Speaker Mandarin TTS Corpus and the Baselines.* Interspeech 2021.
+- **AISHELL-1** ([OpenSLR-33](https://www.openslr.org/33/)) — 400 spk → contributes to `stats_zh.json` v0.2.0.
+  Bu, H., Du, J., Na, X., Wu, B., & Zheng, H. (2017). *AISHELL-1: An Open-Source Mandarin Speech Corpus and a Speech Recognition Baseline.* O-COCOSDA 2017. ([arXiv:1709.05522](https://arxiv.org/abs/1709.05522))
+- **AISHELL-3** ([OpenSLR-93](https://www.openslr.org/93/)) — 218 spk → contributes to `stats_zh.json` v0.2.0.
+  Shi, Y., Bu, H., Xu, X., Zhang, S., & Li, M. (2021). *AISHELL-3: A Multi-Speaker Mandarin TTS Corpus.* Interspeech 2021. ([ISCA archive](https://www.isca-archive.org/interspeech_2021/shi21c_interspeech.html))
 - **Common Voice — Mozilla Data Collective, Scripted Speech 25.0 (fr)** — 2026-03-09 dump, 984F + 3793M speakers → `stats_fr.json` v0.1.0.
-  Ardila, R., Branson, M., Davis, K., Henretty, M., Kohler, M., Meyer, J., Morais, R., Saunders, L., Tyers, F. M., & Weber, G. (2020). *Common Voice: A Massively-Multilingual Speech Corpus.* LREC 2020. — [dataset](https://mozilladatacollective.com/) (CC0-1.0)
+  Ardila, R., Branson, M., Davis, K., Kohler, M., Meyer, J., Henretty, M., Morais, R., Saunders, L., Tyers, F., & Weber, G. (2020). *Common Voice: A Massively-Multilingual Speech Corpus.* LREC 2020, 4218–4222. ([ACL Anthology](https://aclanthology.org/2020.lrec-1.520/)) — [dataset](https://mozilladatacollective.com/) (CC0-1.0)
 
-For the full training protocol see [`voiceya/sidecars/visualizer-backend/CHANGELOG_ZH.md`](./voiceya/sidecars/visualizer-backend/CHANGELOG_ZH.md) and [`CHANGELOG_FR.md`](./voiceya/sidecars/visualizer-backend/CHANGELOG_FR.md).
+For the full training protocol (sampling, holdout splits, weight search), see [`voiceya/sidecars/visualizer-backend/CHANGELOG_ZH.md`](./voiceya/sidecars/visualizer-backend/CHANGELOG_ZH.md) and [`CHANGELOG_FR.md`](./voiceya/sidecars/visualizer-backend/CHANGELOG_FR.md).
 
 ### Vendored components
 

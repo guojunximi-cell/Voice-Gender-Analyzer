@@ -41,6 +41,25 @@
 .vga-timeline {
 	margin-top: 0;
 	contain: layout style;
+	/* Reserves enough room for both the ~116px skeleton and the populated
+	   timeline (~150–300px) so the skeleton→data swap doesn't push siblings.
+	   Paired with #phone-timeline-root:not([hidden]) below. */
+	min-height: 220px;
+}
+
+/* When the analyzer unhides the root, reserve the same vertical box so the
+   container itself doesn't grow underneath siblings as content streams in.
+   ``flex-shrink: 0`` is critical: panel-center is ``display:flex; column``
+   with overflow-y:auto. At narrow three-panel widths (≤ 1000 px) the panel
+   would otherwise shrink phone-timeline below its natural content height
+   (transcript + bands + nav + footer), and the footer (carrying the
+   gender-legend) would overflow down into the next sibling — visually
+   landing under the Distribution card. flex-shrink:0 keeps the timeline at
+   content size; panel-center already scrolls when total content exceeds
+   the viewport. */
+#phone-timeline-root:not([hidden]) {
+	min-height: 220px;
+	flex-shrink: 0;
 }
 
 .vga-timeline[data-state="skeleton"] .vga-skel {
@@ -71,11 +90,27 @@
 
 /* ── Active-char readout (header above the sandwich) ─────────── */
 .vga-timeline__readout-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
 	margin-bottom: 8px;
 }
 
 .vga-timeline__readout-row:empty {
 	display: none;
+}
+
+/* Readout pill grows to take remaining width; the bar-mode toggle keeps
+   its natural width on the right edge.  Without the grow, the pill would
+   collapse to its content and the toggle would float in the middle. */
+.vga-timeline__readout-row > .vga-transcript-readout {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.vga-timeline__bar-mode {
+	flex: 0 0 auto;
+	margin-left: auto;
 }
 
 /* ── Row grid: [label | content] ─────────────────────────────
@@ -243,6 +278,21 @@
 	text-align: center;
 }
 
+.vga-transcript-readout__phone {
+	font-family: "SF Mono", "JetBrains Mono", "Fira Mono", monospace;
+	font-size: 0.78rem;
+	color: var(--text-secondary);
+	background: var(--bg-primary);
+	padding: 1px 8px;
+	border-radius: 999px;
+	letter-spacing: 0.02em;
+	font-variant-numeric: tabular-nums;
+}
+
+.vga-transcript-readout__phone.is-hidden {
+	display: none;
+}
+
 .vga-transcript-readout__metric {
 	display: inline-flex;
 	align-items: baseline;
@@ -370,6 +420,53 @@
 	display: none;
 }
 
+/* ── Bar-mode toggle (phone detail vs word aggregate) ─────────────
+   Lives at the right edge of the readout row, next to the active-char
+   pill.  Compact: a small pill-shaped 2-segment switcher whose height
+   roughly matches the readout pill so the row reads as one strip. */
+/* Visually paired with .vga-transcript-readout — same bg, radius, padding,
+   font-size, min-height — so the readout pill on the left and the toggle
+   on the right read as one strip.  The active button mirrors the readout's
+   "active char" treatment (var(--active) color); the inactive button uses
+   the muted label tone of __label. */
+.vga-band-mode {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 14px;
+	padding: 6px 10px;
+	background: var(--bg-secondary);
+	border-radius: var(--radius-sm);
+	font-size: 0.82rem;
+	color: var(--text-secondary);
+	min-height: 28px;
+	box-sizing: border-box;
+}
+
+.vga-band-mode-btn {
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	transition: color 120ms linear;
+}
+
+.vga-band-mode-btn:hover {
+	color: var(--text-primary);
+}
+
+.vga-band-mode-btn.is-active {
+	color: var(--active);
+	font-weight: 500;
+}
+
+.vga-band-mode-btn:focus-visible {
+	outline: 2px solid var(--active);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
 /* ── Timeline footer (shared palette legend only) ─────────────── */
 .vga-timeline__footer {
 	margin-top: 10px;
@@ -397,43 +494,58 @@
 }
 
 .vga-gender-legend__labels {
-	/* Three labels (left/mid/right) anchored to the bar's left/center/right edges
-	   via absolute positioning, plus a flex-flow info button pushed to the
-	   row's right end via margin-left:auto.
-	   Earlier version used `justify-content: space-between` over the four
-	   children, but `--mid` is absolute (out of flow), leaving three flex items
-	   distributed at start/center/end — which made "女声方向" land in the dead
-	   center, overlapping with the absolute "中性" label and looking like the
-	   middle label was missing. */
-	display: flex;
+	/* Grid layout: [ left | mid | right ]. The ``?`` info button used to
+	   live in a 4th 20px tail column; on 2026-05-06 it was lifted out of
+	   this row and overlaid on the gradient bar itself, so the right
+	   label now sits flush against the bar's right edge. */
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
 	align-items: center;
+	column-gap: 8px;
 	padding-top: 4px;
+	/* 6px breathing room below the glyph bottom: panel-center already gives
+	   a 14px gap to the next sibling, but at certain DPR / zoom levels the
+	   labels still read as "swallowed" by the Distribution card. 6px lifts
+	   the visual gap to ~20px, comfortably past the perception threshold. */
+	padding-bottom: 6px;
 	font-size: 0.78rem;
 	color: var(--text-secondary);
 	position: relative;
 }
 
+.vga-gender-legend__label--left {
+	grid-column: 1;
+	justify-self: start;
+	min-width: 0;
+}
+
 .vga-gender-legend__label--mid {
-	position: absolute;
-	left: 50%;
-	transform: translateX(-50%);
+	grid-column: 2;
+	justify-self: center;
 	color: var(--text-muted);
 }
 
 .vga-gender-legend__label--right {
-	/* Anchor to the bar's right edge.  28px = info-button width (20px) + 8px gap. */
-	position: absolute;
-	right: 28px;
+	grid-column: 3;
+	justify-self: end;
+	min-width: 0;
 }
 
 .vga-gender-legend__info {
 	all: unset;
 	box-sizing: border-box;
-	margin-left: auto;
+	/* Floats above the right end of the gradient bar.  Button bottom sits
+	   2px above the 10px-tall bar-wrap top edge → top: -(20 + 2) = -22px.
+	   The legend's right edge is well right of the centered nav arrows
+	   above, so the lifted button doesn't collide with them. */
+	position: absolute;
+	top: -22px;
+	right: 0;
 	width: 20px;
 	height: 20px;
 	border: 1px solid var(--border);
 	border-radius: 50%;
+	background: var(--surface);
 	text-align: center;
 	line-height: 18px;
 	font-size: 12px;
@@ -638,5 +750,22 @@
 
 	.vga-return-btn {
 		animation: none;
+	}
+}
+
+/* Mobile: trim the gap between the nav-row arrows and the (hoisted) gender
+   bar. Lives at the bottom so source order beats the base rules above. */
+@media (max-width: 780px) {
+	.vga-timeline {
+		min-height: 0;
+	}
+	#phone-timeline-root:not([hidden]) {
+		min-height: 0;
+	}
+	.vga-timeline__nav-row {
+		margin-top: 4px;
+	}
+	.vga-timeline__footer {
+		margin-top: 4px;
 	}
 }

@@ -5,8 +5,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from voiceya import routers
@@ -38,6 +39,28 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title=CFG.app_name, version="2.0", lifespan=lifespan)
+
+
+@app.get("/healthz", include_in_schema=False)
+async def _healthz():
+    # 部署平台 healthcheck 端点——redirect 模式下中间件也会放行，
+    # 不依赖 Redis/worker，只要进程活着就 200。
+    return {"status": "ok", "redirect": bool(CFG.redirect_to)}
+
+
+if CFG.redirect_to:
+    _REDIRECT_BASE = CFG.redirect_to.rstrip("/")
+
+    @app.middleware("http")
+    async def _redirect_all(request: Request, _call_next):
+        if request.url.path == "/healthz":
+            return await _call_next(request)
+        target = _REDIRECT_BASE + request.url.path
+        if request.url.query:
+            target += "?" + request.url.query
+        # 308 保留 method+body，浏览器+API 调用统一迁移；浏览器会缓存。
+        return RedirectResponse(url=target, status_code=308)
+
 
 app.add_middleware(
     CORSMiddleware,

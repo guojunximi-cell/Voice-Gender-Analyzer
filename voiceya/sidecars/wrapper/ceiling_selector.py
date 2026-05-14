@@ -100,6 +100,21 @@ _ZH_VOWELS = {
     "ʐ̩",
     "z̩",
 }
+# voiceya patch (2026-05-12): Korean MFA v3 vowel nuclei.  Mirrors
+# acousticgender.library.resonance.KO_VOWELS — both lists must agree on the
+# 15 labels (7 base × short/long + ɐ).  Glides (j, w, ɰ, ɥ) excluded —
+# Korean diphthongs are emitted as glide+vowel sequences, not composite
+# labels.  Inventory verified against `mfa model inspect acoustic korean_mfa`.
+_KO_VOWELS = {
+    "ɐ",
+    "e", "eː",
+    "ɛ", "ɛː",
+    "i", "iː",
+    "o", "oː",
+    "u", "uː",
+    "ɨ", "ɨː",
+    "ʌ", "ʌː",
+}
 
 # Default when too few vowels qualify for a meaningful score (fr only — see
 # _ADAPTIVE_LANGS below).  5500 Hz is Praat's official recommendation for adult
@@ -113,7 +128,7 @@ _DEFAULT_CEILING = 5500
 # files (calibrated against 5000 Hz extraction) keep reading correctly.
 _LEGACY_CEILING = 5000
 
-# Adaptive ceiling enabled for fr + zh.  Empirically:
+# Adaptive ceiling enabled for fr + zh + en.  Empirically:
 #   - fr: female F2 of /i/ / /y/ / /e/ collapses at the 5000 Hz ceiling, so
 #         adaptive ceiling lifts measurements out of clamp(0,1) floor and
 #         restores gender separation (median 0.219 / 0.566 male/female,
@@ -124,14 +139,15 @@ _LEGACY_CEILING = 5000
 #         caused over-correction on adaptive lift.  As of 2026-05-01 stats_zh
 #         is re-trained at fixed 5500 Hz on AISHELL-3 (5000 segs, 50 phones)
 #         so adaptive ceiling re-enabled here matches the new calibration.
-#   - en: gender separation already acceptable at 5000 (median 0.49 / 0.89,
-#         gap +0.40); selector picks ceiling per-recording across 4500–6500
-#         and the existing 5m+5f regression doesn't drift.  Stays out of the
-#         set for now — re-train stats.json @ 5500 to add it cleanly.
-# en bypasses the selector entirely — the patched Praat script's Phonemes:
-# section is still 5000 Hz baseline so phones.parse + resonance behaviour
-# match pre-2026-05-01 byte-for-byte for languages outside the set.
-_ADAPTIVE_LANGS = frozenset({"fr", "zh"})
+#   - en: same /IY/ F2 collapse at 5000 (calibration_v1 showed 26 % of
+#         LibriSpeech F speakers saturated at the clamp ceiling because the
+#         upstream stats.json was baked at 5000 Hz with an artificially-low
+#         /IY1/ F2 mean of 2112 Hz — see CHANGELOG_EN.md, 2026-05-06).
+#         As of 2026-05-06 stats.json is re-trained at fixed 5500 Hz on
+#         LibriSpeech train-clean-100 (5000 segs, 59 phones) so adaptive
+#         ceiling enabled here matches the new calibration; saturation
+#         dropped from 26 % to 0 % in calibration_v1 verification.
+_ADAPTIVE_LANGS = frozenset({"fr", "zh", "en"})
 
 
 def _is_vowel(phone: str | None, lang: str) -> bool:
@@ -143,6 +159,10 @@ def _is_vowel(phone: str | None, lang: str) -> bool:
         # Strip tone diacritics first — Mandarin phone labels carry them
         # (`i˥`, `a˧˨`), but ZH_VOWELS holds only the base nuclei.
         return _TONE_RE.sub("", phone) in _ZH_VOWELS
+    if lang == "ko":
+        # Direct IPA membership; Korean has no tone diacritics.  Short
+        # and long are separate phones in KO_VOWELS.
+        return phone in _KO_VOWELS
     return any(c in "AEIOUY" for c in phone)
 
 

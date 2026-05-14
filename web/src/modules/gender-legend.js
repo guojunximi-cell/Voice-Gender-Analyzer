@@ -29,6 +29,8 @@ export class GenderLegend {
 			`<div class="vga-gender-legend__bar-wrap">` +
 			`<div class="vga-gender-legend__bar" style="background: ${gradient}"></div>` +
 			`</div>` +
+			`<button type="button" class="vga-gender-legend__info" ` +
+			`aria-label="${t("legend.infoAria")}">?</button>` +
 			`<div class="vga-gender-legend__labels">` +
 			`<span class="vga-gender-legend__label vga-gender-legend__label--left">` +
 			`${t("legend.male")}` +
@@ -39,8 +41,6 @@ export class GenderLegend {
 			`<span class="vga-gender-legend__label vga-gender-legend__label--right">` +
 			`${t("legend.female")}` +
 			`</span>` +
-			`<button type="button" class="vga-gender-legend__info" ` +
-			`aria-label="${t("legend.infoAria")}">?</button>` +
 			`</div>` +
 			`<div class="vga-gender-legend__popover" hidden role="dialog" ` +
 			`aria-label="${t("legend.scienceAria")}">` +

@@ -32,17 +32,21 @@ def parse(praat_output, lang='en'):
 	data = {}
 
 	pronunciation_dict = {}
-	# voiceya patch: fr added 2026-04-28; french_mfa dict shares mandarin_mfa's
-	# multi-column probability format.  See voiceya/sidecars/README.md.
+	# voiceya patch: fr added 2026-04-28, ko added 2026-05-12.  zh/fr/ko all
+	# use MFA pretrained v3's multi-column probability dict format
+	# (word\tprob\tprob\tprob\tprob\tphone1 phone2 ...); en uses cmudict's
+	# 2-column ARPABET format.  See voiceya/sidecars/README.md "Vendor patches".
 	if lang == 'zh':
 		dict_file, dict_encoding = 'mandarin_dict.txt', 'utf-8-sig'
 	elif lang == 'fr':
 		dict_file, dict_encoding = 'french_mfa_dict.txt', 'utf-8'
+	elif lang == 'ko':
+		dict_file, dict_encoding = 'korean_mfa_dict.txt', 'utf-8'
 	else:
 		dict_file, dict_encoding = 'cmudict.txt', 'iso-8859-1'
 	with open(dict_file, 'r', encoding=dict_encoding) as f:
 		for line in f.readlines():
-			if lang in ('zh', 'fr'):
+			if lang in ('zh', 'fr', 'ko'):
 				# MFA pretrained v3 dict format: word\tprob\tprob\tprob\tprob\tphone1 phone2 ...
 				cols = line.rstrip('\n').split('\t')
 				if len(cols) >= 6:
@@ -55,8 +59,9 @@ def parse(praat_output, lang='en'):
 	data['words'] = []
 	for line in word_lines:
 		cols = line.split('\t')
-		# voiceya patch: fr keeps lowercase like zh; only en cmudict needs upper.
-		word_key = cols[1] if lang in ('zh', 'fr') else cols[1].upper()
+		# voiceya patch: zh/fr/ko keep lowercase (MFA v3 dicts are lowercase);
+		# only en cmudict needs upper-casing for lookup.
+		word_key = cols[1] if lang in ('zh', 'fr', 'ko') else cols[1].upper()
 		data['words'].append({
 			'time' : float(cols[0]),
 			'word' : cols[1],

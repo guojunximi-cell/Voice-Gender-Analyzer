@@ -1,15 +1,27 @@
 import { analyzeAudio, cancelAnalysis } from "./modules/analyzer.js";
 import * as audioCache from "./modules/audio-cache.js";
+import { readEmbeddedCreatedAt } from "./modules/audio-metadata.js";
 import { getMode, onModeChange, setMode } from "./modules/classify-mode.js";
 import { classifyForMode, hasEngineC } from "./modules/classify.js";
-import { buildExportPayload, downloadExport, parseImportFile } from "./modules/export-import.js";
+import { onIncludeConsonantsChange } from "./modules/consonants-toggle.js";
+import { getHiddenBlockIds, initDashboard, resetLayout, showBlock } from "./modules/dashboard.js";
+// disclosure UI disabled (使用前请先了解) — uncomment to restore the gate + header button.
+// import { mountDisclosureModal, showDisclosure } from "./modules/disclosure-modal.js";
+import {
+	buildExportPayload,
+	downloadAudioFilesSequential,
+	downloadExport,
+	parseImportFile,
+} from "./modules/export-import.js";
 import { isTimelineEnabled } from "./modules/feature-flag.js";
 import { applyStaticDom, getLang, onLangChange, setLang, t } from "./modules/i18n.js";
 import { clearMetricsPanel } from "./modules/metrics-panel.js";
 import { PhoneTimeline } from "./modules/phone-timeline.js";
 import { setupRecorder } from "./modules/recorder.js";
+import { buildScriptIdentity } from "./modules/resonance-history.js";
+import { wireResonanceConsonantsToggle } from "./modules/resonance-panel.js";
 import { renderFromSummary } from "./modules/results-render.js";
-import { highlightActiveSegment, renderStats, resetResults } from "./modules/results.js";
+import { renderStats, resetResults } from "./modules/results.js";
 import { getScatterMode, onScatterModeChange, setScatterMode } from "./modules/scatter-mode.js";
 import {
 	addSession,
@@ -61,6 +73,36 @@ function setAudioUnavailableHint(show) {
 	if (el) el.hidden = !show;
 }
 
+// 历史里的"音频录制时间"。优先级：
+//   1. MP4/M4A 容器内嵌的 mvhd / com.apple.quicktime.creationdate（手机录音的真值，
+//      iCloud / 微信 / AirDrop 转一手不会被冲刷）
+//   2. File.lastModified（操作系统 mtime；纯录音 / 桌面文件能用，但同步过的不准）
+//   3. Date.now() —— 最后兜底
+// 结果缓存到 File 实例的 __inferredCreatedAt 上（onFileSelected → analyze
+// 链路里同一个 File 会被读两次：保存 session + 入 audio-cache）。
+async function _audioRecordedAt(file) {
+	if (!file) return Date.now();
+	if (file.__inferredCreatedAt != null) return file.__inferredCreatedAt;
+	let inferred = null;
+	try {
+		const m = await readEmbeddedCreatedAt(file);
+		if (m && Number.isFinite(m.createdAt) && m.createdAt > 0) inferred = m.createdAt;
+	} catch {
+		// readEmbeddedCreatedAt 已经吞过一层异常，这里再保险。
+	}
+	if (inferred == null) {
+		const lm = file.lastModified;
+		if (Number.isFinite(lm) && lm > 0) inferred = lm;
+	}
+	if (inferred == null) inferred = Date.now();
+	try {
+		file.__inferredCreatedAt = inferred;
+	} catch {
+		// 某些 File 实例（File from showOpenFilePicker 在严格模式下）禁止扩展属性。
+	}
+	return inferred;
+}
+
 // ─── Record mode (free-speech vs. script mode for Engine C) ──────
 // When Engine C is on, script mode skips FunASR and feeds the chosen text
 // straight to MFA — same phone alignment, lower CPU/RAM. Disabled and
@@ -93,6 +135,8 @@ function _getRecordOptions() {
 	if (_recordMode !== "script") return { mode: "free", script: null };
 	return { mode: "script", script: _resolveScriptText() };
 }
+
+const _buildScriptIdentity = (summary) => buildScriptIdentity(summary, getLang());
 
 function _applyRecordMode() {
 	const switcher = $("record-mode-switcher");
@@ -270,6 +314,11 @@ function _updateClassifyModeSwitcher() {
 		btn.disabled = needsEC && !ecAvailable;
 		btn.title = btn.disabled ? t("stats.lockedTip") : btn.dataset.originalTitle || btn.title;
 	});
+	// 仅元音 / 包含辅音 toggle is the resonance mode's sub-control: only meaningful
+	// when classify-mode is resonance and Engine C delivered phone data. Hide
+	// otherwise so it doesn't visually compete with the primary tab strip.
+	const toggle = $("resonance-consonants-toggle");
+	if (toggle) toggle.hidden = !(mode === "resonance" && ecAvailable);
 }
 
 function _initClassifyModeSwitcher() {
@@ -283,8 +332,23 @@ function _initClassifyModeSwitcher() {
 		if (!btn || btn.disabled) return;
 		setMode(btn.dataset.mode);
 	});
+	// Toggle now lives next to the classify-mode tabs, so wire its click
+	// handler at app init rather than waiting for resonance-panel's first
+	// render. The wiring inside resonance-panel.js is idempotent so
+	// double-calling is safe.
+	wireResonanceConsonantsToggle();
 	onModeChange(() => {
 		_updateClassifyModeSwitcher();
+		_renderClassifiedForCurrent();
+		scatterRedraw();
+	});
+	// Consonants toggle only affects resonance-mode views, but it's safe to
+	// re-render unconditionally — engineA / pitch paths short-circuit in
+	// classifyPhones and produce identical segments.  Mirrors the
+	// onModeChange wire so both toggles funnel through the same render
+	// pipeline.
+	onIncludeConsonantsChange(() => {
+		if (getMode() !== "resonance") return;
 		_renderClassifiedForCurrent();
 		scatterRedraw();
 	});
@@ -357,9 +421,11 @@ let _engineCInterp = null;
 // when out-of-order events (e.g. Engine C start after Engine B ramp) would
 // otherwise retract the bar. Reset in _finishDuck / _hideDuck.
 let _duckPctHighWater = 0;
-// Engine C start pct — must match backend `pct=72` in audio_analyser/__init__.py.
-const ENGINE_C_START_PCT = 72;
-const ENGINE_C_CAP_PCT = 94;
+// Engine C start pct — must match backend `pct=50` in audio_analyser/__init__.py.
+// Engine B 下线后流水线只剩 A + C + tail。配比按 scripts/profile_pipeline.py
+// 实测：with EC → A 40% / C 38% / tail 12%；no EC → A 75% / tail 15%.
+const ENGINE_C_START_PCT = 50;
+const ENGINE_C_CAP_PCT = 88;
 
 // ── Real progress: set duck bar to exact percentage ──────────
 function _setDuckProgress(pct, msg) {
@@ -383,8 +449,10 @@ function _setDuckProgress(pct, msg) {
 function _startEngineAInterp() {
 	_stopEngineAInterp();
 	const start = Date.now();
+	// Engine B 下线后 A 占全管线 ~40% (with EC) / ~75% (no EC)。TO=46 留 4pt
+	// 给后续 EC 跳到 50；DURATION 90s 因为 prod CPU 上 A 可能跑 20–60s。
 	const FROM = 10,
-		TO = 45;
+		TO = 46;
 	const DURATION_MS = 90_000;
 
 	function tick() {
@@ -596,9 +664,6 @@ function onFileSelected(file) {
 		onReady: (_dur) => {
 			/* controls already enabled in waveform.js */
 		},
-		onTimeUpdate: (t) => {
-			if (analysisData) highlightActiveSegment(t, analysisData.analysis);
-		},
 	});
 }
 
@@ -607,9 +672,11 @@ async function _silentAnalyzeAndSave(file) {
 	try {
 		const data = await analyzeAudio(file, _getRecordOptions());
 		if (data.summary?.overall_f0_median_hz != null) {
+			const identity = await _buildScriptIdentity(data.summary);
 			const session = {
 				id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
 				filename: data.filename,
+				createdAt: await _audioRecordedAt(file),
 				f0_median: data.summary.overall_f0_median_hz,
 				gender_score: data.summary.overall_gender_score,
 				confidence: data.summary.overall_confidence,
@@ -617,6 +684,7 @@ async function _silentAnalyzeAndSave(file) {
 				color: nextSessionColor(),
 				summary: data.summary,
 				analysis: data.analysis,
+				...identity,
 			};
 			saveSession(session);
 			audioCache.set(session.id, file);
@@ -669,19 +737,34 @@ async function initUploaders() {
 	let maxFileSizeMb = 5;
 	let maxDurationSec = 180;
 	let engineCEnabled = false;
+	let debugNoLimits = false;
 	try {
 		const cfg = await fetch("/api/config").then((r) => r.json());
 		allowConcurrent = cfg.allow_concurrent ?? cfg.max_concurrent > 1;
 		maxFileSizeMb = cfg.max_file_size_mb ?? 5;
 		maxDurationSec = cfg.max_audio_duration_sec ?? 180;
 		engineCEnabled = !!cfg.engine_c_enabled;
+		debugNoLimits = !!cfg.debug_no_limits;
 		if (cfg.tone_threshold != null) setToneThreshold(cfg.tone_threshold);
 		if (cfg.weak_tone_threshold != null) setWeakToneThreshold(cfg.weak_tone_threshold);
 	} catch (_) {}
 
+	if (debugNoLimits && !document.getElementById("debug-no-limits-badge")) {
+		const badge = document.createElement("div");
+		badge.id = "debug-no-limits-badge";
+		badge.textContent = "DEBUG: limits off";
+		badge.style.cssText =
+			"position:fixed;right:12px;bottom:12px;z-index:9999;" +
+			"padding:4px 8px;border-radius:6px;" +
+			"background:rgba(220,53,69,.9);color:#fff;" +
+			"font:600 11px/1.2 ui-monospace,monospace;" +
+			"pointer-events:none;user-select:none;";
+		document.body.appendChild(badge);
+	}
+
 	_initRecordMode(engineCEnabled);
 
-	const maxBytes = maxFileSizeMb * 1024 * 1024;
+	const maxBytes = debugNoLimits ? Number.POSITIVE_INFINITY : maxFileSizeMb * 1024 * 1024;
 
 	// 更新上传区提示文字（绑定到 data-i18n 参数，便于语言切换时自动刷新）
 	const hint = document.querySelector(".upload-hint");
@@ -709,28 +792,41 @@ async function initUploaders() {
 		},
 	});
 
-	// Import previously exported .vga.json — single-file, JSON only.
+	// Import previously exported .vga.json — multi-file capable, JSON only.
 	// 走和散点图历史还原一样的路径，把 summary/analysis/audio 灌回 UI。
 	$("import-result-btn")?.addEventListener("click", () => {
 		$("import-input")?.click();
 	});
 	$("import-input")?.addEventListener("change", async (e) => {
-		const file = e.target.files?.[0];
+		const files = [...(e.target.files || [])];
 		e.target.value = "";
-		if (!file) return;
-		try {
-			const { sessions } = await parseImportFile(file);
-			// 单 session：自动打开详情（最常见用例）。
-			// 多 session：仅追加到历史，让用户在散点图自己选要看哪条。
-			if (sessions.length === 1) {
-				await _loadImportedSession(sessions[0]);
-				showToast(t("import.successFmt", { name: sessions[0].filename }));
-			} else {
-				for (const s of sessions) _appendImportedToHistory(s);
-				showToast(t("import.successMultiFmt", { n: sessions.length }));
+		if (files.length === 0) return;
+
+		// 顺序解析：每个文件 base64→Blob 解码会驻留在内存，并行 N 份会把 RSS 吹起来。
+		const allSessions = [];
+		const errors = [];
+		for (const file of files) {
+			try {
+				const { sessions } = await parseImportFile(file);
+				allSessions.push(...sessions);
+			} catch (err) {
+				errors.push({ name: file.name, message: err.message });
 			}
-		} catch (err) {
-			showToast(err.message, "error");
+		}
+
+		for (const { name, message } of errors) {
+			showToast(`${name}: ${message}`, "error");
+		}
+
+		if (allSessions.length === 0) return;
+		// 只有"单文件单 session 且无错"才自动打开详情，沿用旧的 UX 契约。
+		// 其它情况一律入历史，让用户在散点图自己选要看哪条。
+		if (files.length === 1 && allSessions.length === 1 && errors.length === 0) {
+			await _loadImportedSession(allSessions[0]);
+			showToast(t("import.successFmt", { name: allSessions[0].filename }));
+		} else {
+			for (const s of allSessions) await _appendImportedToHistory(s);
+			showToast(t("import.successMultiFmt", { n: allSessions.length }));
 		}
 	});
 }
@@ -818,9 +914,11 @@ $("analyze-btn")?.addEventListener("click", async () => {
 
 		// ── Save session & update scatter plot ─────────────────
 		if (data.summary.overall_f0_median_hz != null) {
+			const identity = await _buildScriptIdentity(data.summary);
 			const session = {
 				id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
 				filename: data.filename,
+				createdAt: await _audioRecordedAt(currentFile),
 				f0_median: data.summary.overall_f0_median_hz,
 				gender_score: data.summary.overall_gender_score,
 				confidence: data.summary.overall_confidence,
@@ -828,6 +926,7 @@ $("analyze-btn")?.addEventListener("click", async () => {
 				color: nextSessionColor(),
 				summary: data.summary,
 				analysis: data.analysis,
+				...identity,
 			};
 			saveSession(session);
 			audioCache.set(session.id, currentFile);
@@ -907,19 +1006,32 @@ async function _refreshExportDialogSize() {
 	if (!dialog?.open) return;
 	const scope = dialog.querySelector('input[name="export-scope"]:checked')?.value || "current";
 	const includeAudio = $("export-include-audio")?.checked ?? false;
+	const alsoAudio = $("export-also-audio")?.checked ?? false;
 	const sizeEl = $("export-audio-size");
-	if (!sizeEl) return;
-	if (!includeAudio) {
-		sizeEl.textContent = t("export.audioSizeNone");
-		return;
+	const alsoHintEl = $("export-also-audio-hint");
+
+	// 任一勾选都要拉 audioFile —— includeAudio 用于估 base64 体积，alsoAudio 用于估文件数。
+	const needAudio = includeAudio || alsoAudio;
+	const stat = needAudio
+		? await _collectSessionsForExport({ scope, includeAudio: true })
+		: { audioBytes: 0, audioCount: 0 };
+
+	if (sizeEl) {
+		if (!includeAudio || stat.audioCount === 0) {
+			sizeEl.textContent = t("export.audioSizeNone");
+		} else if (scope === "all") {
+			sizeEl.textContent = t("export.audioSizeMultiFmt", { n: stat.audioCount, size: _formatBytes(stat.audioBytes) });
+		} else {
+			sizeEl.textContent = t("export.audioSizeFmt", { size: _formatBytes(stat.audioBytes) });
+		}
 	}
-	const { audioBytes, audioCount } = await _collectSessionsForExport({ scope, includeAudio: true });
-	if (audioCount === 0) {
-		sizeEl.textContent = t("export.audioSizeNone");
-	} else if (scope === "all") {
-		sizeEl.textContent = t("export.audioSizeMultiFmt", { n: audioCount, size: _formatBytes(audioBytes) });
-	} else {
-		sizeEl.textContent = t("export.audioSizeFmt", { size: _formatBytes(audioBytes) });
+
+	if (alsoHintEl) {
+		if (alsoAudio && stat.audioCount > 1) {
+			alsoHintEl.textContent = t("export.alsoAudioHintMulti", { n: stat.audioCount });
+		} else {
+			alsoHintEl.textContent = "";
+		}
 	}
 }
 
@@ -962,12 +1074,18 @@ function _closeExportDialog() {
 async function _confirmExport() {
 	const dialog = $("export-dialog");
 	if (!dialog) return;
+	const confirmBtn = $("export-dialog-confirm");
 	const scope = dialog.querySelector('input[name="export-scope"]:checked')?.value || "current";
 	const includeAudio = $("export-include-audio")?.checked ?? true;
 	const includeEngineC = $("export-include-engine-c")?.checked ?? true;
+	const alsoAudio = $("export-also-audio")?.checked ?? false;
 
+	if (confirmBtn) confirmBtn.disabled = true;
 	try {
-		const { sessions } = await _collectSessionsForExport({ scope, includeAudio });
+		// alsoAudio 也要 audioFile，所以即使 includeAudio=false 也得 fetch——
+		// _collectSessionsForExport 的 includeAudio 参数决定要不要 await audioCache.get。
+		const needAudioFiles = includeAudio || alsoAudio;
+		const { sessions } = await _collectSessionsForExport({ scope, includeAudio: needAudioFiles });
 		if (sessions.length === 0) {
 			showToast(t(scope === "all" ? "export.errEmptyHistory" : "export.errNoData"), "error");
 			return;
@@ -977,20 +1095,40 @@ async function _confirmExport() {
 			options: { includeAudio, includeEngineC },
 		});
 		const { filename, size } = downloadExport(exportObj);
+
+		// JSON 已落盘——dialog 不再挡 UI，音频在后台串行下载，用户靠浏览器下载条 + toast 跟进度。
 		_closeExportDialog();
 		showToast(t("export.successFmt", { name: filename, size: _formatBytes(size) }));
+
+		if (alsoAudio) {
+			await new Promise((r) => setTimeout(r, 200));
+			const audioStat = await downloadAudioFilesSequential(sessions);
+			if (audioStat.downloaded > 0) {
+				showToast(t("export.audioDownloadedFmt", { n: audioStat.downloaded }));
+			}
+			if (audioStat.skipped > 0) {
+				showToast(t("export.audioSkippedFmt", { n: audioStat.skipped }), "warn");
+			}
+		}
 	} catch (err) {
 		showToast(t("toast.failedFmt", { msg: err.message }), "error");
+	} finally {
+		if (confirmBtn) confirmBtn.disabled = false;
 	}
 }
 
 $("export-result-btn")?.addEventListener("click", _openExportDialog);
 $("export-dialog-cancel")?.addEventListener("click", _closeExportDialog);
 $("export-dialog-confirm")?.addEventListener("click", _confirmExport);
-// 切 scope / 切 include-audio 都会改变预估体积——重算一次。
+// 切 scope / 切 include-audio / also-audio 都可能改变 hint——重算一次。
 $("export-dialog")?.addEventListener("change", (e) => {
 	const tgt = e.target;
-	if (tgt?.name === "export-scope" || tgt?.id === "export-include-audio" || tgt?.id === "export-include-engine-c") {
+	if (
+		tgt?.name === "export-scope" ||
+		tgt?.id === "export-include-audio" ||
+		tgt?.id === "export-include-engine-c" ||
+		tgt?.id === "export-also-audio"
+	) {
 		_refreshExportDialogSize();
 	}
 });
@@ -1066,9 +1204,6 @@ async function onScatterDotClick(session) {
 				if ($("analyze-btn")) $("analyze-btn").disabled = true;
 				_phoneTimeline?.attachWavesurfer(getWaveSurfer());
 			},
-			onTimeUpdate: (t) => {
-				if (analysisData) highlightActiveSegment(t, analysisData.analysis);
-			},
 		});
 	} else {
 		// Cold：缓存里没有原文件（首刷被淘汰等），段落用右侧列表承担
@@ -1083,12 +1218,14 @@ function onScatterDeselect() {
 }
 
 // 追加单条导入项到历史 + 散点图（不打开详情）。多 session 导入用。
-function _appendImportedToHistory({ summary, analysis, filename, audioFile }) {
+async function _appendImportedToHistory({ summary, analysis, filename, audioFile, createdAt }) {
 	if (summary?.overall_f0_median_hz == null) return null;
 	const sessionId = Date.now().toString() + Math.random().toString(36).slice(2, 8);
+	const identity = await _buildScriptIdentity(summary);
 	const session = {
 		id: sessionId,
 		filename: filename || "imported",
+		createdAt: createdAt ?? (await _audioRecordedAt(audioFile)),
 		f0_median: summary.overall_f0_median_hz,
 		gender_score: summary.overall_gender_score,
 		confidence: summary.overall_confidence,
@@ -1096,6 +1233,7 @@ function _appendImportedToHistory({ summary, analysis, filename, audioFile }) {
 		color: nextSessionColor(),
 		summary,
 		analysis,
+		...identity,
 	};
 	saveSession(session);
 	addSession(session);
@@ -1106,13 +1244,15 @@ function _appendImportedToHistory({ summary, analysis, filename, audioFile }) {
 // ─── Import previously exported result ──────────────────────
 // 走和"点散点图历史 dot"几乎一样的还原路径。如果导出文件包含音频，
 // 还能完整还原 player + 波形 + 卡拉 OK 同步——用户体验从冷态变成热态。
-async function _loadImportedSession({ summary, analysis, filename, audioFile }) {
+async function _loadImportedSession({ summary, analysis, filename, audioFile, createdAt }) {
 	if (phase === "analyzing") cancelAnalysis();
 
 	const sessionId = Date.now().toString() + Math.random().toString(36).slice(2, 8);
+	const identity = await _buildScriptIdentity(summary);
 	const session = {
 		id: sessionId,
 		filename: filename || "imported",
+		createdAt: createdAt ?? (await _audioRecordedAt(audioFile)),
 		f0_median: summary.overall_f0_median_hz,
 		gender_score: summary.overall_gender_score,
 		confidence: summary.overall_confidence,
@@ -1120,6 +1260,7 @@ async function _loadImportedSession({ summary, analysis, filename, audioFile }) 
 		color: nextSessionColor(),
 		summary,
 		analysis,
+		...identity,
 	};
 
 	analysisData = session;
@@ -1172,9 +1313,6 @@ async function _loadImportedSession({ summary, analysis, filename, audioFile }) 
 				if ($("analyze-btn")) $("analyze-btn").disabled = true;
 				_phoneTimeline?.attachWavesurfer(getWaveSurfer());
 			},
-			onTimeUpdate: (tm) => {
-				if (analysisData) highlightActiveSegment(tm, analysisData.analysis);
-			},
 		});
 	} else {
 		setAudioUnavailableHint(true);
@@ -1222,80 +1360,18 @@ async function initScatterFromStorage() {
 	const leftHeader = leftPanel?.querySelector(".panel-header");
 	if (!leftPanel || !leftHeader) return;
 
-	// Start expanded on mobile so the chart is visible by default
-	if (mq.matches) leftPanel.classList.add("panel-expanded");
-
+	// HTML default = no panel-expanded (mobile starts collapsed so the empty
+	// scatter canvas doesn't pad first paint).  Desktop ignores the class.
 	leftHeader.addEventListener("click", () => {
 		if (!mq.matches) return;
 		leftPanel.classList.toggle("panel-expanded");
 	});
 
-	// Reset on resize to desktop; expand when entering mobile
+	// Resize-to-desktop: ensure no leftover toggle state.  Resize-to-mobile:
+	// keep whatever state was there (collapsed by default, or whatever the
+	// user toggled before resizing back).
 	mq.addEventListener("change", (e) => {
 		if (!e.matches) leftPanel.classList.remove("panel-expanded");
-		else leftPanel.classList.add("panel-expanded");
-	});
-})();
-
-// ─── Mobile: tabs for segments / metrics ─────────────────────
-(function initMobileTabs() {
-	const mq = matchMedia("(max-width: 780px)");
-	const tabBar = $("mobile-tabs");
-	const segSection = $("segments-section");
-	const rightPanel = document.querySelector(".panel-right");
-	if (!tabBar || !rightPanel) return;
-
-	const tabs = tabBar.querySelectorAll(".mobile-tab");
-	let activeTab = "metrics";
-
-	function applyTab(tab) {
-		activeTab = tab;
-		tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
-		if (!mq.matches) {
-			// Desktop: show everything
-			segSection?.classList.remove("mobile-hidden");
-			rightPanel.classList.remove("mobile-hidden");
-			return;
-		}
-		if (tab === "segments") {
-			segSection?.classList.remove("mobile-hidden");
-			rightPanel.classList.add("mobile-hidden");
-		} else {
-			segSection?.classList.add("mobile-hidden");
-			rightPanel.classList.remove("mobile-hidden");
-		}
-	}
-
-	tabBar.addEventListener("click", (e) => {
-		const btn = e.target.closest(".mobile-tab");
-		if (!btn) return;
-		applyTab(btn.dataset.tab);
-	});
-
-	// Show tab bar when stats are visible (results phase)
-	const observer = new MutationObserver(() => {
-		const statsVisible = !$("stats-section")?.hidden;
-		tabBar.hidden = !statsVisible;
-		if (statsVisible && mq.matches) applyTab(activeTab);
-	});
-	const statsEl = $("stats-section");
-	if (statsEl) observer.observe(statsEl, { attributes: true, attributeFilter: ["hidden"] });
-
-	// Auto-switch to metrics when a segment is clicked on mobile
-	document.addEventListener("segment-select", () => {
-		if (mq.matches) {
-			applyTab("metrics");
-		}
-	});
-
-	// Reset on resize to desktop
-	mq.addEventListener("change", (e) => {
-		if (!e.matches) {
-			segSection?.classList.remove("mobile-hidden");
-			rightPanel.classList.remove("mobile-hidden");
-		} else {
-			applyTab(activeTab);
-		}
 	});
 })();
 
@@ -1308,6 +1384,7 @@ const _LANG_SHORT_KEY = {
 	"zh-CN": "header.langShort.zh",
 	"en-US": "header.langShort.en",
 	"fr-FR": "header.langShort.fr",
+	"ko-KR": "header.langShort.ko",
 };
 function _updateLangToggleLabel() {
 	const lbl = $("lang-toggle-label");
@@ -1377,6 +1454,70 @@ onLangChange(() => {
 	scatterRedraw();
 });
 
+// ─── Acoustic dashboard wiring ────────────────────────────────
+// Init Gridstack on the right-panel container, then wire the panel-header
+// "+加块" popover and the reset button.
+function _initAcousticDashboard() {
+	const container = document.getElementById("acoustic-dashboard");
+	if (!container) return;
+	initDashboard(container);
+
+	const addBtn = document.getElementById("dashboard-add-block");
+	const resetBtn = document.getElementById("dashboard-reset");
+	const popover = document.getElementById("dashboard-popover");
+
+	function closePopover() {
+		if (popover) popover.classList.remove("is-open");
+		if (addBtn) addBtn.setAttribute("aria-expanded", "false");
+	}
+	function openPopover() {
+		if (!popover) return;
+		const hiddenIds = getHiddenBlockIds();
+		popover.replaceChildren();
+		if (hiddenIds.length === 0) {
+			const empty = document.createElement("div");
+			empty.className = "dashboard-popover-empty";
+			empty.textContent = t("dashboard.popoverEmpty");
+			popover.appendChild(empty);
+		} else {
+			for (const id of hiddenIds) {
+				const item = document.createElement("button");
+				item.type = "button";
+				item.className = "dashboard-popover-item";
+				item.dataset.blockId = id;
+				item.textContent = t(`dashboard.block.${id}`);
+				item.addEventListener("click", () => {
+					showBlock(id);
+					closePopover();
+				});
+				popover.appendChild(item);
+			}
+		}
+		popover.classList.add("is-open");
+		if (addBtn) addBtn.setAttribute("aria-expanded", "true");
+	}
+	const isOpen = () => popover?.classList.contains("is-open");
+
+	addBtn?.addEventListener("click", (e) => {
+		e.stopPropagation();
+		if (isOpen()) closePopover();
+		else openPopover();
+	});
+	// Click-outside / Esc to dismiss popover
+	document.addEventListener("click", (e) => {
+		if (!isOpen()) return;
+		if (popover.contains(e.target) || addBtn?.contains(e.target)) return;
+		closePopover();
+	});
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape" && isOpen()) closePopover();
+	});
+
+	resetBtn?.addEventListener("click", () => {
+		if (confirm(t("dashboard.resetLayout") + "?")) resetLayout();
+	});
+}
+
 // ─── Boot ─────────────────────────────────────────────────────
 initTheme();
 applyStaticDom();
@@ -1388,4 +1529,11 @@ _initClassifyModeSwitcher();
 _updateClassifyModeSwitcher();
 _initScatterModeSwitcher();
 _updateScatterModeSwitcher();
+_initAcousticDashboard();
 initScatterFromStorage();
+
+// disclosure UI disabled (使用前请先了解) — uncomment to restore the gate + header button.
+// Stage 0: ethical disclosure gate. Force-shows on first visit;
+// header "About" button (#disclosure-toggle) re-opens it later.
+// mountDisclosureModal();
+// document.getElementById("disclosure-toggle")?.addEventListener("click", showDisclosure);

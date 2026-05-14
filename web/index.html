@@ -6,7 +6,7 @@
 			(function () {
 				var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
 				document.documentElement.setAttribute("data-theme", t);
-				var SUPPORTED = ["zh-CN", "en-US", "fr-FR"];
+				var SUPPORTED = ["zh-CN", "en-US", "fr-FR", "ko-KR"];
 				var storedLang = localStorage.getItem("vga.lang");
 				var navLang = (navigator.language || "").toLowerCase();
 				var lang =
@@ -16,7 +16,9 @@
 							? "zh-CN"
 							: navLang.indexOf("fr") === 0
 								? "fr-FR"
-								: "en-US";
+								: navLang.indexOf("ko") === 0
+									? "ko-KR"
+									: "en-US";
 				document.documentElement.setAttribute("lang", lang);
 			})();
 		</script>
@@ -28,6 +30,11 @@
 		<title data-i18n="app.title">声音分析鸭 — 声音性别分析</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="preload"
+			as="style"
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+		/>
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 		<link rel="stylesheet" href="/src/styles/main.css" />
 		<link rel="stylesheet" href="/src/styles/timeline.css" />
@@ -100,6 +107,15 @@
 							>
 								Français
 							</button>
+							<button
+								type="button"
+								role="menuitem"
+								class="lang-menu-item"
+								data-lang="ko-KR"
+								data-i18n="header.langName.ko"
+							>
+								한국어
+							</button>
 						</div>
 					</div>
 					<button id="help-toggle" class="icon-btn" data-i18n-aria-label="header.help" aria-label="使用帮助">
@@ -117,6 +133,33 @@
 							<line x1="12" y1="17" x2="12.01" y2="17" />
 						</svg>
 					</button>
+					<!-- disclosure UI disabled (使用前请先了解) — uncomment to restore.
+					<button
+						id="disclosure-toggle"
+						class="icon-btn"
+						data-i18n-aria-label="header.disclosure"
+						data-i18n-title="header.disclosure"
+						aria-label="使用前须知"
+						title="使用前须知"
+					>
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<circle cx="12" cy="12" r="10" />
+							<line x1="12" y1="8" x2="12" y2="12" />
+							<line x1="12" y1="16" x2="12.01" y2="16" />
+						</svg>
+					</button>
+					-->
+
 					<button id="theme-toggle" class="icon-btn" data-i18n-aria-label="header.theme" aria-label="切换主题">
 						<svg
 							class="icon-sun"
@@ -158,6 +201,10 @@
 		<!-- ══════════════════════════ THREE-PANEL LAYOUT ════════════════════════ -->
 		<div class="app-layout">
 			<!-- ══ LEFT PANEL: Scatter plot ════════════════════════════════════════ -->
+			<!-- No `panel-expanded` on first paint: mobile default = collapsed, so the
+			     empty scatter canvas (~180 px) doesn't take vertical real-estate before
+			     any session exists.  User taps the header to expand.  Desktop ignores
+			     the class entirely (collapse rules are inside @media (max-width:780px)). -->
 			<aside class="panel panel-left">
 				<div class="panel-header">
 					<span class="panel-title" data-i18n="panel.history">历史分析</span>
@@ -468,7 +515,7 @@
 						<span data-i18n="upload.privacy"> 服务器不留存音频与分析结果；历史记录保存在您本地浏览器，可随时清空 </span>
 					</p>
 
-					<input type="file" id="import-input" accept=".json,application/json" hidden />
+					<input type="file" id="import-input" accept=".json,application/json" multiple hidden />
 				</section>
 
 				<!-- Export options dialog: range (current/all) + content (audio/engine_c).
@@ -504,6 +551,13 @@
 							<label class="export-dialog-option">
 								<input type="checkbox" id="export-include-engine-c" checked />
 								<span data-i18n="export.includeEngineC">包含 Engine C 音素数据</span>
+							</label>
+							<label class="export-dialog-option">
+								<input type="checkbox" id="export-also-audio" />
+								<span>
+									<span data-i18n="export.alsoAudio">同时单独导出原音频</span>
+									<span class="hint-muted" id="export-also-audio-hint"></span>
+								</span>
 							</label>
 						</fieldset>
 
@@ -621,269 +675,518 @@
 
 				<!-- Phone-level timeline (Engine C, feature-flagged) — drill-down detail -->
 				<div id="phone-timeline-root" hidden></div>
-
-				<!-- Mobile tabs (visible only on narrow screens) -->
-				<div class="mobile-tabs" id="mobile-tabs" hidden>
-					<button class="mobile-tab" data-tab="segments" data-i18n="mobile.tabSegments">分段详情</button>
-					<button class="mobile-tab active" data-tab="metrics" data-i18n="mobile.tabMetrics">声学特征</button>
-				</div>
-
-				<!-- Stats cards — macro conclusion, sits directly above segment list so
-				     the two summary panels (overall composition + per-segment detail)
-				     are visually grouped at the bottom of the center column. -->
-				<section id="stats-section" class="card stats-section" hidden>
-					<div class="section-header">
-						<h2 class="section-title" data-i18n="stats.title">声音占比</h2>
-						<div
-							id="classify-mode-switcher"
-							class="classify-mode-switcher"
-							role="radiogroup"
-							data-i18n-aria-label="stats.modeAria"
-							aria-label="占比依据"
-						>
-							<button
-								class="classify-mode-btn is-active"
-								data-mode="engineA"
-								role="radio"
-								aria-checked="true"
-								data-i18n-title="stats.modeATip"
-								title="依 inaSpeechSegmenter 神经网络标签"
-							>
-								<span data-i18n="stats.modeA">神经网络</span>
-							</button>
-							<button
-								class="classify-mode-btn"
-								data-mode="pitch"
-								role="radio"
-								aria-checked="false"
-								data-i18n-title="stats.modePitchTip"
-								title="依每个音素的基频（165 Hz 为中性线）"
-							>
-								<span data-i18n="stats.modePitch">音高</span>
-							</button>
-							<button
-								class="classify-mode-btn"
-								data-mode="resonance"
-								role="radio"
-								aria-checked="false"
-								data-i18n-title="stats.modeResonanceTip"
-								title="依每个音素的共鸣值（0.5 为中性线）"
-							>
-								<span data-i18n="stats.modeResonance">共鸣</span>
-							</button>
-						</div>
-					</div>
-					<div class="stats-caption" data-i18n="stats.subtitle">仅人声片段（音乐 / 静音不计入）</div>
-					<div class="stats-grid">
-						<div class="stat-card stat-male">
-							<div class="stat-dot"></div>
-							<div class="stat-label" data-i18n="label.male">男声</div>
-							<div class="stat-pct" id="male-pct">—</div>
-							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="male-bar" style="width: 0%"></div></div>
-							<div class="stat-duration" id="male-duration">—</div>
-						</div>
-						<div class="stat-card stat-female">
-							<div class="stat-dot"></div>
-							<div class="stat-label" data-i18n="label.female">女声</div>
-							<div class="stat-pct" id="female-pct">—</div>
-							<div class="stat-bar-wrap"><div class="stat-bar-fill" id="female-bar" style="width: 0%"></div></div>
-							<div class="stat-duration" id="female-duration">—</div>
-						</div>
-					</div>
-				</section>
-
-				<!-- Segment list -->
-				<section id="segments-section" class="card" hidden>
-					<details id="segments-details">
-						<summary class="section-header">
-							<h2 class="section-title" data-i18n="segments.title">分段详情</h2>
-							<span id="segment-count" class="badge">—</span>
-						</summary>
-						<div id="segments-list" class="segments-list"></div>
-					</details>
-				</section>
 			</main>
 
-			<!-- ══ RIGHT PANEL: Acoustic metrics ═══════════════════════════════════ -->
+			<!-- ══ RIGHT PANEL: Acoustic dashboard ═══════════════════════════════════
+			     12-col Gridstack grid (web/src/modules/dashboard.js). Each block is a
+			     `.grid-stack-item` with a `gs-id` + initial `gs-x/y/w/h` defaults that
+			     match DEFAULT_LAYOUT. The user can drag, resize, hide via header ×, or
+			     re-add hidden blocks via the panel-header "+加块" popover. Layout
+			     persisted to localStorage `vga.acoustic.dashboard`.
+
+			     Per-block empty/content states: `[data-block-empty]` shown until the
+			     block has data; `[data-block-content]` swapped in by metrics-panel.js
+			     / classify.js / resonance-panel.js render functions. All inner DOM ids
+			     preserved from the previous flat layout so render code is unchanged. -->
 			<aside class="panel panel-right">
 				<div class="panel-header">
 					<span class="panel-title" data-i18n="panel.metrics">综合声学特征</span>
 					<span id="mc-segment-label" class="mc-segment-label"></span>
-				</div>
-
-				<!-- Advice v2 panel: single-sentence summary + gating warning. -->
-				<div id="advice-panel" class="advice-panel" hidden>
-					<div id="advice-warning" class="advice-warning" hidden>
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-						>
-							<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-							<line x1="12" y1="9" x2="12" y2="13" />
-							<line x1="12" y1="17" x2="12.01" y2="17" />
-						</svg>
-						<span id="advice-warning-text">—</span>
+					<div class="panel-header-actions">
 						<button
 							type="button"
-							id="advice-warning-close"
-							class="advice-warning-close"
-							data-i18n-aria-label="advice.warning.dismiss"
-							aria-label="Dismiss"
+							id="dashboard-add-block"
+							class="dashboard-icon-btn"
+							data-i18n-aria-label="dashboard.addBlock"
+							aria-label="加块"
+							aria-haspopup="menu"
+							aria-expanded="false"
 						>
 							<svg
-								width="12"
-								height="12"
-								viewBox="0 0 24 24"
+								width="16"
+								height="16"
+								viewBox="0 0 16 16"
 								fill="none"
 								stroke="currentColor"
-								stroke-width="2.5"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								aria-hidden="true"
+							>
+								<line x1="8" y1="3" x2="8" y2="13" />
+								<line x1="3" y1="8" x2="13" y2="8" />
+							</svg>
+						</button>
+						<button
+							type="button"
+							id="dashboard-reset"
+							class="dashboard-icon-btn"
+							data-i18n-aria-label="dashboard.resetLayout"
+							aria-label="重置布局"
+						>
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 16 16"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
 								stroke-linecap="round"
 								stroke-linejoin="round"
 								aria-hidden="true"
 							>
-								<line x1="18" y1="6" x2="6" y2="18" />
-								<line x1="6" y1="6" x2="18" y2="18" />
+								<path d="M3 8a5 5 0 1 0 1.5-3.5" />
+								<polyline points="2 2 2 5 5 5" />
 							</svg>
 						</button>
 					</div>
 				</div>
 
-				<div id="metrics-empty" class="metrics-placeholder">
-					<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true">
-						<circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5" />
-						<path
-							d="M10 16 Q13 10 16 16 Q19 22 22 16"
-							stroke="currentColor"
-							stroke-width="1.5"
-							fill="none"
-							stroke-linecap="round"
-						/>
-					</svg>
-					<span data-i18n-html="metrics.emptyClick" data-i18n-multiline="1">点击音段<br />查看声学特征</span>
-				</div>
-
-				<div id="metrics-content" hidden>
-					<!-- 对齐质量软提示（仅在 script/free 模式下 MFA 对齐明显偏弱时显示） -->
-					<div id="mc-align-warning" class="mc-align-warning" hidden>
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-						>
-							<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-							<line x1="12" y1="9" x2="12" y2="13" />
-							<line x1="12" y1="17" x2="12.01" y2="17" />
-						</svg>
-						<span id="mc-align-warning-text">—</span>
-					</div>
-					<!-- F0 + Resonance cards side by side -->
-					<div class="mc-cards-row">
-						<div class="mc-card">
-							<div class="mc-card-title" data-i18n="metrics.cardPitch">基频 PITCH</div>
-							<div class="mc-card-big" id="mc-f0-median">— Hz</div>
-							<div class="mc-card-sub" id="mc-f0-std">±— Hz</div>
-						</div>
-						<div class="mc-card">
-							<div class="mc-card-title" data-i18n="metrics.cardResonance">共鸣 RESONANCE</div>
-							<div class="mc-card-big" id="mc-res-val">—%</div>
-							<div class="mc-res-bar-wrap">
-								<div class="mc-res-bar-fill" id="mc-res-bar" style="width: 0%"></div>
+				<div class="grid-stack" id="acoustic-dashboard">
+					<!-- Block: Pitch range (segment-bound) -->
+					<div class="grid-stack-item" data-block-id="pitch" gs-id="pitch" gs-w="6" gs-h="2" gs-x="0" gs-y="0">
+						<div class="grid-stack-item-content block-card">
+							<header class="block-header">
+								<span class="block-drag-handle" aria-hidden="true">⋮⋮</span>
+								<span class="block-title" data-i18n="dashboard.block.pitch">音高范围</span>
+								<span class="block-meta" id="mc-pitch-median-tag" hidden></span>
+								<button
+									type="button"
+									class="block-collapse-btn"
+									data-block-id="pitch"
+									data-i18n-aria-label="dashboard.toggleCollapse"
+									aria-label="折叠"
+								>
+									<svg
+										viewBox="0 0 24 24"
+										width="14"
+										height="14"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.4"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<polyline points="6 9 12 15 18 9" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									class="block-hide-btn"
+									data-block-id="pitch"
+									data-i18n-aria-label="dashboard.hideBlock"
+									aria-label="隐藏"
+								>
+									×
+								</button>
+							</header>
+							<div class="block-body">
+								<div class="block-empty" data-block-empty data-i18n="dashboard.empty.segment">点击音段查看</div>
+								<div class="block-content" data-block-content hidden>
+									<div id="mc-align-warning" class="mc-align-warning" hidden>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+										>
+											<path
+												d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+											/>
+											<line x1="12" y1="9" x2="12" y2="13" />
+											<line x1="12" y1="17" x2="12.01" y2="17" />
+										</svg>
+										<span id="mc-align-warning-text">—</span>
+									</div>
+									<div class="pitch-range-bar">
+										<div
+											class="pitch-zone pitch-zone-male"
+											data-i18n-title="metrics.zoneMale"
+											title="男性 80~145 Hz"
+										></div>
+										<div
+											class="pitch-zone pitch-zone-overlap"
+											data-i18n-title="metrics.zoneOverlap"
+											title="中间 145~185 Hz"
+										></div>
+										<div
+											class="pitch-zone pitch-zone-female"
+											data-i18n-title="metrics.zoneFemale"
+											title="女性 185~255 Hz"
+										></div>
+										<div class="pitch-range-span" id="mc-pitch-range"></div>
+										<div class="pitch-indicator" id="mc-pitch-indicator"></div>
+									</div>
+									<div class="pitch-range-labels">
+										<span>80</span><span>120</span><span>160</span> <span>200</span><span>240</span><span>280</span
+										><span>320</span>
+									</div>
+									<div class="pitch-legend">
+										<span class="legend-male" data-i18n="metrics.legendMale">♂ 85~155 Hz</span>
+										<span class="legend-neutral" data-i18n="metrics.legendNeutral">♂♀ 145~185 Hz</span>
+										<span class="legend-female" data-i18n="metrics.legendFemale">♀ 175~255 Hz</span>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
 
-					<!-- Collapsible: Pitch range -->
-					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header" data-i18n="metrics.pitchRangeTitle">音高范围 (80~320 Hz)</summary>
-						<div class="mc-collapsible-body">
-							<div class="pitch-range-bar">
-								<div class="pitch-zone pitch-zone-male" data-i18n-title="metrics.zoneMale" title="男性 85~155 Hz"></div>
-								<div
-									class="pitch-zone pitch-zone-overlap"
-									data-i18n-title="metrics.zoneOverlap"
-									title="中间 145~185 Hz"
-								></div>
-								<div
-									class="pitch-zone pitch-zone-female"
-									data-i18n-title="metrics.zoneFemale"
-									title="女性 175~255 Hz"
-								></div>
-								<div class="pitch-range-span" id="mc-pitch-range"></div>
-								<div class="pitch-indicator" id="mc-pitch-indicator"></div>
-							</div>
-							<div class="pitch-range-labels">
-								<span>80</span><span>120</span><span>160</span> <span>200</span><span>240</span><span>280</span
-								><span>320</span>
-							</div>
-							<div class="pitch-legend">
-								<span class="legend-male" data-i18n="metrics.legendMale">♂ 85~155 Hz</span>
-								<span class="legend-neutral" data-i18n="metrics.legendNeutral">♂♀ 145~185 Hz</span>
-								<span class="legend-female" data-i18n="metrics.legendFemale">♀ 175~255 Hz</span>
+					<!-- Block: Formants (segment-bound) -->
+					<div class="grid-stack-item" data-block-id="formants" gs-id="formants" gs-w="2" gs-h="6" gs-x="4" gs-y="2">
+						<div class="grid-stack-item-content block-card">
+							<header class="block-header">
+								<span class="block-drag-handle" aria-hidden="true">⋮⋮</span>
+								<span class="block-title" data-i18n="dashboard.block.formants">共振峰</span>
+								<button
+									type="button"
+									class="block-collapse-btn"
+									data-block-id="formants"
+									data-i18n-aria-label="dashboard.toggleCollapse"
+									aria-label="折叠"
+								>
+									<svg
+										viewBox="0 0 24 24"
+										width="14"
+										height="14"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.4"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<polyline points="6 9 12 15 18 9" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									class="block-hide-btn"
+									data-block-id="formants"
+									data-i18n-aria-label="dashboard.hideBlock"
+									aria-label="隐藏"
+								>
+									×
+								</button>
+							</header>
+							<div class="block-body">
+								<div class="block-empty" data-block-empty data-i18n="dashboard.empty.segment">点击音段查看</div>
+								<div class="block-content" data-block-content hidden>
+									<div class="formants-grid">
+										<div class="formant-row">
+											<span class="fn-label">F0</span><span class="fn-val" id="mc-f0">—</span>
+										</div>
+										<div class="formant-row">
+											<span class="fn-label">F1</span><span class="fn-val" id="mc-f1">—</span>
+										</div>
+										<div class="formant-row">
+											<span class="fn-label">F2</span><span class="fn-val" id="mc-f2">—</span>
+										</div>
+										<div class="formant-row">
+											<span class="fn-label">F3</span><span class="fn-val" id="mc-f3">—</span>
+										</div>
+									</div>
+								</div>
 							</div>
 						</div>
-					</details>
+					</div>
 
-					<!-- Collapsible: Formants -->
-					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header" data-i18n="metrics.formantsTitle">共振峰</summary>
-						<div class="mc-collapsible-body">
-							<div class="formants-grid">
-								<div class="formant-row"><span class="fn-label">F1</span><span class="fn-val" id="mc-f1">—</span></div>
-								<div class="formant-row"><span class="fn-label">F2</span><span class="fn-val" id="mc-f2">—</span></div>
-								<div class="formant-row"><span class="fn-label">F3</span><span class="fn-val" id="mc-f3">—</span></div>
+					<!-- Block: NN estimate (segment-bound) -->
+					<div class="grid-stack-item" data-block-id="nn" gs-id="nn" gs-w="3" gs-h="5" gs-x="3" gs-y="3" hidden>
+						<div class="grid-stack-item-content block-card">
+							<header class="block-header">
+								<span class="block-drag-handle" aria-hidden="true">⋮⋮</span>
+								<span class="block-title" data-i18n="dashboard.block.nn">神经网络估计</span>
+								<button
+									type="button"
+									class="block-collapse-btn"
+									data-block-id="nn"
+									data-i18n-aria-label="dashboard.toggleCollapse"
+									aria-label="折叠"
+								>
+									<svg
+										viewBox="0 0 24 24"
+										width="14"
+										height="14"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.4"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<polyline points="6 9 12 15 18 9" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									class="block-hide-btn"
+									data-block-id="nn"
+									data-i18n-aria-label="dashboard.hideBlock"
+									aria-label="隐藏"
+								>
+									×
+								</button>
+							</header>
+							<div class="block-body">
+								<div class="block-empty" data-block-empty data-i18n="dashboard.empty.segment">点击音段查看</div>
+								<div class="block-content" data-block-content hidden>
+									<!-- Certainty tag = the actual signal; put it FIRST so it stays
+									     visible at every block height. Disclaimer + segment-note are
+									     informational footnotes; CSS dims + caps them, and at narrow
+									     buckets (.block-w1) they're hidden entirely. -->
+									<div id="mc-certainty-tag" class="certainty-tag" hidden></div>
+									<p class="mc-nn-disclaimer" data-i18n="metrics.nnDisclaimer">
+										此估计来自一个在大规模语音数据上训练的分类器。它反映的是「典型听者可能如何感知你的声音」，不代表你的身份。
+									</p>
+									<p class="mc-nn-segment-note" data-i18n="metrics.nnSegmentNote">
+										↑ 整段加权均值。分段详情里偏男/偏女交替是 AI 对中性区边界敏感的正常现象——不代表多说话者。
+									</p>
+								</div>
 							</div>
 						</div>
-					</details>
+					</div>
 
-					<!-- Engine A: Neural network estimate (reference only) -->
-					<details class="mc-collapsible" open>
-						<summary class="mc-collapsible-header" data-i18n="metrics.nnTitle">神经网络估计</summary>
-						<div class="mc-collapsible-body">
-							<p class="mc-nn-disclaimer" data-i18n="metrics.nnDisclaimer">
-								此估计来自一个在大规模语音数据上训练的分类器。它反映的是「典型听者可能如何感知你的声音」，不代表你的身份。
-							</p>
-							<div id="mc-certainty-tag" class="certainty-tag" hidden></div>
-							<p class="mc-nn-segment-note" data-i18n="metrics.nnSegmentNote">
-								↑ 整段加权均值。分段详情里偏男/偏女交替是 AI 对中性区边界敏感的正常现象——不代表多说话者。
-							</p>
+					<!-- Block: Resonance (analysis-bound, not segment) -->
+					<div class="grid-stack-item" data-block-id="resonance" gs-id="resonance" gs-w="6" gs-h="8" gs-x="6" gs-y="0">
+						<div class="grid-stack-item-content block-card">
+							<header class="block-header">
+								<span class="block-drag-handle" aria-hidden="true">⋮⋮</span>
+								<span class="block-title" data-i18n="dashboard.block.resonance">元音共振</span>
+								<span class="block-meta" id="resonance-median-tag" hidden></span>
+								<button
+									type="button"
+									class="block-collapse-btn"
+									data-block-id="resonance"
+									data-i18n-aria-label="dashboard.toggleCollapse"
+									aria-label="折叠"
+								>
+									<svg
+										viewBox="0 0 24 24"
+										width="14"
+										height="14"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.4"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<polyline points="6 9 12 15 18 9" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									class="block-hide-btn"
+									data-block-id="resonance"
+									data-i18n-aria-label="dashboard.hideBlock"
+									aria-label="隐藏"
+								>
+									×
+								</button>
+							</header>
+							<div class="block-body">
+								<div class="block-empty" data-block-empty data-i18n="dashboard.empty.analysis">上传音频后查看</div>
+								<div class="block-content" data-block-content hidden id="resonance-panel">
+									<div id="resonance-summary" class="resonance-summary" hidden></div>
+									<div id="resonance-median-block" class="resonance-median-block" hidden>
+										<div class="resonance-scale-bar">
+											<div class="resonance-zone resonance-zone-male" id="resonance-zone-male"></div>
+											<div class="resonance-zone resonance-zone-overlap" id="resonance-zone-neutral"></div>
+											<div class="resonance-zone resonance-zone-female" id="resonance-zone-female"></div>
+											<div class="resonance-range-span" id="resonance-range-span" hidden></div>
+											<div class="pitch-indicator" id="resonance-indicator"></div>
+										</div>
+										<div class="resonance-scale-labels">
+											<span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+										</div>
+									</div>
+									<div id="resonance-history-header" class="resonance-history-header" hidden></div>
+									<div id="resonance-divergence-advisory" class="resonance-divergence-advisory" hidden></div>
+									<div id="resonance-all-vowels-section" class="resonance-all-vowels-section" hidden>
+										<div class="resonance-section-header">
+											<span class="resonance-section-title" data-i18n="advice.resonance.section_title_all">元音</span>
+										</div>
+										<div id="resonance-all-vowels-list" class="resonance-all-vowels-list"></div>
+									</div>
+									<div id="resonance-caveat" class="advice-caveat" hidden></div>
+								</div>
+							</div>
 						</div>
-					</details>
+					</div>
 
-					<!-- Disclaimer -->
-					<p class="mc-disclaimer">
-						<span data-i18n="metrics.disclaimer.prefix">真挚感谢两个开源项目：神经网络分类器来自</span>
-						<a href="https://github.com/ina-foss/inaSpeechSegmenter" target="_blank" rel="noopener"
-							>inaSpeechSegmenter</a
-						><span data-i18n="metrics.disclaimer.mid"> 音素级共振峰 z-score 链路来自 </span>
-						<a href="https://github.com/lmcnulty/gender-voice-visualization" target="_blank" rel="noopener"
-							>gender-voice-visualization</a
-						>
-						<a
-							href="https://github.com/guojunximi-cell/gender-voice-visualization"
-							target="_blank"
-							rel="noopener"
-							data-i18n="metrics.disclaimer.forkLabel"
-							>fork</a
-						>
-					</p>
+					<!-- Block: Stats distribution (analysis-bound) — hidden by default; user adds via "+加块". -->
+					<div class="grid-stack-item" data-block-id="stats" gs-id="stats" gs-w="4" gs-h="6" gs-x="0" gs-y="2">
+						<div class="grid-stack-item-content block-card">
+							<header class="block-header">
+								<span class="block-drag-handle" aria-hidden="true">⋮⋮</span>
+								<span class="block-title" data-i18n="dashboard.block.stats">占比分布</span>
+								<span class="block-meta" id="stats-dominant-tag" hidden></span>
+								<button
+									type="button"
+									class="block-collapse-btn"
+									data-block-id="stats"
+									data-i18n-aria-label="dashboard.toggleCollapse"
+									aria-label="折叠"
+								>
+									<svg
+										viewBox="0 0 24 24"
+										width="14"
+										height="14"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.4"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<polyline points="6 9 12 15 18 9" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									class="block-hide-btn"
+									data-block-id="stats"
+									data-i18n-aria-label="dashboard.hideBlock"
+									aria-label="隐藏"
+								>
+									×
+								</button>
+							</header>
+							<div class="block-body">
+								<div class="block-empty" data-block-empty data-i18n="dashboard.empty.analysis">上传音频后查看</div>
+								<div class="block-content" data-block-content hidden id="stats-section">
+									<div class="classify-controls-row">
+										<div
+											id="classify-mode-switcher"
+											class="classify-mode-switcher"
+											role="radiogroup"
+											data-i18n-aria-label="stats.modeAria"
+											aria-label="占比依据"
+										>
+											<button
+												class="classify-mode-btn is-active"
+												data-mode="engineA"
+												role="radio"
+												aria-checked="true"
+												data-i18n-title="stats.modeATip"
+												title="依 inaSpeechSegmenter 神经网络标签"
+											>
+												<span data-i18n="stats.modeA">神经网络</span>
+											</button>
+											<button
+												class="classify-mode-btn"
+												data-mode="pitch"
+												role="radio"
+												aria-checked="false"
+												data-i18n-title="stats.modePitchTip"
+												title="依每个音素的基频（165 Hz 为中性线）"
+											>
+												<span data-i18n="stats.modePitch">音高</span>
+											</button>
+											<button
+												class="classify-mode-btn"
+												data-mode="resonance"
+												role="radio"
+												aria-checked="false"
+												data-i18n-title="stats.modeResonanceTip"
+												title="依每个音素的共鸣值（0.5 = 女性参考均值，不是男女中线；实测男声 median ≈ 0.35–0.49）"
+											>
+												<span data-i18n="stats.modeResonance">共鸣</span>
+											</button>
+										</div>
+										<div
+											id="resonance-consonants-toggle"
+											class="resonance-consonants-toggle"
+											role="radiogroup"
+											data-i18n-aria-label="advice.resonance.consonants.aria_label"
+											aria-label="是否包含辅音"
+											hidden
+										>
+											<button
+												type="button"
+												class="resonance-consonants-btn"
+												data-mode="vowels"
+												role="radio"
+												aria-checked="false"
+											>
+												<span data-i18n="advice.resonance.consonants.toggle_vowels_only">仅元音</span>
+											</button>
+											<button
+												type="button"
+												class="resonance-consonants-btn is-active"
+												data-mode="all"
+												role="radio"
+												aria-checked="true"
+											>
+												<span data-i18n="advice.resonance.consonants.toggle_all_phones">包含辅音</span>
+											</button>
+										</div>
+									</div>
+									<div class="stats-caption" data-i18n="stats.subtitle">仅人声片段（音乐 / 静音不计入）</div>
+									<div class="stats-grid">
+										<div class="stat-card stat-male">
+											<div class="stat-dot"></div>
+											<div class="stat-label" data-i18n="label.male">男声</div>
+											<div class="stat-pct" id="male-pct">—</div>
+											<div class="stat-bar-wrap"><div class="stat-bar-fill" id="male-bar" style="width: 0%"></div></div>
+											<div class="stat-duration" id="male-duration">—</div>
+										</div>
+										<div class="stat-card stat-neutral" hidden>
+											<div class="stat-dot"></div>
+											<div class="stat-label" data-i18n="label.neutral">中性</div>
+											<div class="stat-pct" id="neutral-pct">—</div>
+											<div class="stat-bar-wrap">
+												<div class="stat-bar-fill" id="neutral-bar" style="width: 0%"></div>
+											</div>
+											<div class="stat-duration" id="neutral-duration">—</div>
+										</div>
+										<div class="stat-card stat-female">
+											<div class="stat-dot"></div>
+											<div class="stat-label" data-i18n="label.female">女声</div>
+											<div class="stat-pct" id="female-pct">—</div>
+											<div class="stat-bar-wrap">
+												<div class="stat-bar-fill" id="female-bar" style="width: 0%"></div>
+											</div>
+											<div class="stat-duration" id="female-duration">—</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
 				</div>
-				<!-- /metrics-content -->
+
+				<!-- Add-block popover (managed by main.js wiring; .is-open toggles
+				     fade-in/out — base CSS keeps it visibility:hidden+opacity:0). -->
+				<div id="dashboard-popover" class="dashboard-popover" role="menu"></div>
 			</aside>
 		</div>
 		<!-- /app-layout -->
+
+		<!-- Open-source attribution: lives outside .app-layout so it always sits
+		     at the very bottom of the page, below the dashboard scroll. -->
+		<footer class="page-disclaimer">
+			<p class="mc-disclaimer">
+				<span data-i18n="metrics.disclaimer.prefix">真挚感谢两个开源项目：神经网络分类器来自</span>
+				<a href="https://github.com/ina-foss/inaSpeechSegmenter" target="_blank" rel="noopener">inaSpeechSegmenter</a
+				><span data-i18n="metrics.disclaimer.mid"> 音素级共振峰 z-score 链路来自 </span>
+				<a href="https://github.com/lmcnulty/gender-voice-visualization" target="_blank" rel="noopener"
+					>gender-voice-visualization</a
+				>
+				<a
+					href="https://github.com/guojunximi-cell/gender-voice-visualization"
+					target="_blank"
+					rel="noopener"
+					data-i18n="metrics.disclaimer.forkLabel"
+					>fork</a
+				>
+			</p>
+		</footer>
 
 		<!-- Toast -->
 		<div id="toast" class="toast" role="alert" aria-live="assertive"></div>
@@ -900,33 +1203,108 @@
 				<section class="vga-help-section">
 					<h4 data-i18n="help.what.h">这是什么？</h4>
 					<p data-i18n="help.what.p">
-						上传或录制一段普通话或英文音频，分析声音的性别声学特征。输出整段均值 +
-						逐字音高/共鸣色彩，作声音训练的参考工具——并非判定。
+						上传或录制中文 / 英文 /
+						法文音频，分析声音的性别声学特征。中央时间轴展示逐音素的音高与共鸣，右侧给出整段中位数。仅作练声参考，不是判定。
 					</p>
+					<div class="vga-help-engine-grid">
+						<div class="vga-help-engine-card">
+							<div class="vga-help-engine-card-h" data-i18n="help.what.engineA.h">Engine A · 音色参考</div>
+							<div class="vga-help-engine-card-body" data-i18n="help.what.engineA.desc">
+								inaSpeechSegmenter K-3 fork · CNN 分类器，输出整段女性化分数
+							</div>
+						</div>
+						<div class="vga-help-engine-card vga-help-engine-card--primary">
+							<div class="vga-help-engine-card-h" data-i18n="help.what.engineC.h">Engine C · 主线 · 音素级</div>
+							<div class="vga-help-engine-card-body" data-i18n="help.what.engineC.desc">
+								ASR + Montreal Forced Aligner + Praat 共振峰，按音素出 pitch / resonance
+							</div>
+						</div>
+					</div>
+					<span class="vga-help-pill" data-i18n="help.what.beta">beta · 迭代中</span>
 				</section>
 
 				<section class="vga-help-section">
-					<h4 data-i18n="help.heatmap.h">热力图中</h4>
-					<dl>
-						<dt data-i18n="help.heatmap.resonanceDT">共鸣</dt>
-						<dd data-i18n="help.heatmap.resonanceDD">
-							音素内的共鸣。只识别元音。由 F1 F2 F3 加权后得出。Baseline 基于 cis 分布参考。大于 50% 即意味着女性化。
-						</dd>
-						<dt data-i18n="help.heatmap.pitchDT">音高</dt>
-						<dd data-i18n="help.heatmap.pitchDD">音素内的 F0。被认为是男女性化声音的主要边界。</dd>
-					</dl>
+					<h4 data-i18n="help.heatmap.h">术语</h4>
+					<div class="vga-help-term-grid">
+						<div class="vga-help-term-card">
+							<div class="vga-help-term-card-h" data-i18n="help.heatmap.resonanceDT">共鸣</div>
+							<div class="vga-help-term-card-body" data-i18n="help.heatmap.resonanceDD">
+								音素内的共鸣，仅在元音上计算，由 F1 / F2 / F3 加权 + z-score 归一。Baseline 来自 cis
+								录音的分布参考（详见下表）。
+							</div>
+							<div class="vga-help-credit">
+								<span data-i18n="help.heatmap.resonance.credit">算法来自</span>
+								<a
+									href="https://github.com/lmcnulty/gender-voice-visualization"
+									target="_blank"
+									rel="noopener noreferrer"
+									>lmcnulty/gender-voice-visualization</a
+								>
+							</div>
+						</div>
+						<div class="vga-help-term-card">
+							<div class="vga-help-term-card-h" data-i18n="help.heatmap.pitchDT">音高</div>
+							<div class="vga-help-term-card-body" data-i18n="help.heatmap.pitchDD">
+								音素内的 F0（pyin，60–250 Hz）。听感上最容易识别，但不是唯一线索。
+							</div>
+						</div>
+					</div>
+
+					<h5 class="vga-help-subhead" data-i18n="help.baseline.h">参考分布</h5>
+					<div class="vga-help-callout vga-help-callout--info">
+						<span class="vga-help-callout-icon" aria-hidden="true">ⓘ</span>
+						<span data-i18n="help.baseline.note">
+							男女分布严重重叠 — 数字偏哪一侧不构成判定。calibration_v1，每语种 ~90 段 cis 录音。
+						</span>
+					</div>
+					<table class="vga-help-baseline">
+						<thead>
+							<tr>
+								<th data-i18n="help.baseline.col.lang">语种</th>
+								<th data-i18n="help.baseline.col.male">男声 中位数 (p25–p75)</th>
+								<th data-i18n="help.baseline.col.female">女声 中位数 (p25–p75)</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><code>zh-CN</code></td>
+								<td>38% (29–46)</td>
+								<td>73% (62–85)</td>
+							</tr>
+							<tr>
+								<td><code>en-US</code></td>
+								<td>29% (24–38)</td>
+								<td>55% (46–68)</td>
+							</tr>
+							<tr>
+								<td><code>fr-FR</code></td>
+								<td>35% (29–42)</td>
+								<td>65% (55–75)</td>
+							</tr>
+						</tbody>
+					</table>
 				</section>
 
 				<section class="vga-help-section">
 					<h4 data-i18n="help.overall.h">整段分析</h4>
-					<p data-i18n="help.overall.note">基频，共鸣和共振峰采用有效数据的平均值。</p>
-					<dl>
-						<dt data-i18n="help.overall.nnDT">NN / Engine A</dt>
-						<dd data-i18n="help.overall.nnDD">
-							来自 inaSpeechSegmenter 的 CNN 分类器，数据源以法语为主。输出性别标签，设计目的是区分 cis
-							人群在语音中的分布。仅作为 tone 参考。
-						</dd>
-					</dl>
+					<p data-i18n="help.overall.note">时间轴是音素级测量，右侧是整段聚合。聚合方式见下：</p>
+					<h5 class="vga-help-subhead" data-i18n="help.aggregate.h">聚合方式</h5>
+					<div class="vga-help-aggregate-grid">
+						<div class="vga-help-aggregate-cell">
+							<div class="vga-help-aggregate-h" data-i18n="help.aggregate.f0.h">F0</div>
+							<div class="vga-help-aggregate-body" data-i18n="help.aggregate.f0.body">pyin 中位数 + p25 / p75</div>
+						</div>
+						<div class="vga-help-aggregate-cell">
+							<div class="vga-help-aggregate-h" data-i18n="help.aggregate.resonance.h">共鸣</div>
+							<div class="vga-help-aggregate-body" data-i18n="help.aggregate.resonance.body">
+								每元音 median 再取中位数（每元音等权）
+							</div>
+						</div>
+						<div class="vga-help-aggregate-cell">
+							<div class="vga-help-aggregate-h" data-i18n="help.aggregate.formant.h">F1 / F2 / F3</div>
+							<div class="vga-help-aggregate-body" data-i18n="help.aggregate.formant.body">有效帧均值</div>
+						</div>
+					</div>
 				</section>
 
 				<section class="vga-help-section">
@@ -935,17 +1313,17 @@
 						<details>
 							<summary data-i18n="help.qa.q1">先看哪里？</summary>
 							<p data-i18n="help.qa.a1">
-								看 resonance 和 pitch 的热力图，不要看 Neural Net 那个百分比。Neural Net
-								不准。我正在把它降级成「音色参考」。Resonance 和 pitch
-								是直接测量出来的，时间分辨率细到每个音素，这才是能指导练习的东西。
+								看中央时间轴上 resonance 和 pitch 的热力图。右侧 NN
+								那个百分比已经降级成音色参考——不准，别盯着它练。Resonance / pitch
+								是音素级直接测量，这才是能指导练习的东西。
 							</p>
 						</details>
 						<details>
-							<summary data-i18n="help.qa.q2">三个引擎分歧？</summary>
+							<summary data-i18n="help.qa.q2">两个引擎分歧？</summary>
 							<p data-i18n="help.qa.a2">
-								信 resonance 和 pitch。它们对不上 NN 是正常的。它们测的不是同一个东西。更有用的问法是「resonance 和
-								pitch 自己之间对得上吗」。如果 pitch 已经上去了但 resonance
-								还偏低，说明抬了音高但共鸣腔还没改，这就是下一步的方向。
+								信 resonance 和 pitch（Engine C）。它们对不上 NN（Engine
+								A）是正常的——测的不是同一个东西。更有用的问法是「resonance 和 pitch 自己之间对得上吗」。如果 pitch
+								已经上去但 resonance 还偏低，说明抬了音高但共鸣腔还没改，这就是下一步的方向。
 							</p>
 						</details>
 						<details>
@@ -969,7 +1347,7 @@
 						</details>
 						<details>
 							<summary data-i18n="help.qa.q7">语言切换？</summary>
-							<p data-i18n="help.qa.a7">右上角切 zh-CN / en-US。</p>
+							<p data-i18n="help.qa.a7">右上角依次切换 zh-CN / en-US / fr-FR。</p>
 						</details>
 						<details>
 							<summary data-i18n="help.qa.q8">数据会留吗？</summary>
@@ -1024,7 +1402,7 @@
 							</li>
 							<li>
 								<a
-									href="https://github.com/guojunximi-cell/gender-voice-visualization"
+									href="https://github.com/lmcnulty/gender-voice-visualization"
 									target="_blank"
 									rel="noopener noreferrer"
 									data-i18n="help.links.gvv"
@@ -1082,7 +1460,7 @@
 							<div class="vga-help-flow-step">
 								<div class="vga-help-flow-step-h" data-i18n="help.flow.s1.h">上传 / 录音</div>
 								<div class="vga-help-flow-step-note" data-i18n="help.flow.s1.note" data-i18n-params='{"mb":5,"min":3}'>
-									拖拽音频、选择文件，或调用麦克风（≤ 5 MB，&lt; 3 分钟，中文 zh-CN 或英文 en-US）
+									拖拽音频、选择文件，或调用麦克风（≤ 5 MB，&lt; 3 分钟，中文 zh-CN / 英文 en-US / 法文 fr-FR）
 								</div>
 							</div>
 							<div class="vga-help-flow-arrow" aria-hidden="true">▼</div>
@@ -1119,6 +1497,80 @@
 				</section>
 			</div>
 		</div>
+
+		<!-- disclosure UI disabled (使用前请先了解) — was: 首次启动浮层，同 vga-help-modal 视觉、独立逻辑.
+		     Uncomment + restore disclosure-toggle button + main.js wiring to bring it back.
+		<div
+			id="disclosure-modal"
+			class="vga-help-modal"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="disclosure-title"
+		>
+			<div class="vga-help-backdrop" id="disclosure-backdrop"></div>
+			<div class="vga-help-overlay-card card">
+				<div class="vga-help-header">
+					<span id="disclosure-title" data-i18n="disclosure.title">使用前请先了解</span>
+					<button
+						id="disclosure-close"
+						class="icon-btn"
+						data-i18n-aria-label="disclosure.close"
+						aria-label="关闭"
+						hidden
+					>
+						✕
+					</button>
+				</div>
+				<section class="vga-help-section">
+					<p data-i18n="disclosure.intro">
+						这个工具帮你测量声音的几个声学指标，作为练习参考。它不是诊断、不是评分、不是替代专业老师。
+					</p>
+					<ul class="disclosure-points">
+						<li data-i18n="disclosure.point.measurement">显示的是测量值，不是给你的指令——具体怎么练你说了算。</li>
+						<li data-i18n="disclosure.point.model_judgment">
+							数字是模型判断，不一定等同于人耳听感。模型在某些声音上会出错。
+						</li>
+						<li data-i18n="disclosure.point.not_teacher">
+							不替代 voice teacher / SLP——这些数字读不出技巧细节，老师可以。
+						</li>
+						<li data-i18n="disclosure.point.dysphoria">
+							如果当下情绪不太稳，结果可能让你感觉更糟。可以先关掉，状态好一点再回来。
+						</li>
+					</ul>
+				</section>
+				<section class="vga-help-section">
+					<h4 data-i18n="disclosure.resources.heading">推荐资源</h4>
+					<ul class="disclosure-resources">
+						<li>
+							<a href="https://www.youtube.com/@TransVoiceLessons" target="_blank" rel="noopener noreferrer">
+								TransVoiceLessons
+							</a>
+							<span class="disclosure-resource-note" data-i18n="disclosure.resources.transvoice_note">
+								— Zheanna Erose 的频道，TVT 社区最常推荐的入门教学。
+							</span>
+						</li>
+						<li>
+							<a href="https://www.youtube.com/@SumianVoice" target="_blank" rel="noopener noreferrer">
+								Sumian Voice
+							</a>
+							<span class="disclosure-resource-note" data-i18n="disclosure.resources.sumian_note">
+								— Sumian 的频道，覆盖 resonance / pitch / weight 等技巧。
+							</span>
+						</li>
+					</ul>
+				</section>
+				<button
+					type="button"
+					id="disclosure-acknowledge"
+					class="btn-primary disclosure-acknowledge"
+					data-i18n="disclosure.acknowledge"
+				>
+					我已了解，开始使用
+				</button>
+			</div>
+		</div>
+		-->
+
 		<style>
 			/* ── Overlay container ───────────────────────────── */
 			.vga-help-modal {
@@ -1310,6 +1762,180 @@
 				line-height: 1.6;
 			}
 
+			/* ── Engine cards (what is this?) ─────────────────── */
+			.vga-help-engine-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 8px;
+				margin-top: 10px;
+			}
+			.vga-help-engine-card {
+				border: 1px solid var(--border);
+				background: var(--surface-hover);
+				border-radius: 10px;
+				padding: 10px 12px;
+			}
+			.vga-help-engine-card--primary {
+				border-color: color-mix(in srgb, var(--female, var(--accent)) 40%, var(--border));
+				background: color-mix(in srgb, var(--female, var(--accent)) 8%, var(--surface-hover));
+			}
+			.vga-help-engine-card-h {
+				font-size: 0.82rem;
+				font-weight: 600;
+				color: var(--text-primary);
+				margin-bottom: 4px;
+			}
+			.vga-help-engine-card-body {
+				font-size: 0.78rem;
+				color: var(--text-secondary);
+				line-height: 1.5;
+			}
+			.vga-help-pill {
+				display: inline-block;
+				margin-top: 10px;
+				padding: 2px 8px;
+				font-size: 0.72rem;
+				font-weight: 600;
+				color: var(--text-muted);
+				background: var(--surface-hover);
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				letter-spacing: 0.02em;
+			}
+
+			/* ── Term cards (resonance / pitch) ───────────────── */
+			.vga-help-term-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 8px;
+			}
+			.vga-help-term-card {
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 10px 12px;
+				background: var(--surface);
+			}
+			.vga-help-term-card-h {
+				font-size: 0.86rem;
+				font-weight: 700;
+				color: var(--text-primary);
+				margin-bottom: 4px;
+			}
+			.vga-help-term-card-body {
+				font-size: 0.8rem;
+				color: var(--text-secondary);
+				line-height: 1.55;
+			}
+			.vga-help-credit {
+				margin-top: 6px;
+				font-size: 0.72rem;
+				color: var(--text-muted);
+				line-height: 1.4;
+			}
+			.vga-help-credit a {
+				color: var(--text-secondary);
+				text-decoration: none;
+				border-bottom: 1px dashed var(--border);
+				padding-bottom: 1px;
+				transition:
+					color var(--transition),
+					border-color var(--transition);
+			}
+			.vga-help-credit a:hover,
+			.vga-help-credit a:focus-visible {
+				color: var(--female);
+				border-bottom-color: var(--female);
+			}
+
+			/* ── Subhead between sections ─────────────────────── */
+			.vga-help-subhead {
+				font-size: 0.78rem;
+				font-weight: 600;
+				color: var(--text-muted);
+				margin: 16px 0 8px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+
+			/* ── Callouts (info / warn) ───────────────────────── */
+			.vga-help-callout {
+				display: block;
+				border-radius: 10px;
+				padding: 10px 12px;
+				font-size: 0.8rem;
+				line-height: 1.55;
+				margin-bottom: 10px;
+			}
+			.vga-help-callout--info {
+				border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+				background: color-mix(in srgb, var(--accent) 8%, transparent);
+				color: var(--text-secondary);
+			}
+			.vga-help-callout--info .vga-help-callout-icon {
+				color: var(--accent);
+				margin-right: 6px;
+				font-weight: 700;
+			}
+			/* ── Baseline table ───────────────────────────────── */
+			.vga-help-baseline {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 0.8rem;
+				font-variant-numeric: tabular-nums;
+			}
+			.vga-help-baseline thead th {
+				text-align: left;
+				font-weight: 600;
+				font-size: 0.74rem;
+				color: var(--text-muted);
+				padding: 6px 8px;
+				border-bottom: 1px solid var(--border);
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+			}
+			.vga-help-baseline tbody td {
+				padding: 7px 8px;
+				border-bottom: 1px solid var(--border);
+				color: var(--text-primary);
+			}
+			.vga-help-baseline tbody tr:last-child td {
+				border-bottom: none;
+			}
+			.vga-help-baseline tbody td:first-child code {
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				font-size: 0.78rem;
+				color: var(--text-muted);
+				background: var(--surface-hover);
+				padding: 1px 6px;
+				border-radius: 4px;
+			}
+
+			/* ── Aggregation grid ─────────────────────────────── */
+			.vga-help-aggregate-grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 6px;
+				margin-bottom: 12px;
+			}
+			.vga-help-aggregate-cell {
+				border: 1px solid var(--border);
+				background: var(--surface-hover);
+				border-radius: 8px;
+				padding: 8px 10px;
+			}
+			.vga-help-aggregate-h {
+				font-size: 0.78rem;
+				font-weight: 700;
+				color: var(--text-primary);
+				margin-bottom: 3px;
+				font-variant-numeric: tabular-nums;
+			}
+			.vga-help-aggregate-body {
+				font-size: 0.74rem;
+				color: var(--text-muted);
+				line-height: 1.45;
+			}
+
 			/* ── Friendly links ─────────────────────────────── */
 			.vga-help-links-group {
 				margin-bottom: 14px;
@@ -1360,6 +1986,20 @@
 				.vga-help-header {
 					font-size: 0.9rem;
 					padding: 14px 0 10px;
+				}
+				.vga-help-engine-grid,
+				.vga-help-term-grid {
+					grid-template-columns: 1fr;
+				}
+				.vga-help-aggregate-grid {
+					grid-template-columns: 1fr;
+				}
+				.vga-help-baseline {
+					font-size: 0.74rem;
+				}
+				.vga-help-baseline thead th,
+				.vga-help-baseline tbody td {
+					padding: 5px 6px;
 				}
 			}
 		</style>

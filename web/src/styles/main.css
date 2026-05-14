@@ -22,6 +22,8 @@
 
 	--male: #4a7fd4;
 	--male-subtle: rgba(74, 127, 212, 0.18);
+	--neutral: #a787c2;
+	--neutral-subtle: rgba(167, 135, 194, 0.18);
 	--female: #c25e8f;
 	--female-subtle: rgba(194, 94, 143, 0.18);
 	--music: #b8972a;
@@ -39,10 +41,17 @@
 
 	--transition: 180ms ease;
 
+	/* Dashboard block-card chrome: slightly stronger border (between
+	   --border and --border-strong) + softer shadow than --shadow-sm
+	   so the border, not the lift, draws the card edge.  Tuned 2026-05-11. */
+	--block-card-border: rgba(0, 0, 0, 0.11);
+	--block-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
 	/* Safari fallbacks (color-mix not supported) */
 	--bg-glass: rgba(247, 246, 243, 0.8);
 	--accent-border: rgba(201, 100, 66, 0.3);
 	--male-dom-bg: rgba(74, 127, 212, 0.08);
+	--neutral-dom-bg: rgba(167, 135, 194, 0.08);
 	--female-dom-bg: rgba(194, 94, 143, 0.08);
 	--noise-dom-bg: rgba(122, 122, 114, 0.08);
 	--surface-blend: #f8f8f7;
@@ -75,6 +84,8 @@
 	   so they sit calmly on dark surfaces instead of vibrating. */
 	--male: #7ba4f0;
 	--male-subtle: rgba(123, 164, 240, 0.2);
+	--neutral: #bba3d0;
+	--neutral-subtle: rgba(187, 163, 208, 0.2);
 	--female: #e896b7;
 	--female-subtle: rgba(232, 150, 183, 0.2);
 	--music: #d9be7a;
@@ -87,6 +98,7 @@
 	--bg-glass: rgba(20, 20, 19, 0.82);
 	--accent-border: rgba(212, 165, 116, 0.32);
 	--male-dom-bg: rgba(123, 164, 240, 0.1);
+	--neutral-dom-bg: rgba(187, 163, 208, 0.1);
 	--female-dom-bg: rgba(232, 150, 183, 0.1);
 	--noise-dom-bg: rgba(154, 154, 156, 0.1);
 	--surface-blend: #1f1f1d;
@@ -95,6 +107,9 @@
 	   deep enough to read on pure-dark OLED. */
 	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.25);
 	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+
+	--block-card-border: rgba(255, 255, 255, 0.12);
+	--block-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* ============================================================
@@ -149,9 +164,11 @@ body {
 }
 
 .header-inner {
-	max-width: 780px;
-	margin: 0 auto;
-	padding: 0 24px;
+	/* Span full viewport so the logo hugs the left edge and the action
+	   buttons (lang / help / disclosure / theme) hug the right edge. The
+	   previous max-width: 780px capped them into a centered band. */
+	max-width: none;
+	padding: 0 20px;
 	height: 56px;
 	display: flex;
 	align-items: center;
@@ -847,25 +864,25 @@ body {
 /* ============================================================
    STATS
    ============================================================ */
-.stats-section {
+/* Distribution panel — first child inside .panel-right (above .resonance-panel).
+   Chrome (border, header, padding) comes from .mc-collapsible* rules; the
+   margin matches .resonance-panel and #metrics-content (panel-right has no
+   internal padding, and the 14px-top opens a gap below the panel-header). */
+.stats-collapsible {
+	margin: 14px 14px 0;
 }
 
 /* Caption above the male/female bars, calls out that the % denominator is
    voiced speech (not full audio) — see results.js renderStats. */
 .stats-caption {
-	padding: 0 12px 6px;
 	font-size: 11px;
 	line-height: 1.3;
 	color: var(--text-muted);
 }
 
-/* Stats list mirrors .segments-list visual language: a column of transparent
-   grid rows inside a single .card wrapper (no per-row borders / shadows / left
-   accent stripes).  Per-type dominance is conveyed by a subtle tinted
-   background — kept here because it carries information that the segment list's
-   uniform .active state doesn't need. */
+/* Stats list: column of transparent grid rows inside the collapsible body.
+   Per-type dominance is conveyed by a subtle tinted background. */
 .stats-grid {
-	padding: 0 12px 12px;
 	display: flex;
 	flex-direction: column;
 	gap: 3px;
@@ -873,7 +890,11 @@ body {
 
 .stat-card {
 	display: grid;
-	grid-template-columns: 10px minmax(60px, auto) 56px 1fr 36px;
+	/* Bar caps at 220 px on wide panels — a 4-px-tall bar stretching to 240+ px
+	   reads as a thin lonely thread. Floor 80 px keeps it useful on narrow ones.
+	   With no 1fr column, leftover panel width sits as silent right-side
+	   whitespace instead of overinflating the bar. */
+	grid-template-columns: 10px minmax(60px, auto) 56px minmax(80px, 220px) 36px;
 	align-items: center;
 	gap: 10px;
 	padding: 8px 8px;
@@ -887,6 +908,9 @@ body {
 
 .stat-male.dominant {
 	background: var(--male-dom-bg);
+}
+.stat-neutral.dominant {
+	background: var(--neutral-dom-bg);
 }
 .stat-female.dominant {
 	background: var(--female-dom-bg);
@@ -903,6 +927,9 @@ body {
 
 .stat-male .stat-dot {
 	background: var(--male);
+}
+.stat-neutral .stat-dot {
+	background: var(--neutral);
 }
 .stat-female .stat-dot {
 	background: var(--female);
@@ -941,6 +968,9 @@ body {
 .stat-male .stat-bar-fill {
 	background: linear-gradient(to right, var(--male-subtle), var(--male));
 }
+.stat-neutral .stat-bar-fill {
+	background: linear-gradient(to right, var(--neutral-subtle), var(--neutral));
+}
 .stat-female .stat-bar-fill {
 	background: linear-gradient(to right, var(--female-subtle), var(--female));
 }
@@ -966,23 +996,6 @@ body {
 	margin-bottom: 12px;
 }
 
-#segments-details > summary {
-	list-style: none;
-	cursor: pointer;
-}
-#segments-details > summary::-webkit-details-marker {
-	display: none;
-}
-#segments-details > summary .section-title::after {
-	content: " ▸";
-	font-size: 0.7em;
-	color: var(--text-muted);
-	margin-left: 4px;
-}
-#segments-details[open] > summary .section-title::after {
-	content: " ▾";
-}
-
 .section-title {
 	font-size: 0.9rem;
 	font-weight: 600;
@@ -999,11 +1012,16 @@ body {
 	border: 1px solid var(--border);
 }
 
-/* Classify-mode segmented control — swaps the classification source driving
-   the stats bar, waveform overlay, and history scatter.
+/* Classify-mode segmented control — Distribution's NN / Pitch / Resonance
+   tabs. Standalone inline pills, no container chrome; the active button's
+   own background + shadow does the visual work.
    Scatter-mode segmented control — swaps the history panel's Y-axis between
-   gender score (strips) and creation time (dots).  Shares pill sizing. */
-.classify-mode-switcher,
+   gender score (strips) and creation time (dots). Keeps a wrapping container
+   below since it spans full width with equal-flex children. */
+.classify-mode-switcher {
+	display: inline-flex;
+	gap: 6px;
+}
 .scatter-mode-switcher {
 	display: inline-flex;
 	gap: 2px;
@@ -1060,77 +1078,6 @@ body {
 	text-align: center;
 }
 
-.segments-list {
-	padding: 0 12px 12px;
-	display: flex;
-	flex-direction: column;
-	gap: 3px;
-	max-height: min(360px, 45vh);
-	overflow-y: auto;
-	scrollbar-width: thin;
-	scrollbar-color: var(--border-strong) transparent;
-}
-.segments-list::-webkit-scrollbar {
-	width: 4px;
-}
-.segments-list::-webkit-scrollbar-track {
-	background: transparent;
-}
-.segments-list::-webkit-scrollbar-thumb {
-	background: var(--border-strong);
-	border-radius: 2px;
-}
-
-.segment-item {
-	display: grid;
-	grid-template-columns: 10px minmax(60px, auto) 96px 1fr 6px 28px;
-	align-items: center;
-	gap: 10px;
-	padding: 8px 8px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	transition: background var(--transition);
-	font-size: 0.85rem;
-	border: 1px solid transparent;
-}
-
-.segment-item:hover {
-	background: var(--surface-hover);
-	border-color: var(--border);
-}
-
-.segment-item.active {
-	background: var(--accent-subtle);
-	border-color: var(--accent-border);
-}
-
-.segment-swatch {
-	width: 10px;
-	height: 10px;
-	border-radius: 3px;
-	flex-shrink: 0;
-}
-
-.segment-label {
-	font-weight: 500;
-	min-width: 60px;
-	color: var(--text-primary);
-	white-space: nowrap;
-}
-
-.segment-time {
-	color: var(--text-muted);
-	font-variant-numeric: tabular-nums;
-	font-size: 0.78rem;
-}
-
-.segment-duration {
-	color: var(--text-muted);
-	font-size: 0.75rem;
-	font-variant-numeric: tabular-nums;
-	text-align: right;
-}
-
 /* ============================================================
    TOAST
    ============================================================ */
@@ -1168,58 +1115,81 @@ body {
 }
 
 /* ============================================================
-   ENTER ANIMATIONS
-   ============================================================ */
-@keyframes fadeUp {
-	from {
-		opacity: 0;
-		transform: translateY(12px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-
-.stats-section,
-#segments-section {
-	animation: fadeUp 320ms cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-
-/* ============================================================
-   THREE-PANEL LAYOUT
+   APP LAYOUT — 2-col stacked
+   左栏 history 全高；右栏始终在中栏底下，不再有 3-col 模式。
    ============================================================ */
 .app-layout {
 	display: grid;
-	grid-template-columns: 240px 1fr 304px;
-	height: calc(100vh - 56px);
-	overflow: hidden;
+	grid-template-columns: 240px 1fr;
+	/* Row 1 collapses to fit center content. Row 2 grows with the dashboard.
+	   `align-content: start` packs rows at the top so any leftover from
+	   `min-height` lands as trailing blank below the dashboard, not as a
+	   wedge between center and right. */
+	grid-template-rows: auto auto;
+	grid-template-areas:
+		"left center"
+		"left right";
+	min-height: calc(100vh - 56px);
+	align-content: start;
 }
 
 .panel {
 	overflow-y: auto;
-	scrollbar-width: thin;
-	scrollbar-color: var(--border-strong) transparent;
+	/* Hidden scrollbar across the whole UI (panels, page, help modal). The
+	   user can still scroll with mouse-wheel / trackpad / touch / keyboard;
+	   we just don't draw the gutter. Per-block exceptions go in their own
+	   selector (e.g., RESONANCE block already had this treatment). */
+	scrollbar-width: none;
+	-ms-overflow-style: none;
 }
 .panel::-webkit-scrollbar {
-	width: 4px;
+	display: none;
 }
-.panel::-webkit-scrollbar-track {
-	background: transparent;
+
+/* Page-level scroll (html/body): hide the chrome scrollbar so the dashboard
+   scroll past viewport is invisible-but-functional. */
+html,
+body {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
 }
-.panel::-webkit-scrollbar-thumb {
-	background: var(--border-strong);
-	border-radius: 2px;
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+	display: none;
+}
+
+/* "How to use" / disclosure modal scrollable card. Selector is a class
+   defined inline in index.html (.vga-help-overlay-card). */
+.vga-help-overlay-card {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+.vga-help-overlay-card::-webkit-scrollbar {
+	display: none;
 }
 
 .panel-left {
+	grid-area: left;
 	border-right: 1px solid var(--border);
 	display: flex;
 	flex-direction: column;
+	/* Fixed (not sticky) so it stays glued to the viewport regardless of
+	   page scroll. Sticky was getting pushed up because the grid cell's
+	   "containing block" only extends ~141px past the panel's height,
+	   limiting sticky travel. The grid column (240px) is still allocated
+	   in `grid-template-columns: 240px 1fr` even though we take this
+	   element out of the in-flow placement. */
+	position: fixed;
+	top: 56px;
+	left: 0;
+	width: 240px;
+	height: calc(100vh - 56px);
+	overflow-y: auto;
 }
 
 .panel-center {
-	padding: 20px 20px 48px;
+	grid-area: center;
+	padding: 20px 20px 16px;
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
@@ -1227,9 +1197,370 @@ body {
 }
 
 .panel-right {
-	border-left: 1px solid var(--border);
-	overflow-y: auto;
+	grid-area: right;
+	border-top: 1px solid var(--border);
+	display: flex;
+	flex-direction: column;
+	/* Override .panel { overflow-y: auto } — the dashboard sets its own
+	   container height so let the page scroll naturally instead of nesting a
+	   second scroll. */
+	overflow-y: visible;
+	/* Anchor for #dashboard-popover (absolute-positioned). */
+	position: relative;
 }
+
+/* ============================================================
+   ACOUSTIC DASHBOARD — Gridstack-based, block-card chrome
+   ============================================================ */
+.dashboard-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: all var(--transition);
+}
+.dashboard-icon-btn:hover {
+	background: var(--surface-hover);
+	border-color: var(--border);
+	color: var(--text-secondary);
+}
+.dashboard-icon-btn[aria-expanded="true"] {
+	background: var(--surface-hover);
+	border-color: var(--border-strong);
+	color: var(--text-primary);
+}
+
+#acoustic-dashboard.grid-stack {
+	background: transparent;
+	padding: 6px 10px;
+	/* No flex:1 here — Gridstack sets inline height on the grid based on
+	   its content rows, so let .panel-right grow naturally with that height
+	   (and push the page-disclaimer footer below). */
+}
+
+.grid-stack-item-content.block-card {
+	background: var(--surface);
+	border: 1px solid var(--block-card-border);
+	border-radius: var(--radius-md);
+	box-shadow: var(--block-card-shadow);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	transition:
+		border-color var(--transition),
+		box-shadow var(--transition);
+}
+.grid-stack-item:hover > .grid-stack-item-content.block-card {
+	border-color: var(--border-strong);
+	box-shadow: var(--shadow-sm);
+}
+
+.block-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--border);
+	font-size: 0.68rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.07em;
+	user-select: none;
+	flex-shrink: 0;
+}
+.block-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.block-meta {
+	font-weight: 500;
+	font-size: 0.7rem;
+	text-transform: none;
+	letter-spacing: 0;
+	color: var(--text-primary);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Drag handle: only fades in when block is hovered, so the body stays
+   trivially clickable (collapsibles, mode switcher, toggles all native). */
+/* Drag handle is removed from layout entirely until the user long-presses
+   (0.8s) to enter edit mode — see armBlock in dashboard.js. Using display:none
+   instead of opacity:0 means the title can sit flush-left against the header
+   padding and the body stays trivially clickable. */
+.block-drag-handle {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	font-size: 0.85rem;
+	line-height: 1;
+	color: var(--text-muted);
+	cursor: grab;
+	letter-spacing: -0.15em;
+	opacity: 0.7;
+}
+.block-drag-handle:active {
+	cursor: grabbing;
+}
+.grid-stack-item[data-edit-armed="true"] .block-drag-handle {
+	display: inline-flex;
+}
+.grid-stack-item[data-edit-armed="true"] .block-drag-handle:hover {
+	opacity: 1;
+	color: var(--text-secondary);
+}
+
+/* Hide × button: out of layout until armed — same pattern as drag handle, so
+   the chevron sits flush against the right edge during normal reading. */
+.block-hide-btn {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	border-radius: 4px;
+	color: var(--text-muted);
+	font-size: 1.05rem;
+	line-height: 1;
+	cursor: pointer;
+	opacity: 0.7;
+	transition: background var(--transition), color var(--transition);
+}
+.grid-stack-item[data-edit-armed="true"] .block-hide-btn {
+	display: inline-flex;
+}
+.block-hide-btn:hover {
+	opacity: 1;
+	background: var(--surface-hover);
+	color: var(--text-primary);
+}
+
+/* Collapse chevron — always visible (primary affordance, vs hover-only drag/hide). */
+.block-collapse-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	border-radius: 4px;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: all var(--transition);
+}
+.block-collapse-btn:hover {
+	background: var(--surface-hover);
+	color: var(--text-primary);
+}
+.block-collapse-btn svg {
+	transition: transform 0.2s ease;
+}
+.grid-stack-item[data-collapsed="true"] .block-collapse-btn svg {
+	transform: rotate(-180deg);
+}
+/* Collapsed: hide body, drop the header divider so the card reads as a clean strip. */
+.grid-stack-item[data-collapsed="true"] .block-body {
+	display: none;
+}
+.grid-stack-item[data-collapsed="true"] .block-header {
+	border-bottom: 0;
+}
+
+.block-body {
+	flex: 1;
+	min-height: 0;
+	padding: 10px 12px 12px;
+	/* hidden, not auto: when content is too tall, we expect ResizeObserver
+	   to add .block-w<N> classes that swap inner layout (see #2 in task_plan).
+	   A scrollbar would be the failure mode, not the feature. */
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* RESONANCE block: per-vowel list can have 12+ rows; let the body scroll
+   but hide the scrollbar chrome (Firefox / WebKit / IE) so it stays clean. */
+.grid-stack-item[data-block-id="resonance"] .block-body {
+	overflow-y: auto;
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE/Edge legacy */
+}
+.grid-stack-item[data-block-id="resonance"] .block-body::-webkit-scrollbar {
+	display: none; /* Chrome/Safari */
+}
+
+.block-empty {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	font-size: 0.78rem;
+	text-align: center;
+	line-height: 1.5;
+	padding: 16px;
+}
+
+.block-content {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+/* Gridstack resize handles: also gated behind the long-press arm. Without
+   pointer-events:none they'd still grab pointer events from the corner pixels
+   even at opacity 0, letting the user resize before arming. */
+.grid-stack-item > .ui-resizable-handle {
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--transition);
+}
+.grid-stack-item[data-edit-armed="true"] > .ui-resizable-handle {
+	opacity: 0.5;
+	pointer-events: auto;
+}
+.grid-stack-item[data-edit-armed="true"] > .ui-resizable-handle:hover {
+	opacity: 0.9;
+}
+
+/* iOS-style "edit mode" jiggle — confirms to the user that the block is now
+   draggable/resizable. Wraps the inner card so the gridstack item itself
+   stays at clean integer positions for hit-testing. */
+@keyframes block-arm-jiggle {
+	0% {
+		transform: rotate(-0.55deg) translate(0, 0);
+	}
+	50% {
+		transform: rotate(0.55deg) translate(0, 0);
+	}
+	100% {
+		transform: rotate(-0.55deg) translate(0, 0);
+	}
+}
+.grid-stack-item[data-edit-armed="true"] > .grid-stack-item-content {
+	animation: block-arm-jiggle 0.45s ease-in-out infinite;
+	transform-origin: center center;
+}
+/* Pause the jiggle while the user is actively dragging or resizing — the
+   simultaneous motion would feel jittery. Gridstack tags the engaged item
+   with .ui-draggable-dragging / .ui-resizable-resizing. */
+.grid-stack-item.ui-draggable-dragging > .grid-stack-item-content,
+.grid-stack-item.ui-resizable-resizing > .grid-stack-item-content {
+	animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.grid-stack-item[data-edit-armed="true"] > .grid-stack-item-content {
+		animation: none;
+		outline: 2px dashed var(--accent, var(--text-secondary));
+		outline-offset: -2px;
+	}
+}
+
+/* While dragging, dim the placeholder + freeze hover effects so the visual
+   stays calm. */
+.grid-stack > .grid-stack-placeholder > .placeholder-content {
+	background: var(--accent-subtle);
+	border: 1px dashed var(--accent-border);
+	border-radius: var(--radius-md);
+	color: transparent;
+}
+
+/* Add-block popover (managed by main.js wiring). Anchored to panel-header.
+   Default closed = visibility:hidden + opacity:0 + slight upward shift; open
+   = .is-open class with full opacity + translateY(0). The visibility delay
+   on close ensures the fade plays before the element becomes inert. */
+.dashboard-popover {
+	position: absolute;
+	top: 44px;
+	right: 14px;
+	min-width: 160px;
+	background: var(--surface);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md);
+	padding: 4px;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	opacity: 0;
+	visibility: hidden;
+	transform: translateY(-6px) scale(0.98);
+	transform-origin: top right;
+	transition:
+		opacity 160ms ease-out,
+		transform 160ms ease-out,
+		visibility 0s linear 160ms;
+}
+.dashboard-popover.is-open {
+	opacity: 1;
+	visibility: visible;
+	transform: translateY(0) scale(1);
+	transition:
+		opacity 160ms ease-out,
+		transform 160ms ease-out,
+		visibility 0s linear 0s;
+}
+.dashboard-popover-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: transparent;
+	border: 0;
+	border-radius: 6px;
+	color: var(--text-primary);
+	font-size: 0.82rem;
+	text-align: left;
+	cursor: pointer;
+	transition: background var(--transition);
+}
+.dashboard-popover-item:hover {
+	background: var(--surface-hover);
+}
+.dashboard-popover-empty {
+	padding: 10px 12px;
+	color: var(--text-muted);
+	font-size: 0.78rem;
+	text-align: center;
+}
+
+/* Page-level attribution footer — sits outside .app-layout, always at the
+   very bottom of the page regardless of dashboard scroll height. */
+.page-disclaimer {
+	padding: 18px 24px 24px;
+	border-top: 1px solid var(--border);
+	background: var(--bg);
+}
+.page-disclaimer .mc-disclaimer {
+	max-width: 1200px;
+	margin: 0 auto;
+	border-top: none;
+	padding-top: 0;
+	text-align: center;
+}
+
+/* The old centered-card "ACOUSTIC SUMMARY" placeholder rule is gone — each
+   dashboard block now owns its own empty state. Keep .metrics-placeholder
+   as a thin compatibility shim only if some other code still references it. */
 
 /* Panel header (shared by left + right) */
 .panel-header {
@@ -1296,66 +1627,363 @@ body {
 	padding: 24px;
 }
 
-/* ── Advice v2 panel ──────────────────────────────────────────
-   One-sentence summary + gating warning. */
-.advice-panel {
-	padding: 14px 14px 8px;
+/* ── Resonance panel ──────────────────────────────────────────
+   Wrapped in <details class="mc-collapsible resonance-panel">; chrome
+   (border, header, padding) comes from .mc-collapsible* rules. The
+   panel sits directly under .panel-right (which has no internal
+   padding), so we add card margins here to give the rounded border
+   breathing room — same 14px metric used by #metrics-content below. */
+.resonance-panel {
+	margin: 14px 14px 0;
+}
+
+.resonance-summary {
+	font-size: 0.8rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+}
+
+/* ── Median scale bar ─────────────────────────────────────────
+   Mirrors the Pitch Range bar recipe: a 10px-tall pill split
+   into three zone tints (cis-male / androgynous / cis-female)
+   with a frosted indicator at the median resonance %. Zone
+   widths are written inline by JS from the language's calibration
+   thresholds (see _ZONE_THRESHOLDS in resonance-panel.js). */
+.resonance-median-block {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
-	border-bottom: 1px solid var(--border-strong);
+	gap: 6px;
+	margin-top: 2px;
 }
 
-.advice-warning {
+.resonance-scale-bar {
+	position: relative;
+	height: 10px;
+	border-radius: 99px;
+	overflow: visible;
+	background: var(--border-strong);
+	display: flex;
+}
+
+.resonance-zone {
+	height: 100%;
+}
+/* Soft tints (α≈0.2) so the indicator + range span dominate the eye
+   instead of the zone fill — a saturated blue across cis-male p0..p25
+   would read as "far from the goal" even when the indicator sits on
+   the cis-male population median. .pitch-zone-* uses the same alpha
+   for visual parity. */
+.resonance-zone-male {
+	background: rgba(91, 141, 239, 0.2);
+}
+.resonance-zone-overlap {
+	background: rgba(160, 120, 210, 0.18);
+}
+.resonance-zone-female {
+	background: rgba(224, 122, 170, 0.2);
+}
+
+/* Range span — frosted-glass overlay marking min..max of per-vowel
+   resonance medians. Clone of .pitch-range-span recipe. JS sets
+   left/width inline; transition mirrors the Pitch Range easing. */
+.resonance-range-span {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	height: 16px;
+	left: 0;
+	width: 0;
+	background: rgba(255, 255, 255, 0.16);
+	backdrop-filter: blur(4px) saturate(1.15);
+	-webkit-backdrop-filter: blur(4px) saturate(1.15);
+	border: 1px solid rgba(255, 255, 255, 0.32);
+	border-radius: 999px;
+	box-shadow:
+		0 1px 3px rgba(0, 0, 0, 0.08),
+		inset 0 1px 0 rgba(255, 255, 255, 0.3);
+	box-sizing: border-box;
+	pointer-events: none;
+	transition:
+		left 500ms cubic-bezier(0.4, 0, 0.2, 1),
+		width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] .resonance-range-span {
+	background: rgba(255, 255, 255, 0.06);
+	border-color: rgba(255, 255, 255, 0.16);
+	box-shadow:
+		0 1px 3px rgba(0, 0, 0, 0.25),
+		inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.resonance-scale-labels {
+	display: flex;
+	justify-content: space-between;
+	font-size: 0.62rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── All-vowels list ──────────────────────────────────────────
+   One row per vowel with n≥5, mirroring the Distribution
+   panel's stat-card recipe: vowel label | gradient progress bar
+   | right-aligned %. Bar fill animates 700ms on render via the
+   same easing the Distribution bars use. */
+.resonance-history-header {
+	font-size: 0.72rem;
+	color: var(--text-secondary);
+	font-style: italic;
+	opacity: 0.9;
+	margin-top: 2px;
+}
+
+/* Pitch-compensation advisory: appears between history-header and the
+   per-vowel list when NN gender_score climbed but most vowels regressed.
+   Soft accent recipe — neutral, no red. */
+.resonance-divergence-advisory {
+	margin-top: 6px;
+	padding: 8px 10px;
+	background: color-mix(in srgb, var(--accent) 6%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+	border-radius: var(--radius-sm);
+	font-size: 0.78rem;
+	line-height: 1.55;
+	color: var(--text-primary);
+}
+
+.resonance-all-vowels-section {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 2px;
+}
+
+.resonance-section-header {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
 	gap: 8px;
-	padding: 8px 10px;
-	background: color-mix(in srgb, var(--accent) 10%, transparent);
-	border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
-	border-radius: var(--radius-sm);
+	flex-wrap: wrap;
+}
+
+.resonance-section-title {
+	font-size: 0.72rem;
+	font-weight: 600;
 	color: var(--text-secondary);
-	font-size: 0.76rem;
-	line-height: 1.4;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
 }
 
-.advice-warning svg {
-	flex-shrink: 0;
-	color: var(--accent);
-}
-
-.advice-warning-text,
-#advice-warning-text {
-	flex: 1;
-}
-
-.advice-warning-close {
-	flex-shrink: 0;
-	display: inline-flex;
+/* Row hosting the classify-mode tabs (神经网络 / 音高 / 共鸣) and, when
+   resonance mode is active, the inline 仅元音 / 包含辅音 toggle on the right.
+   Same row so both segmented controls share the surface-bg active style and
+   read as one control bar. */
+.classify-controls-row {
+	display: flex;
 	align-items: center;
-	justify-content: center;
-	width: 20px;
-	height: 20px;
-	margin-left: 4px;
-	padding: 0;
-	background: transparent;
-	border: none;
-	border-radius: 4px;
-	color: var(--text-secondary);
-	cursor: pointer;
-	opacity: 0.7;
-	transition:
-		background-color 120ms ease,
-		opacity 120ms ease,
-		color 120ms ease;
+	justify-content: space-between;
+	gap: 8px;
+	flex-wrap: wrap;
 }
 
-.advice-warning-close:hover,
-.advice-warning-close:focus-visible {
-	background: color-mix(in srgb, var(--accent) 18%, transparent);
+/* Toggle: 仅元音 / 包含辅音.  Visually identical to .classify-mode-btn so the
+   resonance sub-control reads as part of the same control bar as the
+   神经网络 / 音高 / 共鸣 tabs to its left. */
+.resonance-consonants-toggle {
+	display: inline-flex;
+	gap: 6px;
+}
+
+.resonance-consonants-toggle[hidden] {
+	display: none;
+}
+
+.resonance-consonants-btn {
+	font: inherit;
+	font-size: 0.7rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	background: transparent;
+	border: 0;
+	padding: 3px 9px;
+	border-radius: 6px;
+	cursor: pointer;
+	transition:
+		background-color 0.12s ease,
+		color 0.12s ease;
+	line-height: 1.3;
+	font-variant-numeric: tabular-nums;
+}
+
+.resonance-consonants-btn:hover:not(.is-active) {
+	color: var(--text-primary);
+}
+
+.resonance-consonants-btn.is-active {
+	background: var(--surface);
+	color: var(--text-primary);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.resonance-consonants-btn:focus-visible {
+	outline: 2px solid var(--accent, #7aa);
+	outline-offset: 1px;
+}
+
+.resonance-all-vowels-list {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 2px 12px;
+}
+/* Bucket-driven reflow for the resonance vowel list (set on the grid-stack
+   item by dashboard.js's ResizeObserver). Wider blocks pack more columns so
+   we don't need a scrollbar. */
+.grid-stack-item.block-w2 .resonance-all-vowels-list {
+	/* Each vowel row's min-content is ~240px (label 38 + bar 80 + pct 38 +
+	   n 38 + 3×10 gap + 2×8 padding). At block-w2 width (240-479px), 2 cols
+	   would force the grid to 480px and overflow horizontally — the right
+	   column gets clipped. Stay at 1 col until block-w3 (≥480px) where 2
+	   cols actually fit. */
+	grid-template-columns: 1fr;
+}
+.grid-stack-item.block-w3 .resonance-all-vowels-list {
+	/* Was 3 cols, but each vowel row needs ~280px (label + bar min + pct +
+	   n_count); 3 cols at ~624px block width = 208px each → right column
+	   gets clipped. 2 cols (~312px each) leaves comfortable room. */
+	grid-template-columns: 1fr 1fr;
+}
+.grid-stack-item.block-w4 .resonance-all-vowels-list {
+	grid-template-columns: 1fr 1fr 1fr;
+}
+
+.resonance-vowel-row {
+	display: grid;
+	grid-template-columns: auto 1fr auto auto;
+	align-items: center;
+	gap: 10px;
+	padding: 4px 8px;
+	font-size: 0.74rem;
+	line-height: 1.4;
+	color: var(--text-primary);
+	border-radius: var(--radius-sm);
+	transition: background 180ms ease;
+}
+
+.resonance-vowel-row:hover {
+	background: color-mix(in srgb, var(--text-secondary) 4%, transparent);
+}
+
+/* Consonant rows: italic IPA + muted color so users can tell at a glance
+   which entries aren't trainable vowel targets.  Bar fill stays the same
+   gradient but at 65% opacity. */
+.resonance-vowel-row.is-consonant .resonance-vowel-label {
+	font-style: italic;
+	color: var(--text-muted);
+}
+
+.resonance-vowel-row.is-consonant .resonance-vowel-bar-fill {
+	opacity: 0.65;
+}
+
+.resonance-vowel-row.is-consonant .resonance-vowel-pct {
+	color: var(--text-muted);
+}
+
+.resonance-vowel-label {
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+	min-width: 38px;
+}
+
+.resonance-vowel-bar-wrap {
+	height: 4px;
+	background: var(--border-strong);
+	border-radius: 99px;
+	overflow: hidden;
+	min-width: 80px;
+}
+
+.resonance-vowel-bar-fill {
+	height: 100%;
+	width: 0%;
+	border-radius: 99px;
+	background: linear-gradient(90deg, var(--accent-subtle), var(--accent));
+	transition: width 700ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.resonance-vowel-pct {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	min-width: 38px;
+	text-align: right;
+}
+
+.resonance-vowel-n {
+	font-size: 0.66rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	opacity: 0.75;
+	/* Right-aligned + min-width so the "(n=N)" opening parens line up
+	   vertically across rows even when % values have different digit
+	   counts (0% vs 39% vs 100%). */
+	min-width: 38px;
+	text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.resonance-vowel-bar-fill,
+	.resonance-vowel-row {
+		transition: none;
+	}
+	.resonance-consonants-btn {
+		transition: none;
+	}
+}
+
+/* ── Disclosure modal (Stage 0) ───────────────────────────────
+   Re-uses .vga-help-modal chrome; adds list + button styling. */
+.disclosure-points {
+	margin: 6px 0 0;
+	padding-left: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	color: var(--text-primary);
+	font-size: 0.86rem;
+	line-height: 1.55;
+}
+
+.disclosure-resources {
+	margin: 6px 0 0;
+	padding-left: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 0.84rem;
+	line-height: 1.5;
+}
+
+.disclosure-resources a {
 	color: var(--accent);
-	opacity: 1;
-	outline: none;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.disclosure-resources a:hover,
+.disclosure-resources a:focus-visible {
+	color: var(--accent-hover);
+}
+
+.disclosure-resource-note {
+	color: var(--text-secondary);
+}
+
+.disclosure-acknowledge {
+	margin-top: 18px;
+	width: 100%;
 }
 
 #metrics-content {
@@ -1469,17 +2097,24 @@ body {
 	height: 100%;
 }
 
+/* Bar covers 80–320 Hz linearly. Boundaries from zones.js:
+   male  < 145 Hz  → (145-80)/240 = 27.083 %
+   neutral 145–185 → (185-145)/240 = 16.667 %
+   female > 185 Hz → labels stop at 255 Hz (typical-female top)
+                   → (255-185)/240 = 29.167 %
+   The remaining ~27 % at the far ends is shown as an empty gutter, signaling
+   "outside the typical-population range" without claiming a zone. */
 .pitch-zone-male {
-	width: 31%;
-	background: rgba(91, 141, 239, 0.45);
+	width: 27.083%;
+	background: rgba(91, 141, 239, 0.2);
 }
 .pitch-zone-overlap {
-	width: 17%;
-	background: rgba(160, 120, 210, 0.4);
+	width: 16.667%;
+	background: rgba(160, 120, 210, 0.18);
 }
 .pitch-zone-female {
-	width: 33%;
-	background: rgba(224, 122, 170, 0.45);
+	width: 29.167%;
+	background: rgba(224, 122, 170, 0.2);
 }
 
 .pitch-indicator {
@@ -1513,14 +2148,14 @@ body {
 	height: 16px;
 	left: 50%;
 	width: 0;
-	background: rgba(255, 255, 255, 0.32);
-	backdrop-filter: blur(6px) saturate(1.25);
-	-webkit-backdrop-filter: blur(6px) saturate(1.25);
-	border: 1px solid rgba(255, 255, 255, 0.55);
+	background: rgba(255, 255, 255, 0.16);
+	backdrop-filter: blur(4px) saturate(1.15);
+	-webkit-backdrop-filter: blur(4px) saturate(1.15);
+	border: 1px solid rgba(255, 255, 255, 0.32);
 	border-radius: 999px;
 	box-shadow:
-		0 1px 4px rgba(0, 0, 0, 0.12),
-		inset 0 1px 0 rgba(255, 255, 255, 0.55);
+		0 1px 3px rgba(0, 0, 0, 0.08),
+		inset 0 1px 0 rgba(255, 255, 255, 0.3);
 	box-sizing: border-box;
 	pointer-events: none;
 	transition:
@@ -1529,11 +2164,11 @@ body {
 }
 
 [data-theme="dark"] .pitch-range-span {
-	background: rgba(255, 255, 255, 0.12);
-	border-color: rgba(255, 255, 255, 0.28);
+	background: rgba(255, 255, 255, 0.06);
+	border-color: rgba(255, 255, 255, 0.16);
 	box-shadow:
-		0 1px 4px rgba(0, 0, 0, 0.35),
-		inset 0 1px 0 rgba(255, 255, 255, 0.18);
+		0 1px 3px rgba(0, 0, 0, 0.25),
+		inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .pitch-range-labels {
@@ -1545,11 +2180,10 @@ body {
 }
 
 .pitch-legend {
-	display: flex;
-	gap: 8px;
-	font-size: 0.68rem;
-	color: var(--text-muted);
-	flex-wrap: wrap;
+	/* Hidden by request — bar zone colors already convey Masc/Mixed/Fem;
+	   the explicit "♂ 80-145 / ♂♀ 145-185 / ♀ 185-255" Hz labels were
+	   redundant and crowded the block. DOM left intact for easy revert. */
+	display: none;
 }
 
 .legend-male {
@@ -1566,7 +2200,24 @@ body {
 .formants-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	gap: 6px 12px;
+	gap: 4px 10px;
+}
+/* Bucket-driven reflow for the F0/F1/F2/F3 grid. */
+.grid-stack-item.block-w1 .formants-grid {
+	grid-template-columns: 1fr;
+}
+.grid-stack-item.block-w3 .formants-grid,
+.grid-stack-item.block-w4 .formants-grid {
+	grid-template-columns: repeat(4, 1fr);
+}
+
+/* NN block: only hide the long disclaimer + segment-note at the very
+   smallest bucket (w1, <240px). The user's default NN tile is 3 cols ≈
+   312px, in w2; that's tall enough (h=5 = 250px) to fit all three pieces
+   (certainty + disclaimer + segment-note ≈ 200px). */
+.grid-stack-item.block-w1 .mc-nn-disclaimer,
+.grid-stack-item.block-w1 .mc-nn-segment-note {
+	display: none;
 }
 
 .formant-row {
@@ -1608,43 +2259,6 @@ body {
 	color: var(--text-muted);
 	text-align: center;
 	margin-top: 4px;
-}
-
-/* Segment acoustic dot indicator */
-.segment-acoustic-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: var(--accent);
-	justify-self: center;
-	flex-shrink: 0;
-}
-
-.segment-item.no-acoustics {
-	opacity: 0.65;
-}
-
-/* Confidence micro-bar in segment list */
-.segment-conf-bar {
-	width: 28px;
-	height: 3px;
-	background: var(--border);
-	border-radius: 99px;
-	position: relative;
-	overflow: hidden;
-	flex-shrink: 0;
-	justify-self: end;
-}
-.segment-conf-bar::after {
-	content: "";
-	position: absolute;
-	left: 0;
-	top: 0;
-	height: 100%;
-	width: calc(var(--conf, 0.5) * 100%);
-	background: var(--accent);
-	border-radius: 99px;
-	transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Certainty tag — primary signal of the NN section, no spectrum bar */
@@ -1728,6 +2342,20 @@ body {
 }
 .mc-collapsible-header::marker {
 	display: none;
+}
+
+/* Right-aligned median value tag inside the collapsible header
+   (Pitch range, Resonance). margin-left: auto pushes it past the
+   title; the ::after toggle still sits on the far right. */
+.mc-collapsible-value {
+	margin-left: auto;
+	margin-right: 8px;
+	font-weight: 500;
+	font-size: 0.7rem;
+	text-transform: none;
+	letter-spacing: 0;
+	color: var(--text-primary);
+	font-variant-numeric: tabular-nums;
 }
 
 .mc-collapsible-header::after {
@@ -1818,7 +2446,7 @@ body {
    ============================================================ */
 @media (max-width: 1000px) {
 	.app-layout {
-		grid-template-columns: 200px 1fr 270px;
+		grid-template-columns: 200px 1fr;
 	}
 }
 
@@ -1826,21 +2454,70 @@ body {
 	.app-layout {
 		grid-template-columns: 1fr;
 		grid-template-rows: auto auto auto;
+		grid-template-areas: none;
 		height: auto;
 		overflow: visible;
 	}
 	.panel-center {
+		grid-area: auto;
+		order: 1;
+		/* Sticky gender-legend below needs the body to be the scroll
+		   container — leaving panel-center as overflow:auto would pin the
+		   sticky element to this panel (which is content-sized and never
+		   scrolls), so the bar would never actually stay put. */
+		overflow-y: visible;
+		/* Drop flex on mobile: sticky on a flex item gets bound to the flex
+		   container's resolved height (which here is content-only ≈573px) and
+		   doesn't follow body scroll past the panel. Block layout lets sticky
+		   resolve against the body. */
+		display: block;
+	}
+	/* On mobile, dashboard blocks are full-width — even at 768px viewport the
+	   RESONANCE block lands in block-w4 bucket (≥720), packing 3 columns at
+	   ~240px each which overflows once you add padding/scrollbar. Force 1
+	   column regardless of bucket so vowel rows always fit. Same-specificity
+	   selector beats the bucket rules (above) by source order. */
+	.grid-stack-item.block-w2 .resonance-all-vowels-list,
+	.grid-stack-item.block-w3 .resonance-all-vowels-list,
+	.grid-stack-item.block-w4 .resonance-all-vowels-list {
+		grid-template-columns: 1fr;
+	}
+	/* Pin the gender-tendency gradient bar (Masculine/Androgynous/Feminine
+	   labels) to just below the header so users can scroll through the
+	   dashboard without losing track of where the voice landed. Mobile only —
+	   on desktop the bar already sits above an in-view dashboard.
+	   The legend is hoisted out of the timeline (phone-timeline.js) up to
+	   `.app-layout` so its sticky containing block is page-tall. */
+	.vga-timeline__footer-legend--hoisted {
+		position: sticky;
+		top: 56px;
+		z-index: 5;
+		background: var(--bg-glass);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		padding: 6px 20px 8px;
+		/* Match panel-center's order so it lands right after it and before
+		   panel-left in the mobile flex/grid order. */
 		order: 1;
 	}
 	.panel-left {
+		grid-area: auto;
 		order: 2;
 		height: auto;
 		border-right: none;
 		border-top: 1px solid var(--border);
+		/* Reset desktop's `position: fixed; top: 56px; left: 0; width: 240px`
+		   (added in 64b52fc to glue the panel to the viewport on desktop).
+		   Without this reset, mobile keeps the element out of normal flow,
+		   `order: 2` is ignored, and PAST SESSIONS floats over the player. */
+		position: static;
+		top: auto;
+		left: auto;
+		width: auto;
 	}
 	.panel-right {
+		grid-area: auto;
 		order: 3;
-		border-left: none;
 		border-top: 1px solid var(--border);
 	}
 	.upload-section {
@@ -1912,6 +2589,20 @@ body {
 	.panel-left.panel-expanded .panel-collapse-chevron {
 		transform: rotate(90deg);
 	}
+	/* Collapsed state: drop the header's bottom border so it merges flat
+	   into panel-right's border-top, hide the orphaned action icons, and
+	   `display: none` the scatter body — the inline-flex switcher's pill
+	   background paints through `max-height: 0` otherwise. */
+	.panel-left:not(.panel-expanded) .panel-header {
+		border-bottom: none;
+	}
+	.panel-left:not(.panel-expanded) .panel-header-actions {
+		display: none;
+	}
+	.panel-left:not(.panel-expanded) .scatter-mode-switcher,
+	.panel-left:not(.panel-expanded) .scatter-wrap {
+		display: none;
+	}
 
 	/* Touch-friendly targets */
 	.icon-btn {
@@ -1919,10 +2610,6 @@ body {
 		min-width: 44px;
 		min-height: 44px;
 		justify-content: center;
-	}
-	.segment-item {
-		min-height: 44px;
-		padding: 10px;
 	}
 	.play-btn {
 		width: 44px;
@@ -1947,50 +2634,6 @@ body {
 	}
 	.recorder-mic-btn {
 		padding: 10px 16px;
-	}
-
-	/* Mobile tabs */
-	.mobile-tabs {
-		display: flex;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		overflow: hidden;
-		flex-shrink: 0;
-	}
-	.mobile-tab {
-		flex: 1;
-		padding: 10px 8px;
-		background: var(--bg-secondary);
-		border: none;
-		font: inherit;
-		font-size: 0.8rem;
-		font-weight: 500;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition:
-			background var(--transition),
-			color var(--transition);
-		min-height: 44px;
-	}
-	.mobile-tab + .mobile-tab {
-		border-left: 1px solid var(--border);
-	}
-	.mobile-tab.active {
-		background: var(--surface);
-		color: var(--text-primary);
-		font-weight: 600;
-	}
-	.mobile-tab:hover:not(.active) {
-		background: var(--surface-hover);
-		color: var(--text-secondary);
-	}
-
-	/* When metrics tab is active, hide segments; when segments tab active, hide right panel */
-	.panel-right.mobile-hidden {
-		display: none;
-	}
-	#segments-section.mobile-hidden {
-		display: none !important;
 	}
 }
 
@@ -2290,16 +2933,16 @@ body {
 .panel-collapse-chevron {
 	display: none;
 }
-.mobile-tabs {
-	display: none;
-}
 
 /* ============================================================
    PHONE BREAKPOINT (480px)
    ============================================================ */
 @media (max-width: 480px) {
 	.panel-center {
-		padding: 12px 12px 40px;
+		/* Bottom-padding kept tiny on phone — the next sibling on mobile is the
+		   hoisted gender-legend bar, so any extra padding here just inflates the
+		   gap between the timeline arrows and the bar. */
+		padding: 12px 12px 6px;
 	}
 	.upload-section {
 		padding: 12px;

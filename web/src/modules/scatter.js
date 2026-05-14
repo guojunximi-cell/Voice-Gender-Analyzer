@@ -91,6 +91,19 @@ export function initScatter(canvasEl, { onDotClick, onDeselect } = {}) {
 
 	const ro = new ResizeObserver(() => _resize());
 	ro.observe(canvas.parentElement);
+
+	// Force a re-resize after the wrap's max-height transition lands. Mobile
+	// collapse/expand animates max-height (300 ms; main.css ~2199); ResizeObserver
+	// can fire mid-animation with rect.height=0 — listening for transitionend
+	// guarantees we catch the final, stable size.
+	canvas.parentElement.addEventListener("transitionend", (e) => {
+		if (e.target !== canvas.parentElement) return;
+		if (e.propertyName !== "max-height" && e.propertyName !== "height" && e.propertyName !== "width") {
+			return;
+		}
+		_resize();
+	});
+
 	_resize();
 
 	// Drive the cross-fade ourselves: main.js doesn't need to call
@@ -744,10 +757,30 @@ function _tooltipAnchor(session) {
 }
 
 // ─── Resize ───────────────────────────────────────────────────
+// rAF retry budget for `_resize` when the parent's bounding rect is 0×0
+// (CSS transition mid-flight, layout not yet committed, etc.). 30 frames
+// ≈ 500 ms at 60 fps — long enough to outlast the 300 ms max-height
+// transition on `.scatter-wrap`, short enough that a truly hidden parent
+// doesn't burn rAFs forever. Counter resets after a successful resize.
+const _MAX_RESIZE_RETRIES = 30;
+let _resizeRetries = 0;
+
 function _resize() {
 	if (!canvas?.parentElement) return;
 	const rect = canvas.parentElement.getBoundingClientRect();
-	if (!rect.width || !rect.height) return;
+	if (!rect.width || !rect.height) {
+		// Defer instead of silently exiting — early-exit was leaving the canvas
+		// bitmap at the spec default 300×150 while CSS stretched it to 100%
+		// of the (eventually) full panel, producing a thin red strip rendered
+		// at the wrong scale. Retry on the next frame; bail after the budget
+		// to avoid infinite loops if the parent really is hidden.
+		if (_resizeRetries < _MAX_RESIZE_RETRIES) {
+			_resizeRetries++;
+			requestAnimationFrame(_resize);
+		}
+		return;
+	}
+	_resizeRetries = 0;
 
 	dpr = window.devicePixelRatio || 1;
 	canvas.width = rect.width * dpr;

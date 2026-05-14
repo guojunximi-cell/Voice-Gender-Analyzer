@@ -44,18 +44,17 @@ export function groupPhonesByChar(phones) {
 			});
 		}
 	}
-	// Compute aggregates per character cell
+	// Compute aggregates per character cell — duration-weighted so that a long
+	// vowel dominates a short adjacent consonant, which is what the eye and
+	// ear actually pick up; the previous unweighted mean over-counted brief
+	// stops and skewed CV chars away from their vowel core.  Pitch keeps the
+	// "voiced only" gate (Praat returns 0/null for unvoiced).
 	for (const c of chars) {
-		const voiced = c.phones.filter((p) => p.pitch > 0);
-		c.pitch = voiced.length ? _mean(voiced.map((p) => p.pitch)) : null;
-		const resVals = c.phones.map((p) => p.resonance).filter((r) => r != null);
-		c.resonance = resVals.length ? _mean(resVals) : null;
-		const f1Vals = c.phones.map((p) => p.F1).filter((v) => v != null);
-		c.F1 = f1Vals.length ? _mean(f1Vals) : null;
-		const f2Vals = c.phones.map((p) => p.F2).filter((v) => v != null);
-		c.F2 = f2Vals.length ? _mean(f2Vals) : null;
-		const f3Vals = c.phones.map((p) => p.F3).filter((v) => v != null);
-		c.F3 = f3Vals.length ? _mean(f3Vals) : null;
+		c.pitch = _durWeightedMean(c.phones, "pitch", (p) => p.pitch > 0);
+		c.resonance = _durWeightedMean(c.phones, "resonance");
+		c.F1 = _durWeightedMean(c.phones, "F1");
+		c.F2 = _durWeightedMean(c.phones, "F2");
+		c.F3 = _durWeightedMean(c.phones, "F3");
 	}
 
 	// Pitch is fundamentally sparse at the phone level: Praat can't extract F0
@@ -151,19 +150,43 @@ function _mean(arr) {
 	return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-// CJK ideograph (BMP Unified + Extension A).  A "char" that is a single CJK
-// codepoint is a hanzi → weight 1 (one visual square, same as pre-weight
-// behaviour).  Anything else is treated as an English word → its letter count
-// clamped to [2, 10]: floor of 2 so "a"/"I" don't collapse to invisible, ceiling
-// of 10 so "antidisestablishmentarianism" can't consume half a page.
+function _durWeightedMean(phones, key, predicate = null) {
+	let sum = 0;
+	let w = 0;
+	for (const p of phones) {
+		const v = p[key];
+		if (v == null) continue;
+		if (predicate && !predicate(p)) continue;
+		const d = Math.max(0, p.end - p.start);
+		if (d <= 0) continue;
+		sum += v * d;
+		w += d;
+	}
+	return w > 0 ? sum / w : null;
+}
+
+// One visual square = weight 1.  Covers:
+//   - CJK Unified Ideographs (BMP 0x4E00-0x9FFF + Extension A 0x3400-0x4DBF) —
+//     Mandarin hanzi
+//   - Hangul Syllables (0xAC00-0xD7A3) — Korean precomposed syllables (modern
+//     orthography is precomposed-only; standalone Jamo is rare and not added)
+// Anything else falls through to the "English word" branch: letter count
+// clamped to [2, 10] — floor 2 so "a"/"I" don't collapse to invisible, ceiling
+// 10 so "antidisestablishmentarianism" can't consume half a page.
 function _cellWeight(ch) {
 	if (!ch) return 0;
-	// Spread to iterate code points (handles surrogate pairs even though CJK
-	// BMP doesn't need it — future-proof for extension ranges).
+	// Spread to iterate code points (handles surrogate pairs even though the
+	// ranges we check are all BMP — future-proof for extension ranges).
 	const cps = [...ch];
 	if (cps.length === 1) {
 		const cp = cps[0].codePointAt(0);
-		if ((cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0x3400 && cp <= 0x4dbf)) return 1;
+		if (
+			(cp >= 0x4e00 && cp <= 0x9fff) || // CJK Unified Ideographs
+			(cp >= 0x3400 && cp <= 0x4dbf) || // CJK Unified Ideographs Extension A
+			(cp >= 0xac00 && cp <= 0xd7a3) // Hangul Syllables
+		) {
+			return 1;
+		}
 	}
 	const letters = ch.match(/[A-Za-z]/g);
 	const n = letters ? letters.length : cps.length;

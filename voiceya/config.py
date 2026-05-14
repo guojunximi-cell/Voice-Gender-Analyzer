@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     redis_uri: str = Field(..., validation_alias=AliasChoices("REDIS_URI", "REDIS_URL"))
     web_dir: Path = BASE_DIR.parent / "web"
 
+    # 旧部署（Railway）切到 VPS（voiceduck.cc）后用：设成 "https://voiceduck.cc"
+    # 即可让所有请求 308 跳转过去，路径/方法/query 全保留。空串 = 不跳转。
+    redirect_to: str = ""
+
     task_max_exec_sec: PositiveInt = 15 * 60
     task_events_ttl_sec: PositiveInt = 10 * 60
     task_result_ttl_sec: PositiveInt = 10 * 60
@@ -27,10 +31,20 @@ class Settings(BaseSettings):
     max_audio_duration_sec: PositiveInt = 3 * 60
     rate_limit_ct: PositiveInt = 10
     rate_limit_duration_sec: PositiveInt = 60
+    # Dev-only bypass for file size / duration caps; the .env files in
+    # repo root + WSL dev environment set this true so unconstrained local
+    # smoke testing works.  Production deployments leave it false (or unset)
+    # so the rate-limit / size guards stay enforced.  Field exists primarily
+    # to absorb the .env entry — readers are added on a per-feature basis.
+    debug_no_limits: bool = False
 
     # ─── 并发控制 ──────────────────────────────────────────────────
     max_concurrent: PositiveInt = 2
     max_queue_depth: NonNegativeInt = 30
+
+    # ─── 本地调试 ──────────────────────────────────────────────────
+    # True 时跳过文件大小 / 音频时长上限。仅本地调试用，线上保持 False。
+    debug_no_limits: bool = False
 
     # ─── Engine C / 进阶分析 ──────────────────────────────────────
     # feature-flagged，默认关；开启时需要 visualizer-backend sidecar 可达。
@@ -55,6 +69,11 @@ class Settings(BaseSettings):
     # 只有 free + fr-FR 模式触达；不能复用 *.en 检查点（英文专用）。
     # tiny / base / small / medium / large-v3 都可，base 在 CPU 上 ~2× 实时。
     engine_c_whisper_model_fr: str = "base"
+
+    # ─── Engine C / 韩语 ASR (faster-whisper multilingual) ───────
+    # 只有 free + ko-KR 模式触达；同 fr 复用多语言检查点（pin language="ko"）。
+    # 韩语 WER 在 base 模型 ~10-15%，MFA Viterbi 容错足够；想更高精度可上 small。
+    engine_c_whisper_model_ko: str = "base"
 
 
 CFG: Settings = None  # type: ignore

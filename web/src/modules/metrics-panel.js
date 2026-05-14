@@ -10,31 +10,12 @@
  */
 
 import { certaintTag, fmt } from "../utils.js";
+import { setBlockHasContent } from "./dashboard.js";
 import { t } from "./i18n.js";
-
-function animNum(el, target, suffix = "", duration = 600) {
-	if (!el) return;
-	const start = performance.now();
-	const from = parseFloat(el.dataset.current || 0) || 0;
-	el.dataset.current = target;
-	function tick(now) {
-		const p = Math.min((now - start) / duration, 1);
-		const ease = 1 - Math.pow(1 - p, 3);
-		el.textContent = Math.round(from + (target - from) * ease) + suffix;
-		if (p < 1) requestAnimationFrame(tick);
-	}
-	requestAnimationFrame(tick);
-}
-
-function animBar(el, pct, delay = 0) {
-	if (!el) return;
-	setTimeout(() => {
-		el.style.width = `${Math.max(0, Math.min(100, pct))}%`;
-	}, delay);
-}
+import { clearResonancePanel } from "./resonance-panel.js";
 
 // ─── Aggregators ─────────────────────────────────────────────
-function _meanFormants(phones) {
+function _medianFormants(phones) {
 	const pick = (k) => {
 		if (!phones?.length) return null;
 		const vs = [];
@@ -42,7 +23,10 @@ function _meanFormants(phones) {
 			const v = p[k];
 			if (v != null && v > 0) vs.push(v);
 		}
-		return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null;
+		if (!vs.length) return null;
+		vs.sort((a, b) => a - b);
+		const m = vs.length >> 1;
+		return vs.length % 2 ? vs[m] : (vs[m - 1] + vs[m]) / 2;
 	};
 	return { f1: pick("F1"), f2: pick("F2"), f3: pick("F3") };
 }
@@ -75,20 +59,15 @@ function _weightedEngineA(analysis) {
 
 // ─── Public: render whole-file averages ──────────────────────
 export function renderMetricsPanel(summary, analysis) {
-	const empty = document.getElementById("metrics-empty");
-	const content = document.getElementById("metrics-content");
-	if (!empty || !content) return;
-
 	const ec = summary?.engine_c;
-	if (!ec || !ec.phones?.length) {
-		empty.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/><path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>${t("metrics.noEngineC")}</span>`;
-		empty.hidden = false;
-		content.hidden = true;
-		return;
-	}
-
-	empty.hidden = true;
-	content.hidden = false;
+	const hasEC = !!(ec && ec.phones?.length);
+	// Pitch + Formants are Engine C-derived (phone-mean F0, median formants).
+	setBlockHasContent("pitch", hasEC);
+	setBlockHasContent("formants", hasEC);
+	// NN block depends on the analysis array, not Engine C.
+	const hasNN = Array.isArray(analysis) && analysis.length > 0;
+	setBlockHasContent("nn", hasNN);
+	if (!hasEC) return;
 
 	// ── 对齐质量提示 ─────────────────────────────────────────
 	// phone_ratio < 0.8 / coverage < 0.3 时后端已标 low_quality，附上具体
@@ -110,27 +89,28 @@ export function renderMetricsPanel(summary, analysis) {
 		}
 	}
 
-	// ── F0 card ─────────────────────────────────────────────
-	// 卡片上的数字与下方"音高范围"指示器必须同源，否则 164 Hz 的文字会配
-	// 落在 200 Hz 附近的滑块，看起来自相矛盾。统一走 median（更鲁棒，也
-	// 与后端 overall_f0_median_hz 命名一致），mean 仅作 fallback。
-	const pitch = ec.median_pitch_hz ?? ec.mean_pitch_hz;
+	// ── F0 + Formants (frontend-computed phone mean) ────────
+	// F0 与下方"音高范围"指示器同源（median，与后端 overall_f0_median_hz
+	// 命名一致；mean 仅作 fallback），避免 164 Hz 的文字配在 200 Hz 附近
+	// 的滑块上自相矛盾。
+	const pitch = ec.median_pitch_hz;
 	const pitchStd = ec.stdev_pitch_hz;
-	animNum(document.getElementById("mc-f0-median"), Math.round(pitch ?? 0), " Hz");
-	const stdEl = document.getElementById("mc-f0-std");
-	if (stdEl) stdEl.textContent = `±${pitchStd != null ? Math.round(pitchStd) : "—"} Hz`;
+	const { f1, f2, f3 } = _medianFormants(ec.phones);
 
-	// ── Resonance card (0..1 → percent) ─────────────────────
-	const resPct = ec.mean_resonance != null ? Math.round(ec.mean_resonance * 100) : 0;
-	animNum(document.getElementById("mc-res-val"), resPct, "%");
-	animBar(document.getElementById("mc-res-bar"), resPct, 80);
-
-	// ── Formants (frontend-computed phone mean) ─────────────
-	const { f1, f2, f3 } = _meanFormants(ec.phones);
+	const pitchMedianTag = document.getElementById("mc-pitch-median-tag");
+	if (pitchMedianTag) {
+		if (pitch != null) {
+			pitchMedianTag.textContent = `${Math.round(pitch)} Hz`;
+			pitchMedianTag.hidden = false;
+		} else {
+			pitchMedianTag.hidden = true;
+		}
+	}
 	const setFormant = (id, val) => {
 		const el = document.getElementById(id);
 		if (el) el.textContent = val != null ? `${Math.round(val)} Hz` : "—";
 	};
+	setFormant("mc-f0", pitch);
 	setFormant("mc-f1", f1);
 	setFormant("mc-f2", f2);
 	setFormant("mc-f3", f3);
@@ -197,53 +177,10 @@ export function renderMetricsPanel(summary, analysis) {
 }
 
 export function clearMetricsPanel() {
-	const empty = document.getElementById("metrics-empty");
-	const content = document.getElementById("metrics-content");
-	if (empty) {
-		empty.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.3" aria-hidden="true"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/><path d="M10 16 Q13 10 16 16 Q19 22 22 16" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>${t("metrics.emptyUpload")}</span>`;
-		empty.hidden = false;
-	}
-	if (content) content.hidden = true;
+	setBlockHasContent("pitch", false);
+	setBlockHasContent("formants", false);
+	setBlockHasContent("nn", false);
 	const warnEl = document.getElementById("mc-align-warning");
 	if (warnEl) warnEl.hidden = true;
-	clearAdvicePanel();
-}
-
-// ─── Advice v2 panel ─────────────────────────────────────────
-// Renders summary.advice as a gating warning. The summary text is
-// suppressed because the F0 card + advice panels already convey the
-// same numbers and tendency.
-// See docs/plans/v2_redesign_measurement.md §1, §3.
-export function renderAdvicePanel(advice) {
-	const panel = document.getElementById("advice-panel");
-	if (!panel) return;
-	if (!advice) {
-		panel.hidden = true;
-		return;
-	}
-
-	const warnEl = document.getElementById("advice-warning");
-	const warnText = document.getElementById("advice-warning-text");
-	const firstWarn = advice.warnings?.[0];
-	if (warnEl && warnText && firstWarn) {
-		warnText.textContent = t(firstWarn.key, firstWarn.params || {});
-		warnEl.hidden = false;
-		const closeBtn = document.getElementById("advice-warning-close");
-		if (closeBtn && !closeBtn.dataset.bound) {
-			closeBtn.dataset.bound = "1";
-			closeBtn.addEventListener("click", () => {
-				warnEl.hidden = true;
-				panel.hidden = true;
-			});
-		}
-	} else if (warnEl) {
-		warnEl.hidden = true;
-	}
-
-	panel.hidden = !firstWarn;
-}
-
-export function clearAdvicePanel() {
-	const panel = document.getElementById("advice-panel");
-	if (panel) panel.hidden = true;
+	clearResonancePanel();
 }

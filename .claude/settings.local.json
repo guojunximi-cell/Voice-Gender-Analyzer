@@ -153,7 +153,9 @@
       "Bash(2>/dev/null)",
       "Bash(curl -sL --max-time 30 \"https://huggingface.co/api/datasets?search=vctk&full=true&limit=10\")",
       "Bash(.venv/bin/python *)",
-      "Bash(pnpm run *)"
+      "Bash(pnpm run *)",
+      "WebFetch(domain:mfa-models.readthedocs.io)",
+      "WebFetch(domain:www.openslr.org)"
     ]
   }
 }

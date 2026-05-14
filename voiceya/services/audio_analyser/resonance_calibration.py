@@ -30,17 +30,29 @@ from __future__ import annotations
 # Female-speaker percentiles on AISHELL-3 train post-Phase-B (5500 Hz Praat
 # ceiling, stats_zh.json re-trained 2026-05-01).  Snapshot below — re-running
 # scripts/audit_resonance_zh.py on the same fixtures should reproduce these
-# within ±0.01 (the audit is deterministic seed=17).
+# within ±0.01 (audit is deterministic seed=17).
 #
 #   sex  n   P5     P25    P50    P75    P95    mean
-#   F    50  0.490  0.612  0.683  0.842  1.000  0.721
-#   M    42  0.234  0.305  0.403  0.518  0.698  0.417
+#   F    50  0.490  0.612  0.683  0.842  1.000  0.721   ← phase A (2026-05-01, 50 spk)
+#   F    94  0.490  0.616  0.726  0.849  1.000  0.734   ← calibration_v1 (2026-05-06, 94 spk)
+#   M    42  0.234  0.305  0.403  0.518  0.698  0.417   ← phase A
+#   M    94  0.228  0.292  0.382  0.463  0.655  0.396   ← calibration_v1 (multi-session per spk)
+#
+# Reproducibility: calibration_v1 (tests/reports/calibration_v1/aggregate.csv,
+# 94 F + 94 M, 60-90 s sessions) reproduces phase-A within ±0.01 on every
+# percentile.  Thresholds below stay at phase-A values — the drift is below
+# the reproducibility band, no zone reassignment would result.
 #
 # The ``leans_female`` upper bound is set to 0.98 (not F P95 = 1.0) so the
 # top tier doesn't require whole-recording score saturation — at the clamp
 # ceiling the score has lost discriminative power, so we grade-separate the
 # saturated cases as a distinct ``at_ceiling`` tier (UX: a hint that "this
 # voice has more headroom than the score can express").
+#
+# Important: ``mid_neutral`` covers F P25-P75 — i.e. **half of real cis
+# females sit here**.  i18n copy must reflect that reality (the 2026-05-05
+# rewrite removed "still some distance from the female reference"); it's
+# the typical female range, not a deficit zone.
 _ZH_F_P5 = 0.490
 _ZH_F_P25 = 0.612
 _ZH_F_P75 = 0.842
@@ -57,22 +69,29 @@ _ZONES_ZH: tuple[tuple[str, float | None], ...] = (
     ("at_ceiling", None),
 )
 
-# fr-specific anchoring from tests/reports/fr_resonance_baseline_2026-05-01.md
-# (50 F + 50 M speakers from Common Voice fr v17 train, adaptive ceiling on,
-# stats_fr.json @ 5000 baseline).  Snapshot:
+# fr-specific anchoring from tests/reports/calibration_v1/aggregate.csv
+# (2026-05-06).  90 F + 94 M speakers from Common Voice fr (validated.tsv,
+# gender filter, 11 mp3s concatenated to ~60 s session per speaker), sidecar
+# adaptive ceiling, stats_fr.json v17-derived.  Snapshot:
 #
 #   sex  n   P5     P25    P50    P75    P95    mean
-#   F    50  0.420  0.580  0.669  0.795  0.943  0.679
-#   M    50  0.185  0.279  0.327  0.421  0.597  0.363
+#   F    50  0.420  0.580  0.669  0.795  0.943  0.679   ← 2026-05-01 v17 baseline
+#   F    90  0.430  0.547  0.646  0.752  0.960  0.659   ← calibration_v1
+#   M    50  0.185  0.279  0.327  0.421  0.597  0.363   ← 2026-05-01
+#   M    94  0.229  0.294  0.348  0.421  0.601  0.371   ← calibration_v1
 #
-# Notably tighter than zh: F P95 = 0.943 (not saturated), so we use it
-# directly as the ``leans_female / clearly_female`` boundary instead of the
-# 0.98 cap zh needs.  fr has only 2 % F-saturation post-adaptive — the
-# clamp pressure that bothered zh-post-Phase-B (8 %) is mostly absent.
-_FR_F_P5 = 0.420
-_FR_F_P25 = 0.580
-_FR_F_P75 = 0.795
-_FR_F_P95 = 0.943
+# Drift from 2026-05-01: F P5 +0.010, P25 -0.033, P75 -0.043, P95 +0.017.
+# The bulk of fr distribution shifts DOWN (P25/P50/P75) — the v17 50-spk
+# sample over-represented the upper-female tail.  90 spk × 11 stitched
+# clips is the better estimate; updating constants below.
+#
+# Notably still tighter than zh and en: F P95 = 0.960 (≈ 3 % saturation),
+# so we use it directly as the ``leans_female`` upper bound instead of
+# falling back to the 0.98 clamp ceiling.
+_FR_F_P5 = 0.430  # was 0.420
+_FR_F_P25 = 0.547  # was 0.580 — meaningful shift down
+_FR_F_P75 = 0.752  # was 0.795 — meaningful shift down
+_FR_F_P95 = 0.960  # was 0.943
 
 _ZONES_FR: tuple[tuple[str, float | None], ...] = (
     ("clearly_below_female", _FR_F_P5),
@@ -82,14 +101,64 @@ _ZONES_FR: tuple[tuple[str, float | None], ...] = (
     ("at_ceiling", None),
 )
 
-# en: stats.json hasn't been re-trained at 5500 Hz and en isn't yet in
-# `_ADAPTIVE_LANGS` (sidecar pins the legacy 5000 ceiling).  We classify
-# anyway so the UI gets *some* zone label, but the boundaries are imported
-# as-is from zh — accept the minor mis-calibration until en gets its own
-# baseline.  Open question: en may want a wider ``mid_neutral`` band
-# because its raw distribution is tighter (per the README "median 0.49 /
-# 0.89, gap +0.40" empirical note from earlier 5m+5f regression).
-_ZONES_EN = _ZONES_ZH
+# en-US percentiles from tests/reports/calibration_v1/aggregate.csv after
+# the 2026-05-06 stats.json retrain.  91 F + 92 M speakers from LibriSpeech
+# train-clean-100, 6 flacs concatenated to ~60-90 s sessions per speaker,
+# sidecar adaptive ceiling 4500–6500 Hz, stats.json re-baked at fixed 5500
+# Hz on 5000 LibriSpeech train segments (59 phones).  Snapshot evolution:
+#
+#   sex  n   P5     P25    P50    P75    P95    mean   src
+#   F    50  0.498  0.668  0.775  0.961  1.000  0.784  2026-05-05 (16 spk × 3, upstream stats)
+#   F    91  0.525  0.689  0.811  0.987  1.000  0.804  calibration_v1 v0 (upstream stats @ 5000 Hz)
+#   F    91  0.351  0.458  0.553  0.682  0.833  0.568  calibration_v1 v1 (re-trained @ 5500 Hz)  ← current
+#   M    30  0.277  0.406  0.460  0.674  1.000  0.534  2026-05-05
+#   M    92  0.328  0.381  0.489  0.639  1.000  0.546  calibration_v1 v0
+#   M    92  0.195  0.237  0.286  0.385  0.673  0.339  calibration_v1 v1  ← current
+#
+# Why the distribution shifted DOWN despite "fixing" the ceiling: the old
+# upstream stats.json had an artificially-depressed /IY1/ F2 mean of
+# 2112 Hz (vs literature ~2960) because Praat's 5-pole LPC at 5000 Hz
+# intermittently fused F1+F2 into a spurious low-frequency peak when
+# female F2 sat near 5000 Hz.  Real F speakers measuring their TRUE F2
+# (~2700-2900 Hz) thus scored z = +1.6 to +2.7 above this depressed
+# reference and saturated at the clamp ceiling (26 % of F samples hit
+# resonance ≥ 0.98).  Re-training at 5500 Hz lifts /IY1/ F2 mean to
+# 2353 Hz and tightens stdev (474 → 336), so the same TRUE-F2-2800
+# speaker now scores z = +1.0 — high, but no longer saturating.
+#
+# The cost: the old "F P50 = 0.811" was largely an artifact of the
+# downward-biased reference.  Honest reference makes F speakers cluster
+# around their own population mean at z ≈ 0 → resonance ≈ 0.5–0.55.
+# This is the algorithmic intent (``0.5 = female reference mean``) finally
+# being expressed accurately.  See voiceya/sidecars/visualizer-backend/
+# CHANGELOG_EN.md (2026-05-06) for the full diagnosis.
+#
+# Saturation eliminated: ``leans_female`` zone (P75 → at_ceiling) now has
+# 0.682–0.98 = ~30 % of bar width — wider than zh's 14 % (P75=0.849).
+# This is structurally correct: en F P75 = 0.682 sits comfortably below
+# the clamp ceiling, so the boundary doesn't need to be pinned to 0.98
+# (the way the old empirical 0.987 P75 forced it to be).
+_EN_F_P5 = 0.351  # was 0.525 (calibration_v1 v0); shift from 5500 Hz retrain
+_EN_F_P25 = 0.458  # was 0.689
+_EN_F_P75 = 0.682  # was _AT_CEILING (0.98) — now sub-ceiling, leans_female has real width
+
+_ZONES_EN: tuple[tuple[str, float | None], ...] = (
+    ("clearly_below_female", _EN_F_P5),
+    ("leans_male", _EN_F_P25),
+    ("mid_neutral", _EN_F_P75),
+    ("leans_female", _AT_CEILING),
+    ("at_ceiling", None),
+)
+
+# ko: bootstrap (2026-05-12).  No own baseline yet — `stats_ko.json` and
+# its paired calibration_v1 run haven't landed.  Per
+# `feedback_reuse_existing_params.md`, new-language zone constants start
+# by reusing the closest sibling's values; refine only when calibration_v1
+# measures a drift > 0.02 on any percentile.  fr is the structurally
+# closest sibling (CV-based corpus, multilingual whisper ASR, adaptive
+# ceiling path) — alias avoids two separate sets of magic numbers drifting
+# independently before we have data.
+_ZONES_KO = _ZONES_FR
 
 
 def _zones_for_lang(lang: str) -> tuple[tuple[str, float | None], ...]:
@@ -98,6 +167,8 @@ def _zones_for_lang(lang: str) -> tuple[tuple[str, float | None], ...]:
         return _ZONES_FR
     if short == "en":
         return _ZONES_EN
+    if short == "ko":
+        return _ZONES_KO
     return _ZONES_ZH
 
 

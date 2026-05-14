@@ -28,6 +28,7 @@ export function nextSessionColor() {
 // 旧调用点直接读 `meta.zh` 也能拿到切换后的值。
 const _LABEL_KEYS = {
 	male: "label.male",
+	neutral: "label.neutral",
 	female: "label.female",
 	music: "label.music",
 	noise: "label.noise",
@@ -35,6 +36,7 @@ const _LABEL_KEYS = {
 };
 const _LABEL_VARS = {
 	male: "var(--male)",
+	neutral: "var(--neutral)",
 	female: "var(--female)",
 	music: "var(--music)",
 	noise: "var(--noise)",
@@ -116,9 +118,7 @@ export function certaintTag(seg) {
 	if (!seg || (seg.label !== "female" && seg.label !== "male")) return "";
 	const margin = seg.confidence ?? 0;
 	const fem = seg.label === "female";
-	if (margin >= _toneThreshold)
-		return t(fem ? "advice.tone.leans_feminine" : "advice.tone.leans_masculine");
-	if (margin >= _weakToneThreshold)
-		return t(fem ? "advice.tone.weakly_feminine" : "advice.tone.weakly_masculine");
-	return t("advice.tone.not_clearly_leaning");
+	if (margin >= _toneThreshold) return t(fem ? "tone.leans_feminine" : "tone.leans_masculine");
+	if (margin >= _weakToneThreshold) return t(fem ? "tone.weakly_feminine" : "tone.weakly_masculine");
+	return t("tone.not_clearly_leaning");
 }
