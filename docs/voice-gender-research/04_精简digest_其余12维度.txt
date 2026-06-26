@@ -1,0 +1,773 @@
+
+##########################################################################################
+## Transmasculine (FTM) voice & testosterone effects
+OVERVIEW: Gender-affirming testosterone therapy (T) is the single most powerful tool for masculinizing the transmasculine voice, and unlike estrogen (which does NOT raise pitch in trans women), exogenous T reliably and irreversibly lowers fundamental frequency (F0/pitch) by thickening the vocal folds. This is the defining asymmetry between FTM and MTF voice transition: trans men get pitch "for free" from hormones, whereas trans women must train it manually. The mechanism is vocal-fold mass/thickness increase (the folds get heavier and more flaccid, dropping F0); critically, in post-pubertal adults the vocal folds thicken but do NOT meaningfully lengthen, and the laryngeal cartilage framework is already ossified, so the masculinization is incomplete relative to cis male puberty where folds both lengthen and thicken. Typical outcome: female-baseline F0 of roughly 190-210 Hz drops to a male-range ~12
+KEY FINDINGS (claims):
+  - [well] Testosterone lowers trans men's speaking F0 into the cis-male range, with mean F0 ~125 Hz at 12 months and wide individual variation (89-170 Hz).
+  - [well] The pitch drop is largest in the first 2-6 months and plateaus by ~12 months; first changes can appear within 2 weeks.
+  - [well] Mean total pitch decrease after 12 months of T is roughly 6-9 semitones.
+  - [well] Masculinization is INCOMPLETE for ~15-25%: about 21% fail to reach the cis-male F0 range after one year and ~16% are dissatisfied with their voice.
+  - [well] Testosterone thickens the vocal folds but does NOT lengthen them or the vocal tract, producing an F0-resonance mismatch.
+  - [mode] F0 lowering does NOT correlate with circulating androgen levels — dose/level does not predict how much the voice drops.
+  - [mode] ~24% of trans men experience voice symptoms (instability, fatigue, hoarseness) during transition and require/seek voice therapy.
+  - [mode] Laryngoscopy of trans men on T shows high rates of hyperfunctional/compensatory laryngeal behaviors.
+  - [mode] Voice masculinization TRAINING adds masculinity beyond what T delivers — clinically ~35 Hz of additional pitch lowering plus resolution of fatigue/instability.
+  - [well] Voice satisfaction tracks lower F0, and voice is among the highest-rated outcomes of T overall.
+QUANT:
+  - Trans men mean speaking F0 after 12 months on T = ~125 Hz (range ~89-170 Hz, large interindividual variation), n=50; baseline female-typical ~190-210 Hz
+  - Cis reference F0 vs trans men on T = trans men 116.8 Hz (±16.9); cis men 110.6 Hz (±16.6); cis women 192.5 Hz (±25.7) — adults age 20-40
+  - Typical within-participant F0 reduction on T = ~60-70 Hz (≈80 Hz from female baseline), stable after ~3-4 months
+  - Mean F0 decrease in semitones at 12 months = ~6.4 semitones (mean); case study 183→134 Hz = -5.4 ST; some cohorts ~9 ST over first 9 months
+  - Timeline of largest pitch drop = steepest months 1-6 (e.g. -1.8 ST months 1-2, -1.9 ST months 3-4); first changes within ~2 weeks; plateau ~12 months
+  - Fraction failing to reach cis-male F0 range after 1 year of T = ~21% (meta-analysis of 19 studies)
+  - Voice dissatisfaction after T = ~16% dissatisfied; ~21% report incomplete voice-gender congruence/voice problems; ~25% sometimes perceived as female on phone
+  - Trans men reporting voice symptoms (instability/fatigue) needing voice therapy = 24% (n=50)
+  - Estimated vocal tract length (incomplete resonance masculinization) = trans men ~15.7 ± 0.8 cm (intermediate: longer than cis women d=1.0, shorter than cis men d=1.4); 23% outside cis male range
+  - Additional pitch lowering from voice therapy beyond T = ~35 Hz; plus resolution of fatigue and pitch instability
+  - Laryngoscopic findings in trans men on T = ventricular fold constriction ~50%, incomplete glottal closure ~50%, vocal fold erythema ~42%, excessive secretions ~42%
+  - Vocal fold thickening onset = within first ~4 months; folds thicken but do NOT lengthen in post-pubertal adults
+  - Upper vocal range restriction = ~32% of trans masculine participants show restricted upper range; max F0 e.g. 941→746 Hz
+  - Patient satisfaction with voice change from T = 77% rated voice masculinization extremely satisfied (1-2 scale) — highest-rated masculinizing trait
+RESOURCES:
+  - (review/meta-analysis) Ziegler, Henke, Wiedrick, Helou — Effectiveness of testosterone therapy for masculinizing voice: a meta-analytic review | https://www.tandfonline.com/doi/full/10.1080/15532739.2017.1411857
+      use: Defines the realistic 'pass rate' base rates the pass/no-pass classifier should encode — ~75-85% of trans men reach male F0 on T, ~15-25% do not. Use to calibrate confidence thresholds and to set user expectations.
+  - (paper) Nygren et al. — Effects on Voice F0 and Satisfaction in Trans Men during Testosterone (longitudinal) | https://pubmed.ncbi.nlm.nih.gov/26678122/
+      use: Primary timeline + endpoint Hz data for modeling expected F0 trajectory; informs a 'progress tracker' that compares a user's F0 against month-on-T norms.
+  - (paper) Hodges-Simeon et al. — Testosterone therapy masculinizes speech and gender presentation | https://pmc.ncbi.nlm.nih.gov/articles/PMC7876019/
+      use: Critical for the analyzer: pass detection must use BOTH F0 and formants/resonance (VTL), not pitch alone — explains why a low-pitch voice can still read as boyish. Provides cis-male/cis-female/trans-men reference distributions for the NN.
+  - (paper) Cler et al. — Longitudinal Case Study of Transgender Voice Changes under Testosterone | https://pmc.ncbi.nlm.nih.gov/articles/PMC6790287/
+      use: High-resolution time-course for an in-app expectation model ('your voice will drop fastest in months 1-6 and may crack/destabilize mid-transition — this is normal').
+  - (website/community) Reneé Yoxon — Voice Training for Transmascs: Before, During, or After T | https://www.reneeyoxon.com/blog/voice-training-for-transmascs-before-during-or-after-t
+      use: Source of concrete coaching drills and rationale for the training/coaching feature; explains targets (resonance, weight, intonation) the coach module should measure and cue.
+  - (website/community) Connected Speech Pathology — How to Masculinize Your Voice Without Straining It | https://connectedspeechpathology.com/blog/how-to-masculinize-your-voice-without-straining-it
+      use: Maps the trainable acoustic dimensions (resonance/larynx height, weight, intonation contour) the coaching feature should target beyond pitch, plus strain-avoidance safety cues.
+  - (website/community) Voice Science — Trans Masculine Voice Change (lexicon) | https://www.voicescience.org/lexicon/trans-masculine-voice-change/
+      use: Good consolidated reference for voice-health risk flags (fatigue, hyperfunction, range loss) the analyzer could warn about and recommend SLP referral.
+  - (website/community) Wikipedia — Transgender voice therapy | https://en.wikipedia.org/wiki/Transgender_voice_therapy
+      use: Orientation/glossary for building the coaching content taxonomy and aligning terminology with clinical practice.
+  - (paper) NATS — Exogenous Testosterone and the Transgender Singing Voice / Types of T Therapy and Effects on Voice | https://www.nats.org/_Library/JOS_On_Point/Pages_from_JOS_078_4_2022_441.pdf
+      use: Useful for a singing/range-aware extension and for warning users about transient range loss and the unstable phase (relevant to voice-health flags).
+IMPLICATIONS: For the Voice-Gender-Analyzer, the transmasculine case is structurally EASIER on pitch but has a distinct failure mode the tool must catch. Concrete implications: (1) Pass/no-pass must NOT rely on F0 alone. The literature is unambiguous that ~21% of trans men reach low pitch yet still don't read fully male because vocal tract length / formants stay intermediate (the F0-resonance mismatch, 'boyish' voice). The NN/LLM classifier should ingest formant frequencies / estimated VTL alongside F0, and the 'uncertain' band should specifically trigger when F0 is male-typical (<145 Hz) but formants/resonance remain female-leaning. (2) Use concrete reference distributions for the three-way decision: cis male F0 ~110 Hz (SD ~17), cis female ~192 Hz (SD ~26), trans-men-on-T ~117-125 Hz. A user F0 <145 Hz with male-range formants → 'pass'; <145 Hz with high formants → 'uncertain, work on resonance'; >155 Hz → 'no-pass / early in transition.' (3) Progress/expectation modeling: encode the timeline (fastest drop months 1-6, plateau ~12 months, first change ~2 weeks) so a tracking feature can tell a user whether their F0 is on-trajectory for their months-on-T, and reassure during the mid-transition u
+
+##########################################################################################
+## Transfeminine (MTF) voice feminization
+OVERVIEW: Voice feminization for trans women is a multidimensional behavioral and (optionally) surgical undertaking, not a pitch-only problem. The contemporary clinical consensus, codified in protocols such as Davies & Goldberg's "Clinical Aspects of Transgender Speech Feminization" (Intl J Transgenderism, 2006/2008) and Mills & Stoneham's "The Voice Book for Trans and Non-Binary People" (Charing Cross GIC, 2017), is that femininity perception is driven by FOUR critical acoustic-physiologic elements: (1) fundamental frequency (F0/pitch), (2) vocal-tract resonance (vocal-tract length/larynx height), (3) formant tuning (especially F1-F4), and (4) phonatory pattern / vocal weight (vocal-fold mass & adduction). Secondary targets include intonation/melody, articulation precision, and pragmatics/word choice. The single most robust empirical finding is that pitch alone is NEITHER necessary nor sufficient
+KEY FINDINGS (claims):
+  - [well] Perceived gender has a fundamental-frequency crossover around 155-165 Hz, but pitch alone is insufficient to be heard as female.
+  - [well] Resonance/formant frequencies are a primary (arguably the dominant) cue to vocal femininity, independent of pitch.
+  - [well] Voice feminization therapy targets four elements: F0, resonance (vocal-tract length/larynx height), formant tuning, and phonatory pattern (vocal weight).
+  - [mode] Intonation pattern (melody) significantly predicts perceived gender: more upward inflection and wider semitone range read as feminine.
+  - [mode] Behavioral voice therapy reliably raises speaking F0 by ~25-39 Hz and improves perceived femininity, but gains are variable and can regress.
+  - [mode] Phonosurgery is an adjunct that raises pitch but not resonance/formants/intonation; combined surgery+therapy beats surgery alone.
+  - [mode] The best acoustic predictors of perceived femininity/gender attribution are F0, average vowel formant frequencies, and sound pressure level.
+  - [mode] Therapy dosage is typically a few months of weekly sessions, but total session time does not significantly predict F0 gain.
+QUANT:
+  - Adult cisgender female speaking fundamental frequency (mean) = ~196-224 Hz, mean ~205 Hz; typical range ~145-275 Hz (adults)
+  - Adult cisgender male speaking fundamental frequency (mean) = ~107-132 Hz, mean ~116 Hz; typical range ~80-165 Hz (adults)
+  - Perceptual F0 crossover for trans women heard as female vs male = ~155-165 Hz (Gelfer & Schofield ~160 Hz crossover); 'ambiguous pitch range' ~145-165 Hz; ~180 Hz for reliably feminine (Gorham-Rowan & Morris 2000)
+  - Trans women with F0 in cis-female range still judged male = >70% of MTF speakers (despite F0 matching biological-female speakers)
+  - Membranous vocal-fold length, male vs female = Male 14.97 ± 2.01 mm; Female 11.17 ± 0.68 mm (~25% longer in males)
+  - Vocal-fold thickness/width, male vs female = Male 6.07 ± 1.11 mm; Female 5.03 ± 1.10 mm
+  - Voice feminization therapy F0 gain (behavioral) = +~27 Hz vowel /a/; +~39 Hz reading; +~25 Hz spontaneous speech (single-study range 15-55 Hz)
+  - Phonosurgery F0 gain (pooled) = +~71.7 Hz vowel /a/; +~41 Hz reading; +~39 Hz spontaneous (single-study high 110 Hz anterior glottic web)
+  - Combined therapy + surgery vs surgery alone (F0 gain) = ~107 Hz combined vs ~76 Hz surgery alone
+  - Wendler glottoplasty mean F0 gain at 12 months = ~50.25 Hz (F0 on /a/)
+  - VFSRAC (vocal-fold shortening + retrodisplacement of anterior commissure) F0 change = Pre 144.1 Hz → Post 207.4 Hz at 6 months (+73.6 Hz), MTF cohort n=362
+  - Cricothyroid approximation (CTA) durability/satisfaction (older series) = ~50% of patients satisfied; ~31% 'passable' voice
+  - Laser-assisted voice adjustment (LAVA) F0 gain = ~26 Hz (insufficient to reach female pitch range)
+  - Therapy dosage = 5-84 total sessions, typically 1-3x/week, ~60 min/session; therapy time NOT a significant predictor of F0 gain (meta-regression p=0.625)
+  - Intonation goal prevalence and perceptual effect = Intonation a stated goal for 68% of MTF clients; perceived-female speakers used more upward inflections and greater utterance semitone range
+  - Practitioner feminine target speaking-pitch range = ~165-255 Hz (cis-female average); consistently ≥165 Hz tends to read feminine
+RESOURCES:
+  - (review/meta-analysis) Speech therapy for transgender women: an updated systematic review and meta-analysis (Leyns et al.) | https://pmc.ncbi.nlm.nih.gov/articles/PMC10363306/
+      use: Primary source for setting realistic expected F0-gain deltas and for calibrating the pass/uncertain/no-pass thresholds and progress-tracking deltas in the coaching tool.
+  - (review/meta-analysis) Vocal Feminization for Transgender Women: Current Strategies and Patient Perspectives (IJGM 2020) | https://pmc.ncbi.nlm.nih.gov/articles/PMC7024865/
+      use: Single best orientation document mapping the entire feature space (F0, formants, resonance, weight) the analyzer should measure and the surgical-context the LLM should explain to users.
+  - (paper) Gelfer & Schofield (2000), Journal of Voice — perceived-female vs perceived-male acoustic comparison | https://www.sciencedirect.com/science/article/abs/pii/S0892199700800922
+      use: Core evidence for the tool's central message ('pitch is necessary but not sufficient') and for setting the F0 ambiguous band in the classifier.
+  - (paper) Hancock, Colton & Douglas (2014) — Intonation and Gender Perception | https://pubmed.ncbi.nlm.nih.gov/24094799/
+      use: Basis for an intonation/melody feature extractor (semitone range, % rising contours) and a coaching module beyond pitch/resonance.
+  - (guideline) Davies & Goldberg — Clinical Aspects of Transgender Speech Feminization and Masculinization (Intl J Transgenderism 2006) | https://transreads.org/wp-content/uploads/2022/01/2022-01-17_61e5c0da6de9d_clinicalaspectsoftransgenderspeechfeminizationandmasculinizationshelaghdavies2008.pdf
+      use: Defines the named therapy goals and exercise structure the coaching feature should mirror; source of clinically validated target descriptions.
+  - (book) Mills & Stoneham — The Voice Book for Trans and Non-Binary People (2017) | https://library.jkp.com/id007011048/The-Voice-Book-for-Trans-and-Non-Binary-People
+      use: Source of concrete, copyrighted-but-summarizable exercises and a credible structure for the app's training/coaching curriculum.
+  - (paper) Acoustic Predictors of Gender Attribution, Masculinity-Femininity, and Vocal Naturalness (Journal of Voice 2019) | https://www.jvoice.org/article/S0892-1997(18)30355-2/abstract
+      use: Directly informs feature selection and weighting for the NN/LLM pass-detector (which measured features should carry most weight).
+  - (guideline) UCSF Gender Affirming Health Program — Transgender voice and communication / vocal health | https://transcare.ucsf.edu/guidelines/vocal-health
+      use: Clinical guideline framing and vocal-health safety messaging (avoid strain) to embed in coaching warnings.
+  - (review/meta-analysis) Wendler glottoplasty acoustic-outcome meta-analysis (Braz J Otorhinolaryngol / OHN) | https://pmc.ncbi.nlm.nih.gov/articles/PMC9874341/
+      use: Lets the tool contextualize a user's measured F0 relative to surgical vs behavioral expectations and explain surgery's pitch-only limitation.
+  - (website/community) Average Speaking Frequencies: F0 Norms by Age, Sex, and Hormonal Status — Voice Science | https://www.voicescience.org/lexicon/average-speaking-frequencies/
+      use: Reference distributions for the classifier's gender-normed F0 scoring.
+  - (website/community) Connected Speech Pathology — MTF Voice Feminization Training guide | https://connectedspeechpathology.com/blog/mtf-voice-feminization-training
+      use: Plain-language exercise descriptions and realistic timeline copy for the user-facing coaching feature.
+IMPLICATIONS: CLASSIFIER DESIGN (pass / uncertain / no-pass): Do NOT build a pitch-only detector — the literature is unambiguous that F0 alone misclassifies the majority of trans women. The model must jointly extract and weight at least: (1) speaking F0 (median + range), (2) vowel formants F1-F4 / estimated vocal-tract length, (3) a resonance/'brightness' proxy (formant dispersion, spectral tilt), (4) vocal weight / phonation proxies (open quotient, breathiness/HNR, spectral slope), and (5) intonation features (semitone range, % rising contours, % level/monotone). Train labels on listener-perceived gender, not just acoustic bins. THRESHOLDS: Encode an explicit gender-ambiguous F0 band (~145-165 Hz) as 'uncertain' on pitch, with ~180 Hz as 'comfortably feminine' for F0 — but make the final verdict a multi-feature decision so a user with F0 ≈ 200 Hz but male-typical formants is correctly flagged 'no-pass / uncertain' with the reason 'resonance/formants unchanged.' Use cis-female norms (mean ~205 Hz, formants raised ~15-20%) and cis-male norms as the two reference distributions for normed scoring and for an interpretable femininity score.
+
+COACHING / VOICE-TRAINING FEATURE: Structure training aroun
+
+##########################################################################################
+## NN/ML gender & voice-attribute classification + uncertainty estimation from audio
+OVERVIEW: Speaker gender classification from audio is one of the most mature and "easy" paralinguistic tasks: binary male/female accuracy on clean, read-speech benchmarks (Common Voice, VoxCeleb, TIMIT, RAVDESS) routinely sits in the 92-99%+ range across virtually every model family, because the dominant cues — speaking fundamental frequency (F0) and vocal-tract-length-driven formant spacing — are strongly bimodal in the cisgender adult population. The methodological lineage runs from (1) hand-crafted acoustic features (MFCCs, F0/pitch, formants F1-F4, spectral and prosodic descriptors, and the standardized 88-dim eGeMAPS / openSMILE sets) fed to classical classifiers (SVM, GMM, logistic regression, random forest, XGBoost); to (2) end-to-end deep models on spectrograms/MFCCs (CNN, CRNN, LSTM/BiLSTM, attention CNNs); to (3) speaker-embedding back-ends (i-vector, x-vector TDNN, ECAPA-TDNN) where a s
+KEY FINDINGS (claims):
+  - [well] Binary speaker gender classification is a near-solved task on clean read-speech benchmarks, with most model families reaching 92-99%+ accuracy.
+  - [well] Speaker embeddings (x-vector, ECAPA-TDNN) carry gender almost perfectly: a simple classifier on the embedding reaches ~97-99%.
+  - [well] Self-supervised transformer encoders (wav2vec 2.0 / HuBERT / WavLM) are the current SOTA for age/gender and are more robust across conditions than CNN baselines; gender info is present and stable across nearly all transformer layers.
+  - [well] Fundamental frequency (F0) is the single most important acoustic determinant of perceived voice gender, with vocal-tract-length / formant cues (F3, F4, average formant, VTL) as the dominant second factor.
+  - [mode] Voice gender can be modeled as a CONTINUOUS / spectrum quantity (perceived femininity-masculinity), and machine scores correlate meaningfully with human perception.
+  - [mode] Binary/cisgender-trained gender classifiers misgender and poorly serve trans and non-binary speakers; the field is being pushed toward continuous, perception-aligned, identity-respecting modeling.
+  - [well] Deep classifiers are systematically overconfident; temperature scaling is the strongest cheap post-hoc calibration baseline, enabling a trustworthy confidence number behind pass/uncertain/no-pass.
+  - [well] Selective classification (reject option) lets the model abstain on low-confidence inputs via a threshold on max-softmax-probability or predictive entropy, giving a principled accuracy-coverage tradeoff — i.e. the 'uncertain' verdict.
+  - [well] Conformal prediction yields distribution-free prediction SETS with guaranteed coverage; the ambiguous set {female, male} is itself the natural 'uncertain' output.
+  - [mode] Evidential deep learning and MC-dropout/ensembles provide single-pass or sampling-based uncertainty usable for audio reject options.
+  - [well] There is a well-recognized ~145-165 Hz 'ambiguous/androgynous' speaking-F0 zone separating typically-male-perceived from typically-female-perceived voices, which is the natural anchor for the 'uncertain' band and for coaching targets.
+QUANT:
+  - CNN on MFCC features, binary gender accuracy (custom test set) = 99.22% (1662 of 1675 test speakers correct)
+  - 1-D CNN stacking MFCC + Mel-spectrogram + Chroma, binary gender accuracy = 97.8%
+  - Random Forest on ECAPA-TDNN embeddings, gender accuracy on VCTK test split = 99.1% (NeMo embeddings); 97.0% (SpeechBrain embeddings)
+  - X-vector (with data augmentation) gender identification accuracy = ~99%
+  - Fine-tuned wav2vec2 gender classification accuracy/F1 (benchmark probing) = 95.4%
+  - audeering wav2vec2-large-robust age/gender model — minimum gender accuracy across child/female/male; UAR gains vs classical = min 91.1% gender accuracy; +44% gender UAR, +99% age UAR; age MAE 7.1-10.8 yrs
+  - audeering model training data composition = VoxCeleb2 30,300; aGender 29,553; TIMIT 1,570; Common Voice 1,729 samples; base = Wav2Vec2-Large-Robust; pooled last-layer hidden states -> 1024-unit FC heads
+  - Attention-CNN over spectrograms, gender accuracy on Common Voice = ~96%
+  - BiLSTM (2 layers) on Common Voice, gender accuracy/precision (validation) = 0.93 accuracy / 0.94 precision
+  - Machine 'voice gender score' (Extreme Random Forest) correlation with human perceptual ratings = r = 0.63 (female speakers); r = 0.77 (male speakers); optimal sample ~7 s
+  - eGeMAPS standardized acoustic feature-set size = 88 features (F0 stats, jitter, shimmer, HNR, formants F1-F3, spectral, MFCC, loudness)
+  - Cisgender adult speaking F0 ranges and androgynous zone = cis female SF0 ≈ 165-255 Hz; cis male ≈ 85-155 Hz; androgynous/ambiguous ≈ 145-165 Hz; perceived-female typically requires sustained ≥ ~165 Hz; cis female formants ~20% higher than cis male
+  - Largest prospective trans-voice training study — strongest acoustic predictors of 'female-sounding' listener ratings = F0, average formant frequency, and Leq (SPL); n = 74 trans women + 40 cis reference speakers, 79 naive listeners
+  - Selective classification benchmark — softmax-response thresholding error at partial coverage = 2% top-5 ImageNet error at 60% coverage (guaranteed risk via SR threshold)
+RESOURCES:
+  - (model) audeering/wav2vec2-large-robust-24-ft-age-gender (+ 6-layer variant) | https://huggingface.co/audeering/wav2vec2-large-robust-24-ft-age-gender [lic:CC BY-NC-SA 4.0 (non-commercial)]
+      use: Strongest off-the-shelf backbone for the pass-detection model. Use its female/male logits as a calibrated probability after temperature scaling; the child class can flag input issues. BUT license is CC BY-NC-SA 4.0 (non-commercial; commerci
+  - (repo) SpeechBrain (ECAPA-TDNN / x-vector embeddings + VoxCeleb recipes) | https://github.com/speechbrain/speechbrain [lic:Apache-2.0]
+      use: Permissively licensed alternative to audeering. Extract ECAPA embeddings, train a small MLP/logistic head for target-gender probability or a regression head for a continuous femininity score, then calibrate. Embeddings also enable per-user 
+  - (repo) openSMILE + eGeMAPS feature set | https://github.com/audeering/opensmile-python [lic:audEERING source-available (free for research; commercial license required)]
+      use: Gives interpretable, coachable features (F0 mean/SD, formants, HNR) that map directly to voice-training targets — far better for the COACHING half than opaque embeddings. Feed eGeMAPS into a classical model (SVM/RF/XGBoost) for a transparen
+  - (repo) audEERING age/gender how-to | https://github.com/audeering/w2v2-age-gender-how-to [lic:Check repo (MIT-style example code; model weights remain CC BY-NC-SA)]
+      use: Direct integration reference for wiring the model into the app and exposing both predictions and the embedding (the embedding can feed a custom continuous femininity regressor).
+  - (repo) Anvarjon/Age-Gender-Classification (multi-attention CNN, Common Voice) | https://github.com/Anvarjon/Age-Gender-Classification [lic:See repo (research code)]
+      use: Lightweight, trainable-from-scratch architecture if a fully permissive/owned model is needed; spectrogram-CNN baseline to compare against SSL backbones.
+  - (repo) x4nth055/gender-recognition-by-voice | https://github.com/x4nth055/gender-recognition-by-voice [lic:MIT]
+      use: Good reference implementation and quick CPU baseline; useful for understanding the classic MFCC->dense-net pipeline and dataset prep.
+  - (paper) Voice Gender Scoring and Independent Acoustic Characterization of Perceived Masculinity/Femininity | https://arxiv.org/abs/2102.07982 [lic:arXiv (research)]
+      use: Blueprint for the CONTINUOUS scoring engine and for which features to surface in coaching. The correlation ceilings (0.63-0.77) set realistic expectations for how well any machine score can match human 'pass' judgments.
+  - (paper) Speech After Gender: A Trans-Feminine Perspective on Next Steps for Speech Science and Technology | https://arxiv.org/pdf/2407.07235 [lic:arXiv (research)]
+      use: Direct ethical/design guidance: avoid presenting binary verdicts as truth, model a spectrum, validate against perception, and center the trans user — exactly the product's framing.
+  - (paper) Gender-Affirming Voice Training for Trans Women: Acoustic Outcomes & Listener Perceptions (Journal of Voice 2024) | https://pubmed.ncbi.nlm.nih.gov/38503674/ [lic:Closed (Elsevier); abstract open]
+      use: Empirical, trans-specific ground truth for which acoustic targets actually drive listener pass judgments — ideal label/feature design and validation reference for both the detector and the coach.
+  - (paper) Selective Classification for Deep Neural Networks | https://arxiv.org/pdf/1705.08500 [lic:arXiv (research)]
+      use: Implementation recipe for the 'uncertain' verdict: pick a confidence threshold guaranteeing a target error rate, abstain (=uncertain) below it.
+  - (paper) On Calibration of Modern Neural Networks (temperature scaling) | https://arxiv.org/abs/1706.04599 [lic:arXiv (research)]
+      use: Mandatory post-processing step so the probability behind pass/uncertain/no-pass is meaningful; trivial to add (fit T on a held-out trans-inclusive validation set).
+  - (review/meta-analysis) A Gentle Introduction to Conformal Prediction (+ ConfTS / calibration interaction) | https://arxiv.org/abs/2402.05806 [lic:arXiv (research)]
+      use: Alternative to threshold-based abstention: emit {female}/{male} (confident) or {female,male} (uncertain) with a statistical coverage guarantee — clean mapping to pass/uncertain/no-pass.
+  - (paper) FADEL: Uncertainty-aware Fake Audio Detection with Evidential Deep Learning | https://arxiv.org/abs/2504.15663 [lic:arXiv (research)]
+      use: Template for adding evidential uncertainty to an audio gender head — useful to flag out-of-distribution inputs (noise, non-speech, unusual recordings) and abstain rather than misgender.
+  - (model) audeering/wav2vec2-large-robust-6-ft-age-gender | https://huggingface.co/audeering/wav2vec2-large-robust-6-ft-age-gender [lic:CC BY-NC-SA 4.0 (non-commercial)]
+      use: Edge/low-latency option for real-time feedback during voice practice on the 8GB VPS or on-device, where the 24-layer model is too heavy.
+  - (paper) ECAPA-TDNN paper | https://arxiv.org/abs/2005.07143 [lic:arXiv (research); SpeechBrain weights Apache-2.0]
+      use: Reference for the embedding backbone whose representations encode gender ~97-99% and can be repurposed for a continuous femininity regressor + per-user tracking.
+IMPLICATIONS: CONCRETE BUILD GUIDANCE for the pass-detection + voice-coaching tool:
+
+1) Backbone choice. Fastest path to a strong detector is audeering wav2vec2-large-robust age/gender — but its CC BY-NC-SA 4.0 license forbids commercial use, so if this product is or may become monetized, do NOT ship it; instead use Apache-2.0 SpeechBrain ECAPA-TDNN embeddings (or train an attention-CNN/SSL head) and add your own gender/femininity head. Keep the audeering 6-layer variant only for internal benchmarking. Provide the 6-layer/ECAPA path for low-latency real-time feedback on the 8GB VPS.
+
+2) Do NOT ship a raw binary. Every cited model is trained on cisgender binary (or child/female/male) labels and will be overconfident and prone to misgendering trans/non-binary users. Reframe the output as a CONTINUOUS target-gender / femininity score (regression or ordinal head), trained or at minimum validated against HUMAN perceptual ratings (VAS), because machine-vs-human correlation tops out around r≈0.63-0.77 — set product expectations accordingly and never present a verdict as objective truth.
+
+3) Pass / uncertain / no-pass = calibration + selective classification. Pipeline: (a) train the head; (b) fit TEMPER
+
+##########################################################################################
+## Open-source projects, models & apps for voice gender analysis + trans voice training
+OVERVIEW: The tooling landscape splits into three reusable tiers for a "does my voice pass / how do I train it" product. (1) Acoustic-feature engines that compute the gender-relevant primitives — fundamental frequency (F0/pitch), formants (F1–F4, the core of vocal-tract "resonance"/"size"), HNR, jitter/shimmer, and spectral tilt. The dominant open-source stack here is Praat (the reference phonetics engine) exposed to Python via Parselmouth, plus librosa for general DSP, openSMILE for standardized feature sets (GeMAPS/eGeMAPS/ComParE), and dedicated pitch trackers (CREPE/torchcrepe, librosa.pyin/pYIN). These give you transparent, explainable numbers you can map directly to gender-perception thresholds (e.g. F0 and formants), which matters because users and clinicians trust interpretable metrics over black-box "score" outputs. (2) Neural speech toolkits and pretrained gender/age classifiers — Speech
+KEY FINDINGS (claims):
+  - [well] Parselmouth is the de-facto standard for getting Praat-quality F0 and formant measurements into Python, and is what most research/clinical trans-voice analysis builds on.
+  - [well] A small family of wav2vec2 models on HuggingFace are the most reusable pretrained gender classifiers, but they are binary/3-class and trained on cis speech.
+  - [well] The trans community and clinicians treat perceived voice gender as a two-axis problem — pitch (F0) AND resonance (formants/vocal-tract length) — not a single scalar.
+  - [well] CREPE/torchcrepe is the strongest open neural pitch tracker; classical pYIN (in librosa) is the standard transparent baseline.
+  - [well] There is a mature set of trans-specific training apps that define UX/pedagogy norms; most give real-time visual feedback and deliberately avoid a hard male/female verdict.
+  - [well] openSMILE's GeMAPS/eGeMAPS standardized feature sets are the most citable, paralinguistics-validated feature vector for a classifier, but licensing limits commercial use.
+  - [well] SpeechBrain, pyannote.audio and ESPnet are the permissive neural toolkits for speaker embeddings/diarization that you can build a custom (trans-aware) gender/pass head on top of.
+  - [mode] Numerous beginner-grade 'gender by voice' GitHub repos exist but mostly classify with shallow features on small/cis datasets and overstate accuracy.
+  - [well] VoiceLab is a ready-made, citable, Parselmouth-based GUI/library that batch-measures exactly the gender-relevant acoustics, useful as a reference for which metrics to compute.
+  - [mode] Pretrained cis-binary gender models are a poor fit for the trans pass/uncertain/no-pass framing and must be recalibrated, not used off-the-shelf.
+QUANT:
+  - alefiury wav2vec2-xls-r gender model accuracy = F1 = 0.9993 (loss 0.0061) on LibriSpeech-clean-100 test split (70/10/20); cis adult read speech
+  - audeering age+gender model output format = age in [0,1] mapped to 0-100 years; gender = P(child), P(female), P(male) (3-class)
+  - CREPE pitch accuracy vs pYIN (iKala, 2018) = CREPE ~90.5% vs pYIN ~91% Raw Pitch Accuracy clean; CREPE markedly more robust under added noise
+  - CREPE frame/resolution = classifies 20 ms frames into ~360 pitch bins spaced in cents (20-cent resolution)
+  - openSMILE feature set sizes = ComParE-2016 ~6373 features; GeMAPS 62; eGeMAPS 88 features
+  - AbdelkadirSellahi LSTM gender model accuracy = 79.33% on BVC Gender & Age dataset (MFCC + LSTM)
+  - Classic Kaggle 'voice gender' tabular dataset (Becker) = 3168 samples, 21 acoustic features (meanfreq, IQR, sfm, etc.); reported ~97-99% with shallow ML but criticized as leaky
+  - x4nth055 example prediction confidence = e.g. Male 96.36% / Female 3.64% on a sample; Mel-spectrogram NN on Mozilla Common Voice
+  - Eva app pricing = Free base app (pitch tuner + sample lesson); additional lessons $4.99 each
+RESOURCES:
+  - (app) Praat | https://www.fon.hum.uva.nl/praat/
+      use: Authoritative algorithms for every gender-relevant metric; use as ground-truth to validate your own pipeline. Access programmatically via Parselmouth.
+  - (repo) Parselmouth (YannickJadoul) | https://github.com/YannickJadoul/Parselmouth
+      use: Primary engine to extract F0 + formants (F1-F4) + HNR for both the pass-detector's interpretable features and the coach's targets. Note GPL copyleft for a closed-source product.
+  - (repo) librosa | https://github.com/librosa/librosa
+      use: Permissive, commercial-safe building block for spectrograms, mel features for NN input, and a no-download pYIN pitch baseline.
+  - (repo) openSMILE + opensmile-python (audEERING) | https://github.com/audeering/opensmile
+      use: Drop-in, validated feature vector for a gender/voice-quality classifier; eGeMAPS is a strong, compact, explainable input. Watch the commercial license.
+  - (repo) torchcrepe (maxrmorrison) | https://github.com/maxrmorrison/torchcrepe
+      use: Robust, commercial-safe neural F0 for real-time pitch feedback and accurate mean/SD pitch in noisy phone recordings.
+  - (model) CREPE (marl) | https://github.com/marl/crepe
+      use: Reference pitch model / accuracy benchmark; TF deployment option.
+  - (repo) SpeechBrain | https://github.com/speechbrain/speechbrain
+      use: Build a custom, trans-aware gender/pass head on top of speaker embeddings; Apache license is commercial-friendly.
+  - (repo) pyannote.audio | https://github.com/pyannote/pyannote-audio
+      use: Pre-clean audio: isolate voiced single-speaker segments before F0/formant/NN analysis to cut noise-driven errors.
+  - (repo) ESPnet | https://github.com/espnet/espnet
+      use: If adding transcript-aware coaching (intonation on specific phrases) or TTS target-voice demos.
+  - (model) audeering/wav2vec2-large-robust-24-ft-age-gender | https://huggingface.co/audeering/wav2vec2-large-robust-24-ft-age-gender
+      use: Strong baseline gender+age probabilities for a research/non-commercial pass-detector; expose P(target) + confidence. Cannot ship commercially under this license.
+  - (model) alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech | https://huggingface.co/alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech
+      use: Commercial-safe pretrained gender classifier; use calibrated probability as the pass signal. Validate on trans speech before trusting the F1.
+  - (model) Xenova/wav2vec2-...-gender-recognition-librispeech (ONNX) | https://huggingface.co/Xenova/wav2vec2-large-xlsr-53-gender-recognition-librispeech
+      use: Run gender inference client-side (privacy-first), matching the community's strong privacy expectation for voice data.
+  - (model) 7wolf/wav2vec2-base-gender-classification | https://huggingface.co/7wolf/wav2vec2-base-gender-classification
+      use: Lighter alternative gender head to benchmark against.
+  - (repo) x4nth055/gender-recognition-by-voice | https://github.com/x4nth055/gender-recognition-by-voice
+      use: Clean, MIT-licensed reference for an end-to-end record→feature→predict pipeline and CLI/mic capture.
+  - (repo) VoiceLab (Feinberg) | https://github.com/Voice-Lab/VoiceLab
+      use: Authoritative list of metrics + default parameters a clinical-grade analyzer should compute; reproducible reference.
+  - (repo) my-voice-analysis (Shahabks) | https://github.com/Shahabks/my-voice-analysis
+      use: Example of higher-level wrappers around Praat for quick prosody/F0 summaries.
+  - (app) inFormant (in-formant) | https://github.com/in-formant/in-formant
+      use: Best open-source reference implementation for real-time formant (resonance) tracking — the hard part of a coaching UI.
+  - (app) Christella VoiceUp | https://speechtools.co/christella-voiceup
+      use: Clinical pedagogy reference and proof users want longitudinal pitch tracking, not just one-shot verdicts.
+  - (app) Eva / EvaF / EvaM (Exceptional Voice) | https://apps.apple.com/us/app/christella-voiceup-mtf-voice/id1124464717
+      use: Shows the full coaching toolset (tuner, target tracker, loudness) and the value of separate FTM vs MTF programs.
+  - (app) DevExtras Voice Tools | https://devextras.com/voicetools/
+      use: Closest free analog to the target product's analysis side; study its 'gender-associated pitch zone' visualization.
+  - (app) Vocular / Voice Pitch Analyzer (Purr Programming) | https://alternativeto.net/software/voice-pitch-analyzer/
+      use: Reference for the simple 'is my average pitch in the target zone' UX many users start with.
+  - (app) AcousticGender.space | http://acousticgender.space/
+      use: Direct model for the two-axis (pitch x resonance) pass visualization; community-endorsed (Renée Yoxon) but 'grain of salt' accuracy.
+  - (app) Resona | https://resona.cafe/
+      use: Modern UX + privacy reference for real-time spectrogram feedback.
+  - (app) Voice Whiz | https://voicewhiz.app/trans-voice-training/
+      use: Direct competitor doing AI gender-perception scoring; benchmark its framing and accuracy claims.
+  - (app) TruVox (Univ. of Cincinnati) | https://www.uc.edu/news/articles/2024/06/uc-app-helps-gender-diverse-users-sound-more-masculine-or-feminine.html
+      use: Open-source, academically-backed reference implementation to learn architecture and exercises from.
+  - (app) Genderfluent | https://www.genderfluentapp.com/
+      use: Competitor combining a gender-perception readout with longitudinal tracking — close to the target feature set.
+  - (app) Spectrology / Sonic Visualiser / Friture / Overtone Analyzer | https://scinguistics.com/spectrograms/
+      use: Show what raw spectrogram literacy the audience already has; informs how to overlay F0/formant guides on a spectrogram.
+  - (website/community) r/transvoice wiki & TransVoiceLessons/Renée Yoxon/Scinguistics | https://www.transvoicelessons.com/
+      use: Source of truth for target zones, terminology ('size/weight/resonance'), and the framing norms (avoid blunt male/female verdicts) the product's coaching language should adopt.
+  - (review/meta-analysis) Ahmed, Kim & Hoffmann (2022) trans voice training apps review | https://static1.squarespace.com/static/5b8ab61f697a983fd6b04c38/t/6255a9b1be790630633a7224/1649781172123/Ahmed-Kim-Hoffmann-2022-TransVoiceTrainingApps.pdf
+      use: Academic comparison of the app landscape — gaps and user needs to differentiate the product.
+IMPLICATIONS: Concrete build guidance for the NN/LLM pass-detector + voice coach: (1) Feature spine — use Parselmouth (or torchcrepe for pitch + a formant tracker) to compute interpretable primitives: mean/median/SD speaking F0, F1-F3 formants, HNR, spectral tilt. These map directly onto the two community-validated axes (pitch and resonance) and let you show users WHY a verdict was reached, which the community demands. Mind GPL: Parselmouth/Praat and inFormant are GPLv3 — if shipping closed-source, prefer permissive torchcrepe (MIT) + librosa (ISC) for the core and isolate any GPL component, or accept copyleft. (2) Pass-detector — do NOT take argmax of an off-the-shelf binary gender model. Wrap a model like alefiury (Apache-2.0, commercial-OK) or audeering (CC-BY-NC, research only) to output a calibrated P(target gender) and define three bands: pass (high P(target)), uncertain/androgynous (mid band — this is where the audeering 3-class child/female/male confidences or a temperature-scaled probability help), no-pass. Critically, every surveyed model is trained on CIS speech with no trans validation, so reported F1s (e.g. 0.9993) will not hold — you must recalibrate/threshold on real trans recordi
+
+##########################################################################################
+## Acoustic measurement & real-time biofeedback tooling
+OVERVIEW: Real-time gender-voice biofeedback rests on two acoustic primitives: fundamental frequency (F0/pitch) and the lower vocal-tract resonances (formants F1-F2-F3, a proxy for "resonance"/vocal-tract length). Pitch is the easier, more robust signal; resonance is harder to track reliably and harder to render legibly to a lay user. For pitch, the practical algorithm families are (a) time-domain autocorrelation/difference-function methods — YIN and its probabilistic extension pYIN (used by Praat-style trackers and librosa); (b) spectral template matching — SWIPE/SWIPE'; and (c) neural methods — CREPE (CNN on raw 1024-sample frames), SPICE (self-supervised, constant-Q), PESTO, and newer low-latency variants (PENN, SwiftF0). CREPE achieves >90% raw-pitch accuracy at a 10-cent tolerance and is more noise-robust than pYIN/SWIPE below ~10 dB SNR, but the full model is heavy (22.2M params, ~30 ms look
+KEY FINDINGS (claims):
+  - [well] CREPE (deep CNN pitch tracker) reaches >90% raw pitch accuracy within 10 cents and near-100% on clean studio data, and is more noise-robust than pYIN/SWIPE below ~10 dB SNR
+  - [well] Algorithm choice is a real accuracy tradeoff: YIN/pYIN are robust time-domain standards, SWIPE is strong on clean signals but degrades in noise, CREPE wins at low SNR but is heavy
+  - [well] SPICE is a deployable on-device/browser pitch model: self-supervised, ships as TensorFlow.js and TensorFlow Lite, runs on 16 kHz mono audio
+  - [well] Real-time formant/resonance tracking is error-prone and sex-biased; LPC-Burg formants are only a rough approximation and need sex-specific settings
+  - [well] Classic pitch pitfalls — octave errors, subharmonic capture, and voicing misclassification — disproportionately hit low/creaky voices relevant to trans-masc users
+  - [mode] Real-time F2 visual biofeedback can shift resonance and raise perceived femininity — the most direct evidence for gender-voice biofeedback — but on small samples with unproven generalization
+  - [mode] TruVox demonstrates a feasible privacy-preserving, validated real-time gender-voice pitch-trainer architecture
+  - [mode] Visual biofeedback improves in-session target acquisition but transfer/generalization is inconsistent and evidence quality is low
+  - [well] Motor-learning theory says constant high-frequency feedback harms long-term retention; faded/reduced knowledge-of-results is better for durable skill
+  - [well] Browser real-time pitch is feasible within a tight latency budget using AudioWorklet + WASM
+  - [well] Auditory feedback delay becomes perceptually disruptive around 50-200 ms, bounding tolerable end-to-end latency for any 'live' feedback
+  - [mode] Spectrograms and raw formant displays are powerful but hard for lay users; visual+audio feedback beats audio-only
+  - [well] Voice Range Profile (phonetogram) is the standard visualization of vocal capability and a clinically endorsed assessment
+QUANT:
+  - CREPE raw pitch accuracy within 10-cent tolerance = >90% (MDB-stem-synth); ~100% (RWC clean data)
+  - CREPE model size (full vs tiny) = full = 22.2M parameters; tiny = 487k parameters; 360 pitch bins at 20 cents/bin over 6 octaves; 10 ms default step; ~30 ms lookahead
+  - TruVox pitch-engine validation vs Praat = <5 Hz error on pure tones; mean difference 15.4 Hz (SD 10.7) on 16 transfeminine speakers' Rainbow Passage; pitch range setting 50-600 Hz
+  - TruVox usability and learning outcome (n=21) = System Usability Scale mean 79.8 (SD 12.8); 6 of 7 exercises significant error reduction (P<.05), improvements 1-8 Hz; age M=30.2 (SD 8.0)
+  - Cisgender adult speaking F0 norms = Adult female ≈ 205 Hz (other sources 183-210 Hz, SD ~20 Hz); adult male ≈ 116-120 Hz (SD ~18-20 Hz)
+  - Acoustic targets associated with feminine-perceived voice = Average speaking F0 >180 Hz (range ~140-300 Hz), minimum F0 >130 Hz, elevated F1-F4; 'gender-ambiguous' F0 band ≈ 150-185 Hz where formants/F2 become decisive
+  - AudioWorklet real-time budget (browser) = 128-sample render quantum ≈ 2.9 ms at 44.1 kHz; ~16.7 ms compute budget per frame at 60 fps
+  - Perceptually disruptive auditory feedback delay (DAF) = Noticeable effects at ~50-200 ms; ~50-70 ms already perturbs fluency — implies keep live-feedback end-to-end latency well under ~50 ms
+  - Gross Pitch Error definition (eval metric) = Fraction of frames where relative F0 error exceeds 20% threshold
+  - Formant biofeedback feminization study sample = 12 trans women (age M=45.2, SD=18.1) + 19 cis men; live F2 visual target shifted F2 and raised blinded femininity ratings
+  - SPICE input requirement = Mono audio at 16 kHz, .wav; deployable via TensorFlow.js (web) and TensorFlow Lite (mobile)
+RESOURCES:
+  - (model) CREPE (marl/crepe) | https://github.com/marl/crepe [lic:MIT]
+      use: Reference / server-side high-accuracy F0 for the pass-detection model; use 'tiny' or distill for on-device. Good ground-truth for validating a lighter in-browser tracker.
+  - (model) SPICE (TF Hub / TFLite / TF.js) | https://arxiv.org/abs/1910.11664 [lic:Apache-2.0 (Google model)]
+      use: Most direct path to on-device/browser real-time pitch for the live coaching feature without a labeled-data pipeline.
+  - (repo) librosa pyin / YIN | https://librosa.org/doc/main/generated/librosa.pyin.html [lic:ISC]
+      use: Baseline pitch + voicing gate for the analyzer backend; pYIN's HMM voicing helps reject creak/unvoiced frames before computing a verdict.
+  - (repo) Praat / Parselmouth | https://github.com/YannickJadoul/Parselmouth [lic:GPL-3.0 (Praat); MIT (Parselmouth)]
+      use: Server-side formant (F1-F3) + F0 + intensity extraction for resonance scoring and as the validation reference (TruVox benchmarked against Praat to ~15 Hz).
+  - (repo) CREPE.js / pitchy / Pitchfinder | https://github.com/peterkhayes/pitchfinder [lic:MIT]
+      use: Drop-in client-side pitch for low-latency live feedback when a neural model is too heavy; run inside an AudioWorklet (128-sample quanta).
+  - (app) TruVox | https://pmc.ncbi.nlm.nih.gov/articles/PMC12481138/ [lic:free; source release pending]
+      use: Closest existing product to the project's coaching half; concrete, validated UX patterns (pitch-vs-target curve, color reinforcement, on-device privacy) to emulate.
+  - (review/meta-analysis) Sugden et al. 2019 — Ultrasound VBF systematic review | https://pubmed.ncbi.nlm.nih.gov/31179581/ [lic:n/a]
+      use: Evidence-base reality check and design caution: build for transfer/generalization, not just in-app target hits.
+  - (paper) McNamara/Carew-style F2 formant biofeedback feminization study (J Voice 2018/2020) | https://www.jvoice.org/article/S0892-1997(18)30190-5/pdf [lic:n/a]
+      use: Best direct evidence that resonance biofeedback works for gender voice; supports an F2-target coaching mode.
+  - (paper) Faded knowledge-of-results retention study (PMC6698475) | https://pmc.ncbi.nlm.nih.gov/articles/PMC6698475/ [lic:n/a]
+      use: Direct design principle: implement feedback fading + self-estimation prompts in the trainer rather than always-on dense feedback.
+  - (website/community) Web Audio AudioWorklet design pattern (Chrome) + WASM pitch guide | https://developer.chrome.com/blog/audio-worklet-design-pattern/ [lic:n/a]
+      use: Implementation blueprint for low-latency in-browser pitch/resonance feedback (128-sample quanta, ~16.7 ms/frame budget).
+  - (paper) Speech/Voice Range Profile (phonetogram) literature | https://pmc.ncbi.nlm.nih.gov/articles/PMC4157536/ [lic:n/a]
+      use: Optional progress-visualization and baseline screen; frames a user's current vs target pitch/loudness territory.
+  - (website/community) Voice Science (voicescience.org) tools + F0 norms lexicon | https://www.voicescience.org/lexicon/average-speaking-frequencies/ [lic:n/a]
+      use: Norm reference for thresholds and a model for user-friendly resonance/spectrogram rendering.
+IMPLICATIONS: Concrete guidance for building the NN/LLM pass-detector + voice-coach:
+
+PITCH ENGINE (verdict + coaching): Run a robust F0 tracker with an explicit voicing/confidence gate and octave-continuity smoothing — pYIN's HMM voicing or CREPE/SPICE confidence head — because octave errors and subharmonic (creak) capture will otherwise corrupt the pass/no-pass decision, especially for trans-masc users at low pitch. For the cloud analyzer, full CREPE (MIT) is a strong accuracy reference; for the live browser coach, use SPICE (TF.js/TFLite, Apache-2.0) or a WASM YIN/MPM (pitchfinder/pitchy, MIT) inside an AudioWorklet. Validate any lightweight tracker against Praat/Parselmouth the way TruVox did (target ~<15 Hz mean agreement).
+
+RESONANCE: Do not surface raw multi-formant overlays as the primary signal — LPC-Burg formants are sex-biased (male overestimation), unreliable on back vowels, and need per-speaker max-formant ceilings. Compute F1-F3 with Praat/Parselmouth server-side for scoring, but render resonance to users as a friendlier proxy (an F2/F3-driven "vowel-space dot" tracking a target, or resonance band-energy), echoing the validated F2-target paradigm that demonstrably raised femininity
+
+##########################################################################################
+## SLP pedagogy & evidence-based voice-training methodology
+OVERVIEW: Gender-affirming and clinical voice training rest on a shared scientific backbone: the Principles of Motor Learning (PML), drawn from limb-motor and speech-motor research and codified for SLP by Maas et al. (2008, AJSLP). PML splits training conditions into (a) practice conditions — amount, distribution (massed vs distributed), schedule (blocked vs random), variability (constant vs variable), attentional focus (internal vs external), and target complexity; and (b) feedback conditions — type (knowledge of performance KP vs knowledge of results KR), frequency (100% vs faded), and timing (immediate vs delayed). The consistent meta-principle is a phase split: conditions that boost in-session ACQUISITION (massed, blocked, constant practice; internal focus; frequent immediate KP) differ from — and are often the opposite of — conditions that boost long-term RETENTION and TRANSFER/generalization
+KEY FINDINGS (claims):
+  - [well] Motor learning has a phase structure: conditions that maximize in-session acquisition (massed, blocked, constant practice; internal focus; frequent immediate KP feedback) are often opposite to those that maximize long-term retention and transfer (distributed, random, variable practice; external focus; faded/delayed KR feedback).
+  - [well] External attentional focus (attend to the resulting SOUND or resonance sensation/effect, not to muscle/articulator placement) produces more automatic movement and better retention than internal focus.
+  - [well] Semi-occluded vocal tract exercises (SOVT) — straw/tube phonation, lip trills, humming, /m v z/ — work by raising supraglottal inertive reactance, which feeds acoustic energy back to the vocal folds, lowers phonation threshold pressure, and yields easy, efficient phonation.
+  - [well] Flow-resistant straw/tube (SOVT) therapy and Lessac-Madsen Resonant Voice Therapy (LMRVT) are roughly equally efficacious for reducing voice handicap in dysphonia; both beat no-treatment controls.
+  - [mode] Resonant Voice Therapy (LMRVT) improves voice quality/efficiency in dysphonia, but its evidence base is only 'moderate' in strength and limited in volume.
+  - [mode] For gender-affirming voice feminization, ~8–12 weekly 45–60 min sessions produce clinically meaningful, largely durable acoustic change; intensive schedules give comparable results to traditional weekly delivery.
+  - [mode] Gender-affirming voice gains are partially durable but can regress without continued practice; some acoustic parameters hold at 3-month and 1-year follow-up while others do not.
+  - [mode] The traditional exercise hierarchy (sustained vowel → syllable → word → phrase → sentence → reading → conversation → spontaneous) advances at ~80% accuracy per level, but rigid hierarchies that isolate skills out of context can IMPEDE generalization to conversation.
+  - [mode] Distributed (spaced) practice generally favors retention/transfer over massed practice, but the advantage is not universal for complex motor skills — and in speech/voice, massed schedules can also work.
+  - [mode] Vocal hygiene and systemic hydration have supporting evidence for improving/protecting voice quality; warm-ups produce measurable short-term acoustic improvement.
+  - [mode] Adherence to home voice practice is the principal limiting factor for outcomes; non-adherence/dropout reaches ~74% in some reports, and app-based feedback roughly halves missed home-practice tasks.
+  - [mode] Motor-learning concepts can be operationalized into observable, codable clinician/training behaviors and a structured 'prepractice' phase, enabling systematic (and potentially automatable) coaching.
+  - [prel] Community/practitioner pedagogy frames voice gender as multiple semi-independent dimensions (pitch/F0, resonance/'size', vocal weight/fold mass, intonation, articulation) rather than pitch alone — and explicitly warns against pressed/strained phonation while training.
+QUANT:
+  - Feedback-fading schedule used in SLP motor-learning practice (acquisition → retention) = From 100% of trials (every attempt) faded to ~80%, 50%, 20%, then 0%; reduced/delayed feedback favors retention
+  - Accuracy threshold to advance hierarchy level (traditional articulation/voice therapy) = ≥80% accuracy at a level before progressing to the next
+  - Optimal straw diameter for beneficial SOVT back-pressure = ~3.5 mm diameter produced among the highest beneficial back pressure; RCT protocol used a 5 cm × 2.5 mm thin straw
+  - SOVT home-practice dosage in RCT (flow-resistant tube arm) = 4 times/day, ~4 min each, 10 tokens per exercise, weekly 55–60 min clinic sessions, over 4 or 8 weeks
+  - Typical gender-affirming voice feminization course length = ~8–12 weekly sessions of 45–60 min (some programs require ≥8 attended)
+  - Example reading F0 change after feminization training = 146.2 → 203.6 Hz (12 sessions); 144 → 165 Hz (10 sessions); spontaneous 140.9 → 195.2 Hz
+  - Cis-female reference mean speaking F0 (adult cohorts cited) = ≈199 ± 28 Hz (Australian speakers); ≈188 ± 20 Hz (Swedish speakers); 'gender-neutral/ambiguous' band ≈140–165 Hz
+  - Intensive vs traditional gender-affirming schedule comparison = Traditional 1×45 min/wk × 12 wk (n=17) vs Intensive 3×45 min/wk × 4 wk (n=17); comparable outcomes
+  - Warm-up durations tested for acoustic effect = 5–20 min warm-up; jitter/shimmer/NHR decrease, HNR/CPPS/alpha-ratio increase post-warm-up (short-lived)
+  - Voice therapy non-adherence / dropout magnitude = Dropout/poor-attendance reported up to ~74.4%; app-based support cut missed home-practice tasks by ~50%
+  - Hydration effect on voice acoustics = Dehydration worsens NHR, shimmer, jitter, frequency, s/z ratio; water ingestion improves shimmer, jitter, frequency, and maximum phonation time; caffeine not clearly harmful
+RESOURCES:
+  - (paper) Maas et al. 2008 — Principles of Motor Learning in Treatment of Motor Speech Disorders | https://pubs.asha.org/doi/10.1044/1058-0360(2008/025) [lic:Paywalled (ASHA journal); concepts freely summarized in CE article 20589.]
+      use: Primary design spec for the training/coaching engine: how to schedule practice and feedback, and how to interpret day-to-day variability. Drives logic like 'fade feedback over sessions', 'add variable/random practice for carry-over', 'cue e
+  - (website/community) speechpathology.com 20Q Article 20589 — Principles of Motor Learning (clinical tables) | https://www.speechpathology.com/articles/20q-principles-motor-learning-and-20589 [lic:Free article (registration).]
+      use: Directly translatable into app rules for feedback-fading schedules and practice-mode selection by learner stage.
+  - (paper) SOVT RCT — FRT (straw) vs LMRVT (J Voice 2024) | https://pmc.ncbi.nlm.nih.gov/articles/PMC11567055/ [lic:Open access (PMC).]
+      use: Concrete, citable dosage template for a SOVT warm-up/relaxation module and for setting default home-practice reps/frequency.
+  - (review/meta-analysis) Systematic review of Resonant Voice Therapy (PubMed 27705008) | https://pubmed.ncbi.nlm.nih.gov/27705008/ [lic:Abstract free.]
+      use: Evidence basis and honest confidence level for any resonance-training module the app coaches.
+  - (paper) Traditional vs Intensive Gender-Affirming Voice Training schedule (J Voice) | https://www.sciencedirect.com/science/article/abs/pii/S0892199722000674 [lic:Paywalled (abstract free).]
+      use: Justifies offering flexible self-practice schedules (intensive vs spaced) and setting realistic week-count expectations in the coaching plan.
+  - (paper) Non-binary gender-affirming voice case series (PMC10909913) | https://pmc.ncbi.nlm.nih.gov/articles/PMC10909913/ [lic:Open access (PMC).]
+      use: Realistic F0 trajectory data and a model for non-binary/gender-neutral targets (~140–165 Hz) the pass-detector should support beyond binary cis norms.
+  - (paper) Long-term Acoustic Effects of Gender-Affirming Voice Training (PubMed 38704279) | https://pubmed.ncbi.nlm.nih.gov/38704279/ [lic:Abstract free.]
+      use: Supports building maintenance/relapse-prevention practice into the app and tracking which parameters drift, prompting re-training.
+  - (paper) Conversation Training Therapy concept paper (J Voice 2016) | https://www.sciencedirect.com/science/article/abs/pii/S0892199715001368 [lic:Paywalled (abstract free).]
+      use: Argues the app should drive toward conversational/spontaneous practice early and embed targets in real speech — not stop at sustained vowels — to solve the generalization bottleneck.
+  - (review/meta-analysis) Hydration & Voice Quality systematic review (PubMed 29122414) | https://pubmed.ncbi.nlm.nih.gov/29122414/ [lic:Abstract free.]
+      use: Backs vocal-hygiene tips and pre-practice checklists ('hydrate before practice') with citable evidence.
+  - (review/meta-analysis) Vocal Hygiene Programs for Singers systematic review (PubMed 38052688) | https://pubmed.ncbi.nlm.nih.gov/38052688/ [lic:Abstract free.]
+      use: Evidence basis for a vocal-hygiene/warm-down module and for warning users against vocal abuse while pushing pitch/weight.
+  - (paper) Vocal Warm-Up 7-Week Acoustic Case Study (PMC9133272) | https://pmc.ncbi.nlm.nih.gov/articles/PMC9133272/ [lic:Open access (PMC).]
+      use: Supports a mandatory short warm-up before each self-practice session and explains why warm-up ≠ lasting change.
+  - (paper) Smartphone app to enhance voice-therapy adherence (PMC9914943) | https://pmc.ncbi.nlm.nih.gov/articles/PMC9914943/ [lic:Open access (PMC).]
+      use: Direct evidence that an app like this one improves adherence — and a design precedent for reminders, logging, and automated feedback.
+  - (paper) Patient Perceptions of Voice Therapy Adherence (PMC3024882) | https://pmc.ncbi.nlm.nih.gov/articles/PMC3024882/ [lic:Open access (PMC).]
+      use: Defines the exact adherence problems the app should solve (scheduling, accuracy feedback, motivation/streaks, in-context cues).
+  - (paper) Madill et al. — Motor Learning Classification Framework for Voice Therapy (PubMed 31056351) | https://pubmed.ncbi.nlm.nih.gov/31056351/ [lic:Abstract free.]
+      use: A schema for what an automated coach must deliver (model the target, give verbal info, give feedback, sustain motivation) — directly maps to LLM-coach prompt design.
+  - (website/community) Voice Resource Project / Sumian Voice wiki | https://wiki.sumianvoice.com/wiki/pages/vocal-weight/ [lic:Open community wiki (check page for CC terms).]
+      use: Bridges SLP science to actionable trans-voice drills; informs the multi-parameter dimensions the pass-detector measures and the safe-practice guardrails the coach enforces.
+IMPLICATIONS: METHODOLOGY THE APP CAN ENCODE DIRECTLY:\n1) Build the coach around the Principles of Motor Learning phase model. Detect the user's stage and switch conditions: early acquisition = blocked, constant, single-target practice with frequent immediate feedback and internal cues; consolidation = random/variable practice, faded feedback (mirror the 100%→80%→50%→20%→0% schedule), delayed/summary feedback, external-focus cues. This is the strongest evidence-based lever and is uniquely well-suited to an NN/LLM tool that can vary feedback frequency programmatically.\n\n2) Use EXTERNAL attentional-focus cueing in the LLM coach ('make it ring forward', 'aim for this sound') rather than 'tense/relax your larynx'. Evidence says this improves retention and automaticity — and it pairs naturally with the app showing the acoustic target the NN measures.\n\n3) Implement a real exercise hierarchy BUT push toward conversation early. Offer the ladder (sustained vowel → syllable → word → phrase → sentence → reading → structured conversation → spontaneous) with an ~80%-accuracy gate computed by the pass-detector, while heeding CTT's warning: don't trap users at the vowel level. Add conversation-embedded pr
+
+##########################################################################################
+## LLM / generative-AI voice coaching & multimodal feedback
+OVERVIEW: The dominant and most reliable architecture for an LLM-powered voice coach is a two-stage "measure → describe → reason" pipeline, NOT feeding raw audio to a generative model. A deterministic acoustic front-end (Praat/parselmouth/CREPE-style pitch, formant/LPC resonance, per-vowel stats) computes numbers; those numbers are converted into compact natural-language descriptions ("median F0 was 155 Hz, about 25 Hz below your 180 Hz target; F2 on /i/ is low, reading as a longer vocal tract"); and the LLM reasons over that text to produce plain-language, individualized feedback and a practice plan. This is exactly the pattern validated by "Read to Hear" (zero-shot pronunciation assessment), where converting acoustic features (duration, pitch, energy, formants) into descriptive text let an off-the-shelf LLM reason about speech quality competitively without any task-specific training — because LL
+KEY FINDINGS (claims):
+  - [mode] The most reliable way to feed numeric acoustic output to an LLM is to first convert measurements into natural-language descriptions, then have the LLM reason over the text ('describe-then-reason'), rather than passing raw numbers or raw audio.
+  - [mode] LLMs deliver motivational-interviewing-style coaching at fidelity comparable to or exceeding trained humans, making MI the recommended conversational coaching style for a voice coach.
+  - [well] The dominant safety risk for an LLM voice coach is sycophancy / false reassurance — over-helpful agreement that validates the user (e.g. falsely confirming 'you pass') or invents clinical claims about vocal health.
+  - [well] RAG over a curated voice-training knowledge base is the standard, evidence-backed method to ground coaching advice and avoid hallucinated clinical claims.
+  - [mode] A voice coach must NOT collapse the target into a single pitch number or a binary feminine/masculine template; trans/nonbinary users want individualized goal exploration and an evolving trajectory — and explicitly want software to act as a coach/therapist.
+  - [well] Phoneme/feature-level error targeting with auto-generated personalized lesson plans is a proven product pattern (ELSA Speak) directly transferable to per-vowel voice-gender weaknesses.
+  - [well] Progress-aware difficulty adaptation should combine spaced repetition with 'Goldilocks' adaptive sequencing, and personalization needs a minimum data threshold before it kicks in.
+  - [mode] Dual-agent / agentic decomposition (one agent retrieves exemplars/ideal references, another generates feedback) improves coaching quality over a single LLM and supports multimodal grounding.
+  - [mode] LLM clinical/vocal-health systems should ship with an explicit safety-aware evaluation layer that constrains claims to acoustic evidence.
+  - [well] Structured outputs / constrained function-calling are the production-grade way to make an LLM coach's verdict and plan reliable and machine-checkable.
+  - [mode] Audio-native multimodal LLMs (Qwen2-Audio, SALMONN) can describe voice but are NOT trustworthy for precise acoustic measurement and bias toward semantics over prosody.
+  - [mode] Personalized training-plan generation is strongest when the LLM is grounded in a domain knowledge graph/structured knowledge rather than free generation.
+  - [prel] There is an active, specific research line on LLM chatbots for gender-affirming voice therapy, including prompt-engineered coach personality.
+  - [well] Voice/communication training software for trans and nonbinary people must support self-directed customization, privacy, and avoid imposing clinician-defined norms — a design constraint on any AI coach.
+QUANT:
+  - LLM complex-reflection rate vs human experts in motivational interviewing = LLMs produced complex reflections 96% of the time vs 39% for human experts; reflection-to-question ratio 2.8 (LLM) vs 1.2 (human)
+  - Human ability to distinguish LLM vs human therapist MI utterances = ~56% accuracy (near chance); d-prime 0.17–0.25; all 10 LLMs scored MITI global >3.5 (fair) to >4 (good)
+  - LLM compliance with illogical/unsafe medical requests (sycophancy) = Up to 100% initial compliance across tested models, prioritizing helpfulness over logical consistency
+  - AI-MI systems landscape in scoping review = 15 of 1001 records met inclusion (1.5%); 9/15 (60%) rule-based, 4/15 (27%) LLM-based, 2/15 (13%) virtual/mobile agents; 3/15 (20%) RCTs
+  - ELSA Speak training data scale = >200 million hours of accented speech from learners in 195 countries; per-phoneme color score (green/yellow/red)
+  - Duolingo personalization activation threshold = ~100 exercises (~5–6 lessons) before fully personalized sequencing begins; session generation optimized 750ms→14ms
+  - Beyond-the-Industry-Standard study sample = 6 voice experts (5 SLPs + 1 SLP-in-training, 2.5–18 yrs experience) and 10 trans/nonbinary trainees (3 months–8 yrs training); 600+ trainee + 350+ expert codes, 8 themes
+  - TruVox prototype scope = 5 structured vocal-pitch exercises with real-time pitch visualization + LPC-spectrum resonance biofeedback; free, open-source
+  - Relative contribution of pitch to perceived vocal femininity (context for verdict weighting) = Fundamental frequency (F0) accounts for ~50–60% of perceived vocal femininity; remainder from formants (esp. F1/F2), voice quality, resonance
+RESOURCES:
+  - (paper) Read to Hear: Zero-Shot Pronunciation Assessment Using Textual Descriptions and LLMs | https://arxiv.org/pdf/2509.14187
+      use: Blueprint for the core 'measure→describe→reason' bridge: turn the analyzer's F0/formant/per-vowel numbers into descriptive sentences before the LLM writes feedback. Highest-priority pattern.
+  - (paper) Benchmarking Motivational Interviewing Competence of Large Language Models | https://arxiv.org/abs/2603.03846
+      use: Justifies and guides an MI-style conversational coaching layer; MITI gives a concrete eval rubric for the coach's tone/reflections.
+  - (paper) When helpfulness backfires: LLMs and sycophantic false medical information | https://www.nature.com/articles/s41746-025-02008-z
+      use: Defines the #1 failure mode to guard against (false 'you pass' / fabricated strain advice); motivates verdict guardrails and confidence gating.
+  - (paper) Large language models provide unsafe answers to patient-posed medical questions | https://arxiv.org/pdf/2507.18905
+      use: Evidence base for refusing/deferring medical-adjacent questions (pain, strain, surgery) and asking for context before verdicts.
+  - (paper) Grounding LLMs in Clinical Evidence: RAG for NICE Guidelines | https://arxiv.org/pdf/2510.02967
+      use: Template for RAG over WPATH SOC8 / ASHA / r/transvoice wiki / acoustic-target papers to ground coaching with citations.
+  - (review/meta-analysis) RAG in Healthcare: A Comprehensive Review | https://www.mdpi.com/2673-2688/6/9/226
+      use: Architecture menu for building the coach's grounded-advice retrieval layer with provenance.
+  - (paper) Beyond the 'Industry Standard': Individualized Goal Exploration for GAVT Technologies | https://arxiv.org/html/2410.09958v2
+      use: Most directly on-target HCI guidance: shapes how the coach elicits goals, frames the verdict, and avoids templated 'feminine' targets. Must-read.
+  - (paper) Can AI Have a Personality? Chatbot Case Study in Gender-Affirming Voice Therapy Training | https://arxiv.org/pdf/2508.18234
+      use: Direct precedent for a configurable, warm, consistent LLM voice-coach persona via system prompts.
+  - (paper) VocalAgent: LLMs for Vocal Health Diagnostics with Safety-Aware Evaluation | https://arxiv.org/pdf/2505.13577
+      use: Model for shipping a safety/eval guardrail layer that blocks unfounded health claims in voice feedback.
+  - (paper) PresentCoach: Dual-Agent Presentation Coaching through Exemplars and Interactive Feedback | https://arxiv.org/pdf/2511.15253
+      use: Agentic decomposition pattern: split retrieval/exemplar from feedback generation; structured per-parameter output.
+  - (paper) Pronunciation Assessment with Multimodal Large Language Models | https://arxiv.org/pdf/2407.09209
+      use: Reference for if/when to fine-tune a multimodal LLM for per-segment scoring vs the cheaper describe-then-reason route.
+  - (app) ELSA Speak (product) + ELSA Speech Analyzer | https://elsaspeak.com/en
+      use: Closest commercial analogue for per-vowel weakness targeting + auto-generated personalized practice plans and color-coded UI.
+  - (website/community) Duolingo Birdbrain / Half-Life Regression | https://spectrum.ieee.org/duolingo
+      use: Reference design for progress-aware difficulty adaptation and spaced re-testing of pitch/resonance skills.
+  - (paper) Knowledge-grounded LLM for Personalized Sports Training Plan Generation (LLM-SPTRec) | https://www.nature.com/articles/s41598-026-37075-z
+      use: Pattern for grounding exercise-plan generation in a structured catalog of voice exercises tagged by target parameter.
+  - (review/meta-analysis) Evaluation Strategies for LLM-Based Models in Exercise and Health Coaching (Scoping Review) | https://pmc.ncbi.nlm.nih.gov/articles/PMC12520646/
+      use: Source of evaluation methodology for validating the coach's plans and safety before user release.
+  - (review/meta-analysis) New Doc on the Block: Scoping Review of AI Systems Delivering MI for Behavior Change | https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12485255/
+      use: Landscape and design lessons for the motivational-interviewing coaching layer.
+  - (guideline) ASHA Practice Portal: Gender-Affirming Voice and Communication | https://www.asha.org/practice-portal/professional-issues/gender-affirming-voice-and-communication/
+      use: Authoritative KB content for RAG grounding and for scoping what the coach may vs must-not advise.
+  - (guideline) WPATH Standards of Care v8 (SOC8) | https://www.tandfonline.com/doi/full/10.1080/26895269.2022.2100644
+      use: Top-tier guideline document for RAG grounding and safety framing; cite for any care-adjacent statement.
+  - (app) TruVox: Web-Based Vocal Pitch Training for Transgender Women | https://formative.jmir.org/2025/1/e73841
+      use: Open-source prior art for the real-time biofeedback front-end the LLM coach would sit on top of; check license for reuse.
+  - (app) Singing Carrots / SingSage / PitchFlow / Vocal Image (products) | https://singingcarrots.com/ai-singing-coach
+      use: Product patterns for prioritized actionable feedback and progress dashboards adaptable to voice-gender training.
+  - (website/community) r/transvoice wiki & community resources (QueerDoc resource list, Trans Voice Party) | https://queerdoc.com/say-it-out-loud-list-of-transgender-voice-training-resources/
+      use: Primary corpus for the RAG voice-training knowledge base; community-validated exercise vocabulary and progressions.
+  - (website/community) Structured Outputs with LLMs: JSON Mode, Function Calling, and When to Use Each | https://towardsdatascience.com/structured-outputs-with-llms-json-mode-function-calling-and-when-to-use-each/
+      use: Implementation pattern for forcing the coach's verdict+plan into an auditable, gated JSON schema.
+  - (model) Qwen2-Audio Technical Report / SALMONN | https://arxiv.org/pdf/2407.10759
+      use: Optional qualitative descriptor layer (breathiness, brightness, naturalness) — not the measurement source. Check Apache/permissive licensing for Qwen2-Audio.
+IMPLICATIONS: Concrete architecture for the Voice-Gender-Analyzer's coach: (1) Keep the deterministic acoustic analyzer as the single source of truth for the pass/uncertain/no-pass verdict — never let a generative model produce the verdict number. Compute median/range F0, formants/resonance, per-vowel stats, intonation variability. (2) Insert a 'describe' step (the Read-to-Hear pattern): template the numbers into compact natural-language facts WITH the user's own target ('median F0 155 Hz, 25 Hz below your 180 Hz goal; F2 on /i/ low → reads as longer vocal tract'). Feed only that text + retrieved KB snippets to the LLM. (3) Force a structured-output schema: {verdict, confidence, evidence_metrics[], per_parameter_breakdown, prioritized_exercises[], next_difficulty, citations[]}. Gate the verdict: if confidence/sample is low, the schema must emit 'uncertain' and request a longer/cleaner sample rather than guess. (4) RAG-ground every coaching claim against a curated KB (r/transvoice wiki, ASHA gender-affirming voice portal, WPATH SOC8, peer-reviewed acoustic-target papers) and surface citations — this is the primary hallucination defense. Maintain a structured exercise catalog tagged by target para
+
+##########################################################################################
+## Authoritative books, clinical guidelines & key review papers on trans/gender-diverse voice and voice acoustics
+OVERVIEW: The literature underpinning a gender-perception/voice-coaching tool divides into four authoritative tiers. (1) Clinical practice guidelines: the WPATH Standards of Care v8 (Coleman et al., 2022, Int J Transgender Health) contains a dedicated, evidence-graded "Voice and Communication" chapter (Ch. 14) that, for the first time, frames recommendations around all gender goals (feminization, masculinization, and gender-expansive/non-binary) rather than a binary, and affirms voice/communication assessment and intervention by appropriately trained specialists. The UK Royal College of Speech and Language Therapists (RCSLT) maintains a parallel competency framework and clinical-information hub. (2) Authoritative clinical textbooks: Adler, Hirsch & Pickering's "Voice and Communication Therapy for the Transgender/Gender Diverse Client" (3rd ed., Plural, 2019) is the field's comprehensive clinical r
+KEY FINDINGS (claims):
+  - [well] WPATH SOC-8 contains a dedicated, evidence-graded Voice and Communication chapter that is now inclusive of all gender goals (not only feminization/masculinization) and affirms specialist-led assessment and intervention.
+  - [well] Davies, Papp & Antoni (2015) and Davies & Goldberg (2006) are the canonical clinical protocols covering trans-specific voice assessment, feminization, AND masculinization.
+  - [well] Fundamental frequency (F0) is the single strongest acoustic cue to perceived voice gender, but formant frequencies (vocal-tract length/resonance) add substantial, independent weight — F0 alone is insufficient.
+  - [well] The 'gender-ambiguous' speaking-F0 zone is approximately 145–165 Hz; voices below read predominantly male and above ~165–180 Hz predominantly female.
+  - [well] Voice feminization therapy raises speaking F0 by roughly 25–40 Hz on average; phonosurgery yields larger gains (~40–70+ Hz), but neither F0 change nor surgery reliably predicts patient-reported quality of life.
+  - [well] Testosterone reliably lowers F0 into the cis-male reference range at the group level by ~12 months, but with large inter-individual variance, incomplete responders, persistently shorter vocal-tract length than cis men, and frequent transient voice problems.
+  - [well] Normative adult speaking-F0 references: cis men ~107–132 Hz; cis women ~180–224 Hz (roughly a 1.7:1 female:male ratio).
+  - [well] Hillenbrand et al. (1995) provides freely downloadable normative F0 and formant (F1–F4) data for American English vowels separated by men, women, and children — directly usable as a formant/F0 reference and for vowel-based features.
+  - [well] Mills & Stoneham's 'The Voice Book for Trans and Non-Binary People' (2017) is the leading client-facing coaching text and translates clinical technique into self-guided exercises for pitch, resonance, and intonation.
+  - [well] Adler, Hirsch & Pickering's 'Voice and Communication Therapy for the Transgender/Gender Diverse Client' (3rd ed., 2019) is the comprehensive clinical reference textbook for the field.
+QUANT:
+  - Adult cisgender speaking F0 norm — men = Mean ≈ 116 Hz (SD ≈ 12 Hz), range ~93–135 Hz; broader literature ~107–132 Hz; adult males
+  - Adult cisgender speaking F0 norm — women = Mean ≈ 205 Hz (SD ≈ 24 Hz), range ~162–238 Hz; broader literature ~180–224 Hz; adult females
+  - Female:male adult speaking-F0 ratio = ≈ 1.7 : 1 (reflecting pubertal testosterone effect on vocal folds)
+  - Gender-ambiguous speaking-F0 range for female perception = ≈ 145–165 Hz ('ambiguous pitch range'); below reads male, above ~165 Hz increasingly female; trans women
+  - Speaking-F0 gain from voice feminization therapy (VFT) = ≈ +27 Hz (sustained vowels), +39 Hz (reading), +25 Hz (spontaneous speech); trans women
+  - Speaking-F0 gain from feminization phonosurgery = ≈ +72 Hz (vowels), +41 Hz (reading), +39 Hz (spontaneous); up to +107 Hz with VFT + Wendler glottoplasty; trans women
+  - Voice-therapy F0 effect size (feminization) = Hedges g ≈ 0.86 (therapy), 1.21 (Wendler glottoplasty), 3.05 (feminization laryngoplasty); 24 studies, 893 participants
+  - F0 change vs. quality-of-life correlation (feminization) = No reliable correlation — F0 change alone does not predict QoL improvement; trans women
+  - Testosterone-driven speaking-F0 drop (transmasculine) = Group means fall into cis-male reference range by ~12 months; e.g., one case ~183 Hz → ~134 Hz over 1 year; large inter-individual variance, minority of incomplete responders
+  - Residual vocal-tract-length gap after testosterone = Trans men's formant-based VTL remained significantly shorter than cis men despite masculinized F0; vocal power did not reach male norms
+  - Gelfer & Mikos resynthesis SFF levels used = 116, 145, 155, 165, 207 Hz; mid-values (≈145–165 Hz) perceptually ambiguous; F0 primary cue, formants secondary but significant
+  - Hillenbrand et al. (1995) normative dataset composition = 45 men, 48 women, 46 children; 12 vowels in /hVd/; F0 and F1–F4 measured; audio + measurements public
+  - Pediatric speaking-F0 norms (sex divergence at puberty) = 5.5–10.5 yr: ~223 Hz both sexes; 14.5–17.5 yr: males ~122 Hz vs females ~206 Hz
+RESOURCES:
+  - (guideline) WPATH Standards of Care v8 — Chapter 14: Voice and Communication | https://doi.org/10.1080/26895269.2022.2100644 [lic:Open access (CC BY-NC-ND, journal terms)]
+      use: Defines clinically endorsed scope, terminology, and the principle that voice gender is multidimensional and client-goal-defined — frames how the tool should label outcomes (avoid binary-only, support non-binary/'gender-neutral' targets) and
+  - (guideline) RCSLT Trans & Gender-Diverse Voice and Communication Therapy Competency Framework (2019) + clinical-information hub | https://www.rcslt.org/wp-content/uploads/media/Project/RCSLT/rcslt-trans-and-gender-diverse-voice-comm-therapy-2019.pdf [lic:Free (professional body)]
+      use: Enumerates the concrete assessable parameters (pitch, resonance, intonation, articulation, voice quality, non-verbal) that map directly onto features and feedback categories for the coaching engine.
+  - (book) Voice and Communication Therapy for the Transgender/Gender Diverse Client (Adler, Hirsch & Pickering, 3rd ed., 2019) | https://www.pluralpublishing.com/publications/voice-and-communication-therapy-for-the-transgendergender-diverse-client-a-comprehensive-clinical-guide [lic:Commercial (ISBN 9781944883300)]
+      use: Primary reference for designing the analyzer's assessment battery and the coaching curriculum; supplies target values, exercise hierarchies, and outcome-measurement constructs.
+  - (book) The Voice Book for Trans and Non-Binary People (Mills & Stoneham, 2017) + companion SLP text (2020) | https://www.amazon.com/Voice-Book-Trans-Non-Binary-People/dp/1785921282 [lic:Commercial (ISBN 9781785921285)]
+      use: Model for user-facing coaching language, exercise progression, and motivational/identity framing; supports non-binary targets the tool should offer.
+  - (paper) Davies, Papp & Antoni (2015) — Voice and Communication Change for Gender Nonconforming Individuals | https://doi.org/10.1080/15532739.2015.1075931 [lic:Journal (open copy on Zenodo)]
+      use: Blueprint for the multidimensional target-feature set and for masculinization coaching, where acoustic guidance is sparser; pairs with Davies & Goldberg (2006).
+  - (paper) Davies & Goldberg (2006) — Clinical Aspects of Transgender Speech Feminization and Masculinization | https://doi.org/10.1300/J485v09n03_08 [lic:Journal (open mirror available)]
+      use: Establishes the parameter list and clinical reasoning the tool's classifier and coach should mirror; historical anchor for target acoustic ranges.
+  - (review/meta-analysis) Schwarz et al. (2023) — Speech therapy for transgender women: updated systematic review & meta-analysis | https://pmc.ncbi.nlm.nih.gov/articles/PMC10363306/ [lic:Open access (CC BY)]
+      use: Directly supplies the F0 'uncertain' band and expected therapy effect sizes — calibration data for thresholds and for setting realistic coaching goals.
+  - (review/meta-analysis) Voice feminization QoL & efficacy meta-analyses (Nolan/PSRC 2023; OHNS 2025) | https://pmc.ncbi.nlm.nih.gov/articles/PMC12035520/ [lic:Journal (PMC open versions)]
+      use: Strong evidence the tool must NOT equate higher pitch with success; argues for multi-feature 'pass' scoring and for centering user-perceived authenticity/satisfaction in coaching.
+  - (review/meta-analysis) Testosterone masculinization meta-analytic review (Int J Transgenderism, 2018) + Sci Rep 2021 | https://doi.org/10.1080/15532739.2017.1411857 [lic:Journal]
+      use: Defines masculinization detection caveats (incomplete responders, residual VTL/resonance gaps) — the tool should keep coaching resonance/weight even for T users and flag 'pass-but-resonance-high' cases.
+  - (paper) Gelfer & Mikos (2005) — Relative contributions of SFF and formants to gender ID | https://doi.org/10.1016/j.jvoice.2004.10.006 [lic:Journal]
+      use: Empirical basis for weighting F0 vs. formant features in the NN classifier and for the design of the 'uncertain' decision region.
+  - (book) Titze, 'Principles of Voice Production' (1994; NCVS reprint 2000) | https://books.google.com/books/about/Principles_of_Voice_Production.html?id=m48JAQAAMAAJ [lic:Commercial book (NCVS reprint widely available)]
+      use: Theoretical grounding for which acoustic features encode sex/gender (F0 from fold biomechanics; formants from vocal-tract length) and why resonance manipulation works — informs feature engineering and explainable coaching tips.
+  - (dataset) Hillenbrand et al. (1995) vowel data — F0 + formants by sex | https://homepages.wmich.edu/~hillenbr/voweldata.html [lic:Free for research use (author-distributed)]
+      use: Ready-made cis-anchored F0/formant reference distributions for normalization, vowel-based formant features, and as labeled training/validation acoustic data.
+  - (paper) Peterson & Barney (1952) — Control methods in a study of the vowels | https://doi.org/10.1121/1.1906946 [lic:Journal]
+      use: Historical normative anchor for sex-based F0/formant separation; useful for sanity-checking distributions and explaining cues.
+IMPLICATIONS: Concrete guidance for the Voice-Gender-Analyzer build: (1) Do NOT classify pass/uncertain/no-pass on F0 alone. The authoritative consensus (SOC-8, Gelfer & Mikos, the QoL meta-analysis) is that perceived gender is multidimensional. The NN/LLM should ingest F0 (mean, SD/range) PLUS formants F1–F3 / estimated vocal-tract length, resonance, intonation/prosody variation, vocal weight, and articulation. Hillenbrand and Peterson–Barney give ready cis-anchored F0/formant distributions for normalization and as labeled reference data; Titze grounds why these features carry sex/gender information (vocal-fold length→F0; vocal-tract length→formants). (2) Set the feminization decision bands empirically from the reviews: treat ~<150 Hz as male-leaning, ~150–165 Hz as the 'uncertain' core (resolve using formants/resonance), and progressively female above ~165–180 Hz — but always combine with formant cues, since formants can flip judgments inside the ambiguous band. (3) For masculinization detection, do not assume testosterone fully resolves voice gender: expect F0 in cis-male range yet residual short-VTL/high-resonance and low vocal power in some users; the tool should flag 'pitch passes but reso
+
+##########################################################################################
+## Ethics, safety, framing & mental-health considerations for a trans/gender-diverse voice "passing" detection and coaching tool
+OVERVIEW: A tool that judges whether a voice "passes" sits on top of an emotionally loaded, clinically significant, and politically contested concept. Voice is one of the highest-stakes dysphoria triggers: surveys find ~79–85% of trans/gender-diverse (TGD) people experience voice-related gender incongruence, and voice ranks as the second most distressing feature after the upper body. Because of this, the same feedback that motivates one user can amplify dysphoria, shame, and avoidance in another. The dominant design failure in existing apps (Voice Pitch Analyzer, Voice Tools, etc.) is the "industry standard" pattern critiqued in the 2025 CHI paper by Povinelli, Zhu & Zhao: color-coded binary pitch zones that conflate a single acoustic parameter (F0) with gender, present a distant binary target, and produce "shame spirals," demotivation, and "plateaus" where users refuse to practice an imperfect vo
+KEY FINDINGS (claims):
+  - [mode] Existing 'industry standard' voice apps that map pitch to binary gender via color-coded zones cause psychological harm, including shame spirals, demotivation, and practice 'plateaus'
+  - [mode] Voice goals are diverse and often non-binary; feedback must be GOAL-RELATIVE to the user's own stated target, not an imposed cis-binary ideal
+  - [mode] TGD users of voice software want feedback beyond pitch (resonance, weight, intonation), plus accountability, automated personalized goal-setting, and affirmation — not single-parameter pitch scoring
+  - [well] Automatic gender recognition (AGR) systematically encodes gender as binary, immutable, and physiological — structurally misgendering trans and especially non-binary people
+  - [mode] Gender-expansive listeners perceive voice gender multidimensionally and non-binary, validating neutral/ambiguous goals and proving no single classifier is 'objective'
+  - [well] Self-guided pitch/resonance pushing causes vocal strain and muscle tension dysphonia (MTD); the tool must surface warning signs and never reward 'higher pitch at any cost'
+  - [mode] 'Passing' is a politically contested goal; designing the tool to treat passing as the sole success criterion reproduces respectability politics and devalues non-passing/non-binary users
+  - [well] Voice + gender-transition data is high-risk special-category biometric data; on-device processing, explicit consent, minimization, and short retention are ethical requirements
+  - [well] Speech/audio classifiers carry race, accent, age, and language bias, so a gender model will mis-serve marginalized users unless calibrated and uncertainty-honest
+  - [mode] Affirming vs stigmatizing framing has real mental-health stakes per the minority-stress model; the tool can relieve or aggravate dysphoria
+  - [mode] Voice dysphoria is highly prevalent and high-impact, so feedback errors are amplified emotionally — raising the bar for caution
+  - [well] WPATH SOC8 treats voice/communication therapy as medically necessary affirming care and recognizes BOTH mental health and vocal health as essential — supporting a clinician-referral and safeguarding posture
+QUANT:
+  - Prevalence of voice-related gender incongruence/dysphoria among trans/gender-diverse people = ~79% report gender incongruence secondary to voice; ~85% experience voice dysphoria (TGD adults)
+  - Voice disorder present at initial assessment among transfeminine voice clients (often from over-effort/strain) = up to ~30% had a voice disorder at intake
+  - AGR literature operationalization of gender = 94.8% binary, 72.4% immutable, 60.3% physiological (across AGR papers analyzed)
+  - Commercial ASR word error rate by race = avg WER ≈ 0.35 for Black speakers vs ≈ 0.19 for white speakers (5 systems: Amazon, Google, IBM, Microsoft, Apple)
+  - Commercial facial-analysis gender error rate disparity (illustrates demographic bias direction) = up to 34.7% error for dark-skinned women vs 0.8% for light-skinned men; non-binary genders unclassifiable
+  - Cisgender adult speaking fundamental frequency (F0) norms = adult female mean F0 ≈ 200–220 Hz; adult male mean F0 ≈ 100–120 Hz
+  - Gender-ambiguous / 'neutral' speaking F0 band (where pitch alone does not determine perceived gender; other cues dominate) = ≈ 145–165 Hz (some sources 140–185 Hz); listeners switch perception between male/female in this band
+  - Reduction in voice-related dysphoria after successful voice therapy = ~42% reduction on standardized assessment
+  - Mental-health benefit associated with gender-affirming care (illustrates stakes of affirming vs stigmatizing framing) = ~73% lower odds of self-harm/suicidal thoughts and ~60% lower odds of depression (TGD youth cohort); ~40% lower odds of past-year suicide attempt with GAHT under 18
+  - Past-year suicide attempt by access to needed gender-affirming care = 5% (received needed care) vs 9% (did not)
+  - GDPR classification of voiceprint = Special-category biometric data (Article 9) requiring explicit consent when used to identify
+RESOURCES:
+  - (paper) Beyond the 'Industry Standard' (Povinelli, Zhu & Zhao, CHI 2025) | https://arxiv.org/html/2410.09958v3 [lic:arXiv preprint (check final ACM CHI license for reuse)]
+      use: Direct design blueprint for making the analyzer's feedback goal-relative and affirming; gives concrete UI patterns (milestones, 'doing X well' framing) and a vocabulary (descriptive vs technical goals) to translate a user's stated target in
+  - (paper) Considerations for Voice and Communication Training Software for Transgender and Nonbinary People (Bush et al., Journal of Voice 2024) | https://pubmed.ncbi.nlm.nih.gov/35382956/ [lic:Paywalled article; abstract open]
+      use: Feature checklist for the coaching side; justifies multi-parameter feedback (resonance, weight, intonation) over single pitch score and a safety-aware stance.
+  - (paper) The Misgendering Machines (Os Keyes, CSCW 2018) | https://transreads.org/wp-content/uploads/2022/04/2022-04-01_624718fd3c7a7_themisgenderingmachinestranshciimplicationsofautomaticgenderrecognitionoskeyes.pdf [lic:Open PDF (ACM author copy)]
+      use: Ethical guardrail: argues the classifier output is a perception, not identity; motivates 'uncertain' outputs, non-binary support, and framing that never declares who the user 'is'.
+  - (paper) Gender expansive listeners utilize a non-binary, multidimensional conception of gender (Merritt & Bent, Brain and Language 2022) | https://pubmed.ncbi.nlm.nih.gov/34826679/ [lic:Paywalled; abstract open]
+      use: Evidence base for a non-binary/neutral target mode and for choosing/calibrating the listener perspective the model emulates; warns a single cis-binary classifier is not 'objective'.
+  - (guideline) WPATH Standards of Care v8 — Voice & Communication chapter (Coleman et al., 2022) | https://www.tandfonline.com/doi/full/10.1080/26895269.2022.2100644 [lic:Open access (IJTH)]
+      use: Authority for positioning the app as an adjunct (not replacement) to SLPs, embedding referral pathways, and justifying vocal-health warnings.
+  - (paper) Racial disparities in automated speech recognition (Koenecke et al., PNAS 2020) | https://www.pnas.org/doi/10.1073/pnas.1915768117 [lic:Open access]
+      use: Concrete evidence that speech models carry race/dialect bias; mandates demographic transparency, calibration, and uncertainty reporting in the gender verdict.
+  - (paper) Study on Fairness of Speaker Verification on Underrepresented Accents (arXiv 2204.12649) | https://arxiv.org/pdf/2204.12649 [lic:arXiv open]
+      use: Supports bias-aware evaluation across accent/language and the case for an 'uncertain' output band rather than hard binary verdicts.
+  - (website/community) Phonexia — Voice Biometrics under GDPR | https://phonexia.com/blog/using-voice-biometrics-world-gdpr [lic:Public web]
+      use: Privacy design checklist: explicit consent, minimization, encryption, retention limits; argues for on-device processing and no raw-audio upload.
+  - (website/community) FOLX Health — Psychological Impact of Voice Dysphoria | https://www.folxhealth.com/library/the-psychological-impact-of-voice-dysphoria [lic:Public web]
+      use: Quantifies why feedback errors are emotionally amplified; supports the affirming, low-harm framing requirement.
+  - (website/community) The Speech Network — 'Can Voice Feminisation harm my voice?' + Cleveland Clinic MTD page | https://www.thespeechnetwork.co.uk/blog-collection/6/2022 [lic:Public web]
+      use: Source of the concrete vocal-health warning-sign list and stop-criteria the tool should surface; Cleveland Clinic MTD page (https://my.clevelandclinic.org/health/diseases/muscle-tension-dysphonia) backs symptom list.
+  - (book) Serano, Whipping Girl & 'Rethinking LGBTQ+ Visibility' | https://juliaserano.medium.com/rethinking-lgbtq-visibility-69e39f36731 [lic:Public essay; book is copyrighted]
+      use: Conceptual grounding to avoid framing passing as the only valid goal; informs neutral, worth-free language and first-class non-binary outcomes.
+  - (website/community) r/transvoice community wiki and resonance explainers (e.g., Seattle Voice Lab R1/R2) | https://www.seattlevoicelab.com/what-is-r1-r2-r3-how-do-they-effect-the-sound-of-your-voice/ [lic:Community content / public web]
+      use: Grounds multi-parameter feedback and community-aligned vocabulary; r/transvoice wiki is the de facto community knowledge base for tone-and-framing fit.
+IMPLICATIONS: CONCRETE SAFEGUARDS FOR THE VOICE-GENDER-ANALYZER:
+
+1) Make the verdict GOAL-RELATIVE, not binary-absolute. Onboard each user with their OWN target (e.g., 'perceived feminine,' 'androgynous/neutral,' 'perceived masculine,' or a free-form descriptive goal) and report distance/progress toward THAT target. Support a true non-binary/neutral mode (e.g., target the ~145–165 Hz ambiguous band with resonance cues), since gender-expansive listeners genuinely perceive a neutral category (Merritt & Bent 2022). Never hard-code a cis-binary ideal.
+
+2) Use a three-state output, not pass/fail. Surface 'reads as target / uncertain / not yet at target' with an explicit confidence band. The 'uncertain' state is ethically load-bearing: it prevents both false discouragement and false reassurance, and honestly reflects classifier limits. Frame all output as 'how a listener model perceived THIS sample,' explicitly NOT a judgment of identity or worth (Keyes 2018; Serano).
+
+3) Affirming feedback by construction. Lead with concrete things done well and progress since last session ('your resonance shifted toward your goal,' 'pitch is more stable'), not distance-to-goal deficits. Avoid worth-laden or patholo
+
+##########################################################################################
+## Datasets & standardized outcome measures (for voice gender modeling and trans voice)
+OVERVIEW: This dimension splits into two halves that the Voice-Gender-Analyzer must bridge: (1) the speech DATASETS available to train/evaluate a neural gender/femininity model, and (2) the validated SELF-REPORT & PERCEPTUAL OUTCOME instruments that define what "passing" and "progress" mean clinically. On the data side, large open corpora exist with usable binary gender labels — Mozilla Common Voice (CC0, ~31,800 h, 129 languages incl. en/zh/fr/ko, but self-reported gender that is heavily male-skewed and often "undefined"), VoxCeleb1/2 (in-the-wild YouTube, gender in vox*_meta.csv, metadata CC BY-SA 4.0), LibriSpeech (~982 h, CC BY 4.0, gender-balanced), AISHELL-3 (Apache-2.0, 218 Mandarin speakers, 176F/42M), Zeroth-Korean (CC BY 4.0), TIMIT (LDC paid license, rich speaker metadata, 2:1 male), and RAVDESS (CC BY-NC-SA 4.0, 12F/12M actors). These are gender-LABELED but overwhelmingly cisgender and
+KEY FINDINGS (claims):
+  - [well] Mozilla Common Voice provides CC0 (public-domain) multilingual speech with optional self-reported gender, but gender labels are heavily male-skewed and frequently 'undefined'.
+  - [well] VoxCeleb1/2 supply large in-the-wild speaker data with per-speaker gender labels; metadata is CC BY-SA 4.0.
+  - [well] AISHELL-3 (Mandarin) and Zeroth-Korean give permissively-licensed Chinese/Korean speech with gender labels, useful for zh/ko gender modeling.
+  - [well] LibriSpeech, TIMIT, and RAVDESS are standard gender-labeled English corpora with very different licenses (free CC-BY vs paid LDC vs non-commercial).
+  - [mode] The 'Voice Passing' system is a reference design: a binary gender classifier whose continuous output is perceptually calibrated to predict trans-voice gender perception far better than F0 alone.
+  - [mode] Trans-specific labeled voice data is scarce, and collecting/using it raises consent, biometric-privacy, and cis-normative-bias concerns.
+  - [well] The Trans Woman Voice Questionnaire (TWVQ / TVQ-MtF; Dacakis & Davies) is the anchor validated self-report for trans-feminine voice: 30 items, 4-point Likert, total 30-120, higher = worse.
+  - [mode] Item-Response-Theory rescoring of the TWVQ provides interpretable severity bands and confirms a unidimensional, highly reliable construct.
+  - [well] The Voice Handicap Index (VHI-30, 0-120) and short VHI-10 (0-40) are the validated general voice-handicap baselines underlying trans instruments.
+  - [well] The VENI is the only published validated outcome measure built specifically for non-binary individuals.
+  - [well] Research-grade gender/femininity outcomes combine self-rated AND listener-rated VAS scales with acoustic F0 — and self and listener ratings diverge meaningfully.
+  - [well] Listener gender perception of voice flips around ~155-165 Hz, but pitch alone is insufficient — resonance/intonation/quality matter.
+  - [mode] A constellation of newer trans/gender-affirming-voice instruments exists for specific constructs (self-efficacy, participation, congruence).
+QUANT:
+  - Common Voice total size (release 18) = ~31,841 hours total, 20,789 validated hours, 129 languages
+  - Common Voice French gender skew (train labeled utterances) = ~83% male / ~15% female among labeled utterances
+  - VoxCeleb1 size and gender = >100,000 utterances, 1,251 speakers, ~55% male
+  - VoxCeleb2 size and gender = >1,000,000 utterances, 6,000+ speakers, ~2,442 h, ~61% male
+  - LibriSpeech size = ~982 hours, 2,484 speakers, gender-balanced
+  - AISHELL-3 size and gender = ~85 h, 218 Mandarin speakers (176 female / 42 male)
+  - Zeroth-Korean size = ~51.6 h train (22,263 utterances, 105 speakers) + 1.2 h test (457 utterances, 10 speakers)
+  - TIMIT gender ratio = ~2:1 male (e.g., 326M/135F train+val; 112M/56F test), 630 speakers total
+  - RAVDESS composition = 24 actors (12 female / 12 male), 7+ emotions, North American English
+  - Voice Passing eval set & accuracy = 41 speakers (8 cis M, 12 cis F, 21 trans F); trans VFP R²=0.942, cis 0.999; binary harmonic accuracy 94.2%; F0-only trans R²=0.489
+  - Listener perception of trans voices (Voice Passing) = 47.6% perceived female / 47.4% male; reaction time 6.2±5.8 s (vs 3.4-3.7 s cis)
+  - TWVQ / TVQ-MtF structure = 30 items, 4-point Likert (1-4), total score 30-120, higher = worse
+  - TWVQ IRT severity bands (rescaled) & reliability = ≤54 minimal; >54-101 low; >101-140 moderate; >140 high; reliability 0.93; n=86
+  - TWVQ mean at presentation (independent cohort) = ≈ 81 ± 22 (raw 30-120 scale)
+  - VHI-30 structure = 30 items, 3 subscales (Functional/Physical/Emotional, 10 each), 0-4, total 0-120; bands <30 mild / 31-60 moderate / >60 severe
+  - VHI-10 structure & MCID = 10 items, 0-40; ≥11 = significant disorder; MCID ≈ 6 points (some report 4)
+  - VENI structure = 17 items (Physical 7 / Functional 8 / Emotional 2); ICF-based
+  - Cis adult speaking F0 norms = Adult female ~180-220 Hz; adult male ~110-130 Hz (e.g., F 183.3±5.4, M 117.9±4.8 in one study)
+  - Listener gender-perception F0 boundary = ~155-165 Hz; ≥165 Hz perceived female ≥72% of time; ≤160 Hz perceived male; lowest female-perceived avg ~155 Hz
+  - SES-VMTW / GVI / CPIB-GD item counts = SES-VMTW 19 items; GVI 26 items; CPIB-Gender Diverse 10 items (T=50 gender-diverse reference)
+RESOURCES:
+  - (dataset) Mozilla Common Voice | https://commonvoice.mozilla.org/datasets [lic:CC0 1.0 (public domain)]
+      use: Primary multilingual training corpus for the gender/femininity classifier; CC0 means unrestricted commercial use. Must handle male skew and 'undefined' gender; per-language subsets give zh/en/fr/ko coverage matching the project's target use
+  - (dataset) VoxCeleb1 & VoxCeleb2 | https://www.robots.ox.ac.uk/~vgg/data/voxceleb/ [lic:Metadata CC BY-SA 4.0; audio for research use (YouTube-sourced)]
+      use: Large, noisy, real-world data for robust x-vector/embedding gender models (matches phone-recorded user audio better than clean studio corpora).
+  - (dataset) LibriSpeech | http://www.openslr.org/12/ [lic:CC BY 4.0]
+      use: Clean, commercially-usable English data for baseline gender models and data augmentation.
+  - (dataset) AISHELL-3 | https://www.openslr.org/93/ [lic:Apache-2.0]
+      use: Mandarin (zh) gender-model training/eval; Apache-2.0 allows commercial use. Note strong female skew.
+  - (dataset) Zeroth-Korean | https://openslr.org/40/ [lic:CC BY 4.0]
+      use: Korean (ko) gender/ASR coverage for the project's Korean users.
+  - (dataset) TIMIT (LDC93S1) | https://catalog.ldc.upenn.edu/LDC93S1 [lic:LDC paid/membership license (not free)]
+      use: Gold-standard phonetically-balanced gender labels for benchmarking; but LDC paid license limits free/commercial use.
+  - (dataset) RAVDESS | https://zenodo.org/records/1188976 [lic:CC BY-NC-SA 4.0 (commercial license available)]
+      use: Gender + emotion/prosody data; useful for prosody/intonation features. Non-commercial license restricts product use.
+  - (repo) inaSpeechSegmenter (Voice Passing models) | https://github.com/ina-foss/inaSpeechSegmenter [lic:MIT]
+      use: Closest available open implementation of a perceptually-oriented voice-gender classifier; directly reusable as a backbone for the pass-detection engine.
+  - (paper) Voice Passing (paper) | https://arxiv.org/html/2404.15176v1 [lic:arXiv (academic)]
+      use: Reference architecture and validation methodology for mapping classifier output to perceived gender / 'pass-uncertain-no-pass'.
+  - (guideline) Trans Woman Voice Questionnaire (TWVQ / TVQ-MtF) | https://pubmed.ncbi.nlm.nih.gov/23415146/ [lic:Academic instrument; permission/citation typically required from authors (Dacakis/Davies)]
+      use: Primary in-app self-report instrument and ground-truth label for 'self-perceived pass' / progress tracking; multilingual versions fit zh/en/fr/ko users.
+  - (guideline) Voice Handicap Index (VHI-30 / VHI-10) | https://pmc.ncbi.nlm.nih.gov/articles/PMC5710355/ [lic:Academic instrument (Jacobson et al. 1997)]
+      use: General-purpose vocal-health/handicap baseline; underpins TSEQ; gives an MCID-anchored progress metric independent of gender.
+  - (paper) VENI (Voice-related Experiences of Nonbinary Individuals) | https://pubmed.ncbi.nlm.nih.gov/33518474/ [lic:Academic instrument (Shefcik & Tsai)]
+      use: Lets the tool serve non-binary users with a gender-appropriate (non 'female-target') outcome measure and coaching target.
+  - (review/meta-analysis) SES-VMTW / GVI / GSVI / CPIB-GD | https://www.harmonicspeech.com/post/assessment-tools-developed-specifically-for-gender-affirming-voice-training [lic:Mixed academic instruments]
+      use: Alternative labels/targets for coaching (confidence, congruence, real-world participation) beyond binary pass.
+  - (paper) F0 norms & gender-perception thresholds literature | https://www.voicescience.org/lexicon/average-speaking-frequencies/ [lic:N/A (secondary references to primary studies)]
+      use: Defines interpretable acoustic feedback ranges and justifies a multi-feature NN over a single F0 threshold in the coaching module.
+IMPLICATIONS: Concrete implications for building the NN/LLM pass-detection + voice-training tool:
+
+1. Training data strategy: Build the gender/femininity backbone on CC0/permissive corpora — Common Voice (zh/en/fr/ko subsets, CC0), LibriSpeech (CC BY 4.0), AISHELL-3 (Apache-2.0), Zeroth-Korean (CC BY 4.0), and VoxCeleb2 for real-world noise robustness. AVOID TIMIT (paid LDC) and RAVDESS (CC BY-NC) in any commercial build. Expect heavy male skew and large 'undefined'-gender fractions; rebalance/reweight and drop unlabeled gender rather than impute.
+
+2. Don't ship a hard F0 threshold. The evidence is unambiguous that pitch alone (~155-165 Hz boundary) does not determine perceived gender; resonance/formants, intonation, and voice quality matter independently. Use a multi-feature embedding model (x-vector/ResNet style) and output a CONTINUOUS perceptual score, exactly like Voice Passing's VFP, with 'pass / uncertain / no-pass' bands placed around the genuinely ambiguous zone (recall trans voices split ~48/48 female/male perceptually — uncertainty is real and should be surfaced, not hidden).
+
+3. Calibrate to human perception, not to the binary cis label. The key methodological insight: train binary, 
+
+##########################################################################################
+## Non-binary / androgynous / individualized voice targets (diversity of user goals)
+OVERVIEW: Gender in voice is not a binary switch but a continuum, and a growing body of perceptual, acoustic, and clinical work now supports targets anywhere along (and off) a femininity–masculinity axis. The central empirical anchor is the "gender-ambiguous" fundamental-frequency (F0) zone: cis-male mean speaking F0 sits near 116 Hz (SD ~12) and cis-female near 205 Hz (SD ~24), and listener gender judgments become unstable roughly between 145 and 165 Hz (some authors give a wider neutral band of ~150–185 Hz; one synthesis study used ~143 Hz as a "neutral" anchor). Inside this zone, F0 alone stops determining perceived gender and secondary cues dominate — formants/vocal-tract length (resonance), source spectral tilt, articulation, and intonation. Gelfer & Bennett's manipulation work showed that when male formants are paired with a female-typical F0, listeners still call the voice male only ~19% of
+KEY FINDINGS (claims):
+  - [well] There is a gender-ambiguous F0 zone (~145–165 Hz) where pitch alone no longer determines perceived gender; some authors widen the 'neutral' band to ~150–185 Hz.
+  - [well] In the ambiguous F0 zone, formant frequencies / resonance override pitch in determining perceived gender.
+  - [mode] With both F0 and formants in the ambiguous range, articulatory cues outweigh intonation, and F0+formant manipulation alone is insufficient to flip perceived gender for all speakers.
+  - [mode] Gender-expansive (trans/non-binary) listeners perceive voice gender multidimensionally — separate masculinity, femininity, and a third 'other/neither' axis — rather than on a single male–female scale, and diverge most from cis listeners when pitch is neutral.
+  - [mode] Actual non-binary speakers' acoustics sit in an intermediate band: F0 and formant centroids significantly lower than cis women and higher than cis men, with intonation mixing masculine and feminine features.
+  - [mode] A continuous perceived-masculinity/femininity score can be machine-predicted, with F0 mean the top feature and an F3/F4/vocal-tract-length cluster second.
+  - [prel] Clinical evidence specific to non-binary voice training is sparse, individualized, and shows mixed outcomes; protocols were historically built for trans women.
+  - [well] WPATH SOC8 mandates individualized, non-binary-inclusive, non-assuming voice goal-setting (no default to binary feminization/masculinization).
+  - [mode] Pitch, resonance, and vocal weight are independently controllable parameters; an androgynous voice is built by mixing them, not by a single pitch target.
+  - [mode] Trans-masculine and trans-feminine goals are themselves diverse: testosterone lowers pitch but leaves resonance/weight/'youthful' quality unaddressed, and feminine reading does not require high pitch.
+  - [well] Gendered pitch norms are partly cultural, not purely anatomical — the 'ambiguous zone' and what reads as neutral are language/culture-relative.
+  - [mode] Mandarin and other tonal languages carry higher mean F0 and larger F0 excursions than English, shifting where 'neutral' sits for Chinese users.
+QUANT:
+  - Cisgender adult mean speaking F0 (English) = Male ≈116 Hz (SD ~12; range ~93–135 Hz); Female ≈205 Hz (SD ~24; range ~162–238 Hz); ratio ~1.7:1
+  - Gender-ambiguous / androgynous F0 zone = ~145–165 Hz where listener gender judgments are unstable; wider 'neutral' band sometimes cited ~150–185 Hz; one synthesis study used ~143 Hz as a neutral anchor (vs ~174 Hz feminine, ~111 Hz masculine)
+  - Formant dominance over pitch in the ambiguous zone = Male formants + female-appropriate F0 → judged male only ~19% of the time; female formants + male-appropriate F0 → judged female ~20% of the time
+  - Machine-predicted continuous masculinity/femininity score accuracy = Correlation with human ratings up to .63 (female voices) and .77 (male voices) on 7-second samples; F0 mean = top predictor; femininity → 9 acoustic clusters, masculinity → 8
+  - Trans speakers on long-term hormones (median F0) = Trans men 5–10 yr testosterone: median 107.4 Hz (≈ cis-male 103 Hz); trans women 5–10 yr estrogen: median 166.8 Hz (still below cis-female ~196.7 Hz)
+  - Non-binary voice-training case series F0 changes (n=4, 12 weeks, spontaneous speech) = P1 140.9→195.2 Hz (+54); P2 211→177 Hz (−34); P3 129→118 Hz (−11); P4 112→164 Hz (+52); targets set 'up or down' per individual preference, not cis norms
+  - Korean adult speaking F0 = Female median ≈200 Hz, male ≈111 Hz (overall median ≈148 Hz); female ≈ twice male
+  - Cross-linguistic/cultural pitch variation = Japanese women speak at significantly higher pitch than Dutch women (sociocultural, not anatomical); Mandarin shows higher mean F0 and larger F0 excursions than English, especially in single words
+  - Non-binary speakers' acoustic position = F0 and formant centroids intermediate — significantly LOWER than cis women and HIGHER than cis men; intonation mixes masculine+feminine; high within-group variability
+  - Off-the-shelf binary gender classifier accuracy (limitation) = ~98.46% binary male/female accuracy (wav2vec2, Common Voice) — but no androgynous/non-binary output class
+RESOURCES:
+  - (paper) Voice Gender Scoring and Independent Acoustic Characterization of Perceived Masculinity and Femininity (arXiv:2102.07982) | https://arxiv.org/abs/2102.07982
+      use: Blueprint for the distance-to-target continuum: predict a continuous gender score and compute Euclidean/percentile distance from a user-defined point on the masc–fem axis, instead of binary pass/fail. Feature ranking tells the coach which p
+  - (paper) Hope & Lilley — Revisiting the acoustics of speaker gender perception: A gender expansive perspective (JASA 2022) | https://pubs.aip.org/asa/jasa/article/151/1/484/2838196/
+      use: Tells the NN/LLM pass-detector it must weight articulation/style, and warns the coach that hitting target pitch+resonance may still not 'pass' — feeding honest 'uncertain' verdicts.
+  - (paper) Hope & Lilley — Gender-expansive listeners use a non-binary, multidimensional conception of gender (Brain & Language 2021) | https://www.sciencedirect.com/science/article/abs/pii/S0093934X21001437
+      use: Justifies a 3-axis rating UI (masc / fem / androgyny) and an 'audience' setting; supports a non-binary 'reads as neither' target rather than forcing a binary verdict.
+  - (review/meta-analysis) Voice gender diversity: expression, perception and acoustics (Royal Society Open Science 2025, PMC12539971) | https://pmc.ncbi.nlm.nih.gov/articles/PMC12539971/
+      use: Primary literature map for the diversity dimension; sources scales, predictive features (median F0, HNR, F0 SD), and the case for multidimensional measurement.
+  - (paper) Outcomes of Gender-Affirming Voice Training for Non-binary Individuals: A Case Series (Journal of Voice 2023, PMC10909913) | https://pmc.ncbi.nlm.nih.gov/articles/PMC10909913/
+      use: Real F0 trajectories and self-report metric (TSEQ) for individualized goals; evidence that acoustic gains and satisfaction can dissociate — argues for a user-set target + subjective-fit check, not a fixed Hz goal.
+  - (guideline) WPATH Standards of Care, Version 8 — Chapter 13 Voice & Communication | https://www.tandfonline.com/doi/full/10.1080/26895269.2022.2100644
+      use: Authoritative basis for the product's stance: let users define any target, never assume a binary endpoint; informs consent/onboarding copy and the goal-selection flow.
+  - (paper) Gelfer & Bennett — Speaking F0 and Vowel Formants: Effects on Perception of Gender (Journal of Voice 2013) | https://pubmed.ncbi.nlm.nih.gov/23415148/
+      use: Source for the androgynous-pitch band and the rule that resonance must be modeled to predict 'androgynous'; calibrates the 'uncertain/neutral' verdict region.
+  - (website/community) r/transvoice wiki & transvoice.party | https://www.transvoice.party/
+      use: Practitioner-validated parameter decoupling and exercises to coach toward androgynous/individual targets; a source of community-labeled androgynous reference voices for model calibration.
+  - (website/community) Renée Yoxon — Ultimate Guide to Trans Voice Training & 'Mix & Match: Designing Your Nonbinary Voice' | https://www.reneeyoxon.com/blog/the-ultimate-guide-to-trans-voice-training
+      use: Coaching content and exercise structure for non-binary/individual targets; vocal-weight framing fills a gap (weight is rarely measured by acoustic tools but matters perceptually).
+  - (website/community) Adi Wilson / transvoice.coach — 'Androgynous Voices' archetypes | https://www.transvoice.coach/community/androgynous-voices
+      use: A taxonomy of androgynous target presets the tool can offer as starting points before users fine-tune their personal target.
+  - (paper) van Bezooijen — Sociocultural Aspects of Pitch Differences between Japanese and Dutch Women (Language and Speech 1995) | https://journals.sagepub.com/doi/abs/10.1177/002383099503800303
+      use: Mandates locale-specific thresholds (zh/en/fr/ko) rather than one Hz cutoff for the pass/neutral boundary.
+  - (paper) Keating & Kuo — Comparison of Speaking F0 in English and Mandarin (JASA 2012) | https://pubmed.ncbi.nlm.nih.gov/22894225/
+      use: Calibrate the Chinese-language F0 reference distributions and ambiguous-zone location; critical because this project serves Mandarin.
+  - (model) HuggingFace voice-gender classifiers (JaesungHuh/voice-gender-classifier; prithivMLmods/Common-Voice-Gender-Detection, wav2vec2, ~98.46%) | https://huggingface.co/JaesungHuh/voice-gender-classifier
+      use: Usable as a baseline/feature extractor, but their binary output cannot represent androgynous/non-binary targets — motivates building or fine-tuning a continuous, multi-axis head on top (per arXiv:2102.07982).
+  - (website/community) Adobe / general F0 norm reference — VoiceScience 'Average Speaking Frequencies' | https://www.voicescience.org/lexicon/average-speaking-frequencies/
+      use: Reference distributions for placing a user on the continuum and computing distance-to-target; trans-on-hormones medians are realistic interim targets distinct from cis norms.
+IMPLICATIONS: Concrete implications for the NN/LLM pass-detection + voice-training tool:
+
+1) Model gender as a CONTINUOUS multi-axis score, not a binary classifier. Replace/augment any binary HF classifier (which cannot represent androgynous targets) with a regression head producing separate masculinity, femininity, and androgyny/'neither' scores (per Voice Gender Scoring arXiv:2102.07982 and Hope & Lilley's multidimensional findings). 'Pass / uncertain / no-pass' then becomes a distance computation: user places a point anywhere on the continuum (binary or in-between), and the tool reports distance-to-target plus per-parameter deltas.
+
+2) Make the verdict honestly tri-state and observer-aware. The ambiguous F0 zone (~145–165 Hz) is exactly where 'uncertain' should be returned, and where gender-expansive vs cis listeners disagree most — so let users optionally pick an 'audience' (general/cis vs queer-community) and surface that perception is observer-dependent. A non-binary user's success can be 'reads as neither,' not 'reads as the opposite binary.'
+
+3) Decompose and coach the 'Big 3' independently: pitch (F0), resonance (formants/estimated VTL — the strongest perceptual cue once pitch is ambigu
+
+##########################################################################################
+## Voice Conversion (VC) for trans voice: RVC, so-vits-svc, DDSP-based & streaming low-latency VC — as feminization/masculinization aids, self-voice biofeedback ("hear my own voice shifted to target"), and target-exemplar coaching. Pitch/timbre disentanglement, perceptual passing of converted voices, on-device feasibility, and licenses.
+OVERVIEW: Voice conversion (VC) — transforming a source speaker's speech to sound like a target while preserving linguistic content and prosody — has become a fast-moving, heavily community-adopted technology among trans people, yet it is almost entirely absent from clinical voice-training literature. The dominant open-source toolchain is built around content/speaker disentanglement: a self-supervised content encoder (HuBERT/ContentVec/WavLM) strips speaker identity to leave "what is said," an F0 (pitch) extractor (RMVPE, CREPE, FCPE, Harvest, DIO) captures prosody, and a generator/vocoder (VITS-style, NSF-HiFiGAN, BigVGAN, or a DDSP synthesizer) re-renders the audio in the target timbre. RVC (Retrieval-based Voice Conversion) is the most widely used in the trans community because it trains a usable any-to-one model from ~10 minutes of target audio and exposes an explicit semitone "Transpose" cont
+KEY FINDINGS (claims):
+  - [well] RVC (Retrieval-based Voice Conversion) is the most widely community-adopted VC for trans feminization/masculinization; it trains an any-to-one model from ~10 minutes of target audio and exposes an explicit semitone pitch control for cross-gender shifts.
+  - [well] Standard SVC-family VC (RVC, so-vits-svc, DDSP-SVC) works by content/speaker disentanglement: a self-supervised content encoder removes speaker identity, an F0 extractor carries prosody, and a VITS/HiFiGAN/DDSP generator re-renders the target timbre.
+  - [well] Koe AI's LLVC is the lowest-latency open-source VC: <20 ms algorithmic latency at 16 kHz and ~2.8× faster than real-time on a consumer CPU, any-to-one, MIT-licensed.
+  - [well] Google StreamVC runs streaming VC fully on-device: 10.8 ms compute per 20 ms chunk on a single Pixel 7 CPU core, ~70.8 ms end-to-end, and exposes explicit soft-F0 and energy controls enabling deliberate pitch/loudness manipulation.
+  - [well] Seed-VC provides zero-shot (no per-target training) real-time VC, cloning a target voice from 1–30 s of reference audio, with ~300 ms algorithm + ~100 ms device latency — but it is GPLv3 (copyleft).
+  - [well] DDSP-based VC parameterizes audio into pitch, loudness, and a spectral/timbre envelope, naturally disentangling pitch from timbre — closer to what gender-affirming therapy manipulates (resonance vs. pitch) — and is far more CPU/real-time friendly than so-vits-svc.
+  - [well] Real-time acoustic/resonance biofeedback (the non-VC analogue of the 'hear/see your voice vs. target' feature) has peer-reviewed evidence of helping trans women hit feminine formant/resonance targets.
+  - [well] Gender-affirming voice TRAINING reliably changes acoustics and listener-perceived gender and improves vocal satisfaction — establishing that the *target* of any VC-coaching tool (the trainee's own unaided voice) is trainable.
+  - [prel] There is essentially NO peer-reviewed controlled evidence that neural VC, used as a coaching/biofeedback aid, improves a trainee's own (unaided) voice, nor formal perceptual-passing studies of VC-converted output for trans speakers.
+  - [mode] Latency thresholds matter: for a live 'pass-through' or real-time biofeedback feature, total mouth-to-ear latency should ideally sit well under ~100 ms to avoid disrupting the speaker; typical RVC GPU setups hit ~90–150 ms while on-device/CPU LLVC and StreamVC reach <20–70 ms.
+QUANT:
+  - RVC minimum target training data for a usable model = ~10 minutes of low-noise target audio (base model trained on ~50 h VCTK)
+  - RVC cross-gender pitch shift (male→female) = Transpose = +12 semitones (one octave)
+  - RVC real-time end-to-end latency = ~170 ms standard; ~90 ms with ASIO drivers (hardware-dependent); 50–150 ms typical reported
+  - LLVC latency and real-time factor on CPU = <20 ms algorithmic latency @16 kHz; ~2.8× faster than real-time on a consumer CPU
+  - StreamVC on-device compute and end-to-end latency = 10.8 ms compute per 20 ms chunk on one Pixel 7 CPU core; 70.8 ms end-to-end (60 ms architectural); 20 ms/320-sample chunks @16 kHz, 50 Hz inference
+  - StreamVC quality metrics (LibriTTS) = DNSMOS 4.07; WER 6.22%; CER 2.17%; F0 Pearson r=0.842; speaker similarity 77.81%
+  - Seed-VC real-time latency and zero-shot reference length = ~300 ms algorithm + ~100 ms device (~400–430 ms total); clones target from 1–30 s reference audio
+  - so-vits-svc data requirement and sample rate = ~1–2 hours target audio for a decent model; resampled to 44.1 kHz mono; clips 5–15 s
+  - DDSP-SVC training data and sample rate = ~1,000 clips (each ≥2 s) recommended; default 44.1 kHz; lower compute than so-vits-svc
+  - Voice Femininity / listener-uncertainty study = Corpus 41 cis/trans speakers, 57 listeners; +5% 'I don't know' for trans voices; response time ~6.2 s (trans-female) vs 3.4–3.7 s (cis)
+  - Gender-affirming voice training outcome (trans women) = Effects maintained 3 months; ~2/3 increased vocal satisfaction to a relevant degree
+RESOURCES:
+  - (repo) RVC-Project / Retrieval-based-Voice-Conversion-WebUI | https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI [lic:MIT (original RVC; note fumiama RVC fork is AGPL-3.0)]
+      use: Reference implementation for a 'route my voice to a target-gender exemplar' feature and for the semitone-shift biofeedback control. Permissive license eases integration.
+  - (repo) KoeAI/LLVC (Low-latency Real-time Voice Conversion on CPU) | https://github.com/KoeAI/LLVC [lic:MIT]
+      use: Best candidate for an on-device, CPU-only live pass-through / real-time biofeedback engine without a GPU. MIT enables product use.
+  - (paper) StreamVC (Google Research) | https://arxiv.org/html/2401.03078v1 [lic:Paper CC BY 4.0 (no released weights)]
+      use: Architectural blueprint for true on-device mobile VC with deliberate pitch/loudness manipulation — directly applicable to an in-app feminization/masculinization biofeedback toy.
+  - (repo) Plachtaa/seed-vc | https://github.com/Plachtaa/seed-vc [lic:GPL-3.0]
+      use: Lets a user supply ANY target-gender exemplar clip with no training — ideal for 'shift my voice toward this reference' coaching. But GPLv3 restricts closed-source/commercial embedding.
+  - (repo) svc-develop-team/so-vits-svc (+ voicepaw/so-vits-svc-fork) | https://github.com/svc-develop-team/so-vits-svc [lic:AGPL-3.0]
+      use: High-quality target-voice rendering when ample data exists; heavier compute. AGPL is a strong copyleft caution for SaaS.
+  - (repo) yxlllc/DDSP-SVC | https://github.com/yxlllc/DDSP-SVC [lic:MIT]
+      use: Most CPU-friendly SVC and the natural base for experimenting with INDEPENDENT resonance-vs-pitch control (the gendered-timbre axis therapy targets).
+  - (app) w-okada/voice-changer (VCClient) | https://github.com/w-okada/voice-changer [lic:Mixed/Unknown (per-bundled-model; Beatrice non-MIT)]
+      use: De-facto tool trans users already run live; shows the UX (mic-in/speaker-out routing, per-model latency tuning) a coaching feature would emulate. Per-model licenses; Beatrice is proprietary/non-MIT.
+  - (review/meta-analysis) DDSP review (Hayes et al.) — Differentiable Digital Signal Processing for Music & Speech | https://arxiv.org/pdf/2308.15422 [lic:arXiv preprint]
+      use: Theoretical grounding for separating pitch from resonance — the key to a VC tool that coaches formants, not just F0.
+  - (paper) SpeechSplit 2.0 — Unsupervised speech disentanglement | https://arxiv.org/pdf/2203.14156 [lic:arXiv preprint]
+      use: Reference for independently manipulating pitch vs. timbre/rhythm — useful if building controllable gendered-voice transforms.
+  - (paper) TruVox real-time resonance biofeedback (usability study) | https://pubmed.ncbi.nlm.nih.gov/41176464/ [lic:Journal article (paywalled)]
+      use: Closest validated analogue to the planned biofeedback feature; evidence the paradigm works and pointer to individualized-target design.
+  - (paper) Gender-Affirming Voice Training effectiveness (Quinn/Swanson, JSLHR 2023) | https://pubs.asha.org/doi/10.1044/2023_JSLHR-23-00258 [lic:Journal article (paywalled)]
+      use: Outcome benchmark and target metrics (vocal satisfaction, listener perception) any VC-coaching feature should track.
+  - (paper) Voice Femininity Percentage / Voice Passing (Mauclair et al., arXiv:2404.15176) | https://arxiv.org/abs/2404.15176 [lic:arXiv preprint]
+      use: Provides the perceptual-passing scoring concept (continuous % rather than binary) and listener-uncertainty data for the pass/uncertain/no-pass classifier.
+IMPLICATIONS: Concrete implications for the NN/LLM pass-detection + voice-coaching tool:
+
+1) Add a VC-powered 'target preview / shifted self' feature, but keep it clearly separate from the pass detector. The most-requested community use is hearing oneself shifted toward a target. Two complementary modes: (a) zero-shot target-exemplar preview (Seed-VC-style) so a user picks/uploads a target-gender reference voice and hears their own speech rendered in it — great for goal-setting; and (b) explicit-control preview using DDSP/StreamVC-style soft-F0 + spectral-envelope so the user can independently move PITCH and RESONANCE sliders and hear the effect — which maps onto what voice therapy actually trains (resonance/formants, not just F0). Crucially, evaluate the user's OWN unaided voice with the pass detector, never the VC-converted audio, or the pass score becomes meaningless.
+
+2) On-device feasibility is real. LLVC (MIT, <20 ms, 2.8× real-time on CPU) and StreamVC (70.8 ms on a Pixel-7 CPU core) prove a live mic-to-ear loop is achievable without a GPU and even on a phone — viable for a browser/WASM or mobile biofeedback loop. RVC's ~90–170 ms is acceptable for non-conversational practice but borderli
