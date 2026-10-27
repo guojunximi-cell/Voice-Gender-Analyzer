@@ -500,7 +500,8 @@ body {
 /* Export dialog (range + content options). Uses native <dialog>.
    --bg-primary 不存在，必须用 --surface（白）；UA 默认居中，再加
    margin:auto 防外层 transform 影响。 */
-.export-dialog {
+.export-dialog,
+.survey-dialog {
 	border: 1px solid var(--border-strong);
 	border-radius: var(--radius-md);
 	background: var(--surface);
@@ -511,7 +512,8 @@ body {
 	box-shadow: var(--shadow-md);
 	margin: auto;
 }
-.export-dialog::backdrop {
+.export-dialog::backdrop,
+.survey-dialog::backdrop {
 	background: rgba(0, 0, 0, 0.35);
 }
 .export-dialog-form {
@@ -520,7 +522,8 @@ body {
 	gap: 16px;
 	padding: 20px 22px;
 }
-.export-dialog-title {
+.export-dialog-title,
+.survey-title {
 	margin: 0;
 	font-size: 1rem;
 	font-weight: 600;
@@ -568,6 +571,292 @@ body {
 	justify-content: flex-end;
 	gap: 10px;
 	margin-top: 4px;
+}
+
+/* Survey dialog（survey.js）：外框 / backdrop / 标题与 export-dialog 共用上面的规则。
+   内部元素多带 [hidden] 切换，显式压住 display:flex。 */
+.survey-dialog {
+	max-width: 520px;
+	max-height: calc(100dvh - 32px);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.survey-dialog [hidden],
+.survey-prompt[hidden] {
+	display: none !important;
+}
+.survey-form {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 20px 22px;
+}
+.survey-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+}
+.survey-intro {
+	margin: 0;
+	font-size: 0.8rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+.survey-questions {
+	display: flex;
+	flex-direction: column;
+	gap: 22px;
+}
+.survey-section {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+.survey-section-title {
+	margin: 0;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--border);
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.survey-q {
+	border: none;
+	padding: 0;
+	margin: 0;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.survey-q-label {
+	padding: 0;
+	font-size: 0.9rem;
+	font-weight: 500;
+	line-height: 1.45;
+	color: var(--text-primary);
+}
+.survey-req {
+	margin-left: 4px;
+	color: var(--accent);
+}
+.survey-options {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	gap: 2px 8px;
+}
+.survey-option {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	font-size: 0.875rem;
+	line-height: 1.4;
+	color: var(--text-primary);
+	cursor: pointer;
+	padding: 5px 6px;
+	border-radius: var(--radius-sm);
+}
+.survey-option:hover {
+	background: var(--accent-subtle);
+}
+.survey-option input {
+	margin-top: 2px;
+	flex-shrink: 0;
+	accent-color: var(--accent);
+}
+.survey-option.is-disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+.survey-option.is-disabled:hover {
+	background: none;
+}
+.survey-other-input,
+.survey-textarea {
+	margin-bottom: 0;
+}
+textarea.survey-textarea {
+	resize: vertical;
+	height: 88px;
+}
+/* 1–5 / 0–10 分段按钮：radio 视觉隐藏但保留可聚焦，选中态画在 span 上 */
+.survey-scale {
+	display: grid;
+	grid-template-columns: repeat(var(--survey-scale-n), minmax(0, 1fr));
+	gap: 4px;
+}
+.survey-scale-item {
+	position: relative;
+	cursor: pointer;
+}
+.survey-scale-item input {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	margin: 0;
+	cursor: pointer;
+}
+.survey-scale-item span {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 36px;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+	background: var(--bg-secondary);
+	font-size: 0.875rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+	transition:
+		background var(--transition),
+		border-color var(--transition),
+		color var(--transition);
+}
+.survey-scale-item:hover span {
+	border-color: var(--accent);
+}
+.survey-scale-item input:checked + span {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+.survey-scale-item input:focus-visible + span {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+.survey-scale-anchors {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+.survey-scale-anchors span:last-child {
+	text-align: right;
+}
+.survey-gotcha {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+}
+.survey-actions {
+	position: sticky;
+	bottom: 0;
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin: 4px -22px -20px;
+	padding: 12px 22px 16px;
+	border-top: 1px solid var(--border);
+	background: var(--surface);
+}
+.survey-thanks {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	padding: 32px 24px 24px;
+	text-align: center;
+}
+.survey-thanks p {
+	margin: 0;
+	font-size: 0.875rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+.survey-thanks .btn-primary {
+	margin-top: 10px;
+}
+.survey-thanks-emoji {
+	font-size: 2.2rem;
+	line-height: 1;
+}
+/* 反馈浮层里的问卷入口 */
+.survey-entry {
+	display: block;
+	width: 100%;
+	margin: -4px 0 12px;
+	padding: 8px 11px;
+	border: 1px dashed var(--accent-border);
+	border-radius: var(--radius-sm);
+	background: var(--accent-subtle);
+	color: var(--accent);
+	font: inherit;
+	font-size: 0.85rem;
+	font-weight: 500;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color var(--transition);
+}
+.survey-entry:hover {
+	border-color: var(--accent);
+}
+/* 首次进站提示卡：贴在反馈按钮上方（与 .vga-feedback-modal 同锚点） */
+.survey-prompt {
+	position: fixed;
+	right: 28px;
+	bottom: 86px;
+	z-index: 9998;
+	width: 280px;
+	padding: 16px 18px 14px;
+	box-shadow: var(--shadow-md);
+	animation: vgaPopIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.survey-prompt-text {
+	margin: 0 18px 12px 0;
+	font-size: 0.9rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+}
+.survey-prompt-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+.survey-prompt-close {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	display: flex;
+	padding: 4px;
+	border: none;
+	border-radius: var(--radius-sm);
+	background: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+.survey-prompt-close:hover {
+	background: var(--surface-hover);
+	color: var(--text-primary);
+}
+@media (max-width: 480px) {
+	.survey-form {
+		padding: 18px 16px;
+	}
+	.survey-actions {
+		margin: 4px -16px -18px;
+		padding: 12px 16px 14px;
+	}
+	.survey-options {
+		grid-template-columns: 1fr;
+	}
+	.survey-scale {
+		gap: 3px;
+	}
+	.survey-scale-item span {
+		height: 34px;
+		font-size: 0.8rem;
+	}
+	.survey-prompt {
+		left: 16px;
+		right: 16px;
+		width: auto;
+	}
 }
 
 .btn-primary {

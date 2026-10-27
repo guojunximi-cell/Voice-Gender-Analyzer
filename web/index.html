@@ -1385,6 +1385,17 @@
 									提交反馈 / Issue
 								</a>
 							</li>
+							<!-- 只在反馈按钮被长按隐藏后出现；显隐由底部反馈脚本的 setHidden() 控制 -->
+							<li id="feedback-restore-item" hidden>
+								<button
+									type="button"
+									class="vga-help-link-btn"
+									id="feedback-restore"
+									data-i18n="help.links.showFeedback"
+								>
+									重新显示反馈按钮
+								</button>
+							</li>
 						</ul>
 					</div>
 					<div class="vga-help-links-group">
@@ -1973,6 +1984,26 @@
 				color: var(--female);
 				border-bottom-color: var(--female);
 			}
+			/* 帮助里的动作项（不是外链）：去掉按钮默认样式，外观对齐上面的 a */
+			.vga-help-link-btn {
+				appearance: none;
+				background: none;
+				border: none;
+				border-bottom: 1px dashed var(--border);
+				border-radius: 0;
+				padding: 0 0 1px;
+				font: inherit;
+				font-size: 0.84rem;
+				color: var(--text-primary);
+				cursor: pointer;
+				transition:
+					color var(--transition),
+					border-color var(--transition);
+			}
+			.vga-help-link-btn:hover {
+				color: var(--female);
+				border-bottom-color: var(--female);
+			}
 
 			/* ── Mobile breakpoint ─────────────────────────── */
 			@media (max-width: 520px) {
@@ -2293,6 +2324,7 @@
 					</svg>
 				</button>
 			</div>
+			<button type="button" class="survey-entry" id="survey-entry" data-i18n="survey.entry">📋 填写问卷</button>
 			<form id="vgaFeedbackForm" action="https://formspree.io/f/xreolvln" method="POST">
 				<input
 					type="email"
@@ -2317,25 +2349,147 @@
 			</form>
 		</div>
 
+		<!-- 📋 问卷调查：题目由 survey.js 按 QUESTIONS 配置生成到 #survey-questions；
+		     提交复用上面 #vgaFeedbackForm 的 Formspree action，只发问卷答案 -->
+		<div class="survey-prompt card" id="survey-prompt" role="dialog" aria-labelledby="survey-prompt-text" hidden>
+			<button
+				type="button"
+				class="survey-prompt-close"
+				id="survey-prompt-close"
+				data-i18n-aria-label="feedback.close"
+				aria-label="关闭"
+			>
+				<svg
+					width="12"
+					height="12"
+					viewBox="0 0 16 16"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+				>
+					<path d="M3 3l10 10M13 3L3 13" />
+				</svg>
+			</button>
+			<p class="survey-prompt-text" id="survey-prompt-text" data-i18n="survey.prompt.text">
+				🦆 花 1–2 分钟帮鸭鸭变得更好？
+			</p>
+			<div class="survey-prompt-actions">
+				<button type="button" class="btn-secondary" id="survey-prompt-dismiss" data-i18n="survey.prompt.dismiss">
+					不了，谢谢
+				</button>
+				<button type="button" class="btn-primary" id="survey-prompt-open" data-i18n="survey.prompt.open">
+					填写问卷
+				</button>
+			</div>
+		</div>
+
+		<dialog id="survey-dialog" class="survey-dialog" aria-labelledby="survey-title">
+			<form id="survey-form" class="survey-form" novalidate>
+				<div class="survey-header">
+					<h3 class="survey-title" id="survey-title" data-i18n="survey.title">鸭鸭小问卷</h3>
+					<button
+						type="button"
+						class="icon-btn"
+						id="survey-close"
+						data-i18n-aria-label="feedback.close"
+						aria-label="关闭"
+					>
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 16 16"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.6"
+							stroke-linecap="round"
+						>
+							<path d="M3 3l10 10M13 3L3 13" />
+						</svg>
+					</button>
+				</div>
+				<p class="survey-intro">
+					<span data-i18n="survey.intro">匿名问卷，只提交你的回答，不包含音频、分析结果或邮箱。</span>
+					<span data-i18n="survey.requiredHint">带 * 的为必填。</span>
+				</p>
+				<div class="survey-questions" id="survey-questions"></div>
+				<!-- Formspree 蜜罐：真人看不到，机器人填了会被静默丢弃 -->
+				<input type="text" name="_gotcha" class="survey-gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" />
+				<div class="survey-actions">
+					<button type="button" class="btn-secondary" id="survey-cancel" data-i18n="action.cancel">取消</button>
+					<button type="submit" class="btn-primary" id="survey-submit" data-i18n="action.send" disabled>发送</button>
+				</div>
+			</form>
+			<div class="survey-thanks" id="survey-thanks" hidden>
+				<div class="survey-thanks-emoji" aria-hidden="true">🦆</div>
+				<h3 class="survey-title" data-i18n="survey.thanks.title">谢谢你！</h3>
+				<p data-i18n="survey.thanks.body">你的回答已收到，鸭鸭会认真看的。</p>
+				<p id="survey-thanks-intro" data-i18n="survey.thanks.introHint" hidden>
+					多用几次之后，欢迎从右下角的反馈按钮回来补充使用体验。
+				</p>
+				<button type="button" class="btn-primary" id="survey-thanks-close" data-i18n="feedback.close">关闭</button>
+			</div>
+		</dialog>
+		<!-- 📋 问卷调查结束 -->
+
 		<script>
 			function toggleVgaFeedback() {
 				document.getElementById("vgaFeedbackModal").classList.toggle("show");
 			}
 
+			// main.js（module，defer）挂上 window.__vgaI18n 之前调用会回落成 key 本身
+			const _fbT = (k) => {
+				try {
+					return window.__vgaI18n.t(k);
+				} catch (_) {
+					return k;
+				}
+			};
+
 			// 反馈按钮交互：短按打开浮层、长按 800ms 隐藏、超过阈值的拖拽则移动按钮
-			// URL 带 ?feedback=1 可强制恢复隐藏的按钮；位置持久化在 localStorage
+			// 隐藏后可在「使用帮助」里恢复（URL 带 ?feedback=1 也行）；位置持久化在 localStorage
 			(function () {
 				const btn = document.getElementById("vgaFeedbackBtn");
 				const modal = document.getElementById("vgaFeedbackModal");
-				const HIDE_KEY = "vga.feedbackHidden";
+				const restoreItem = document.getElementById("feedback-restore-item");
+				// v1 的隐藏只能靠 ?feedback=1 恢复，大多数人关掉就再也找不到——升 v2 时清掉旧记录，
+				// 让所有人的按钮回来一次
+				const HIDE_KEY = "vga.feedbackHidden.v2";
+				const LEGACY_HIDE_KEY = "vga.feedbackHidden";
 				const POS_KEY = "vga.feedbackPos";
 				const DRAG_THRESHOLD = 6;
 				const MARGIN = 12;
+
+				const flashToast = (key) => {
+					const toast = document.getElementById("toast");
+					if (!toast) return;
+					toast.textContent = _fbT(key);
+					toast.classList.add("show");
+					setTimeout(() => toast.classList.remove("show"), 4000);
+				};
+				// 隐藏状态的唯一出入口：持久化 + 按钮显隐 + 帮助里的恢复入口显隐
+				const setHidden = (hidden) => {
+					try {
+						if (hidden) localStorage.setItem(HIDE_KEY, "1");
+						else localStorage.removeItem(HIDE_KEY);
+					} catch (_) {}
+					btn.style.display = hidden ? "none" : "";
+					if (restoreItem) restoreItem.hidden = !hidden;
+				};
+
+				let storedHidden = false;
+				try {
+					localStorage.removeItem(LEGACY_HIDE_KEY);
+					storedHidden = localStorage.getItem(HIDE_KEY) === "1";
+				} catch (_) {}
 				const forceShow = new URLSearchParams(location.search).get("feedback") === "1";
-				if (!forceShow && localStorage.getItem(HIDE_KEY) === "1") {
-					btn.style.display = "none";
-					return;
-				}
+				if (forceShow) setHidden(false);
+				else if (storedHidden) setHidden(true);
+
+				document.getElementById("feedback-restore")?.addEventListener("click", () => {
+					setHidden(false);
+					flashToast("toast.showFeedback");
+				});
 
 				const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 				const isCustomPos = () => btn.style.left !== "" && btn.style.top !== "";
@@ -2426,15 +2580,10 @@
 						btn.classList.remove("is-longpress", "is-longpress-warn");
 						btn.classList.add("is-longpress-done");
 						modal.classList.remove("show");
-						localStorage.setItem(HIDE_KEY, "1");
-						const toast = document.getElementById("toast");
-						if (toast) {
-							toast.textContent = "已隐藏反馈按钮（URL 加 ?feedback=1 可恢复）";
-							toast.classList.add("show");
-							setTimeout(() => toast.classList.remove("show"), 2600);
-						}
+						flashToast("toast.hideFeedback");
+						// 等 is-longpress-done 的缩小动画播完再真正隐藏
 						setTimeout(() => {
-							btn.style.display = "none";
+							setHidden(true);
 							btn.classList.remove("is-longpress-done");
 						}, 440);
 					}, 800);
@@ -2516,13 +2665,6 @@
 			document.getElementById("vgaFeedbackForm").addEventListener("submit", async function (e) {
 				e.preventDefault(); // 阻止默认的表单跳转
 				const form = e.target;
-				const _fbT = (k) => {
-					try {
-						return window.__vgaI18n.t(k);
-					} catch (_) {
-						return k;
-					}
-				};
 				submitBtn.textContent = _fbT("action.sending");
 				submitBtn.disabled = true;
 

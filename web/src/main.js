@@ -39,6 +39,7 @@ import {
 	saveSession,
 	removeSession as storeRemoveSession,
 } from "./modules/session-store.js";
+import { mountSurvey } from "./modules/survey.js";
 import { setupUploader } from "./modules/uploader.js";
 import {
 	destroyWaveform,
@@ -1520,6 +1521,8 @@ function _initAcousticDashboard() {
 
 // ─── Boot ─────────────────────────────────────────────────────
 initTheme();
+// 先生成问卷 DOM，下面的 applyStaticDom() 一并填上文案
+mountSurvey();
 applyStaticDom();
 _updateLangToggleLabel();
 _updateLangMenuActive();
